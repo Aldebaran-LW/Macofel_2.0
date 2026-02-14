@@ -1,28 +1,36 @@
-export type Expense = {
-  id: string
-  amount: number
-  category: string
-  description: string
-  date: Date
-}
-
-export type ExpenseFormData = Omit<Expense, 'id' | 'date'> & {
-  date: string
-}
-
-export const EXPENSE_CATEGORIES = [
-  'Food',
-  'Transportation',
-  'Housing',
-  'Utilities',
-  'Entertainment',
-  'Healthcare',
-  'Shopping',
-  'Education',
-  'Other'
-] as const
+// Types for MACOFEL E-commerce
 
 export type DateRange = {
   from: Date | undefined
   to: Date | undefined
 }
+
+// Product types
+export type Product = {
+  id: string
+  name: string
+  slug: string
+  description: string
+  price: number
+  stock: number
+  imageUrl: string | null
+  categoryId: string
+  featured: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Category types
+export type Category = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Order types
+export type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
+
+export type UserRole = 'CLIENT' | 'ADMIN'
