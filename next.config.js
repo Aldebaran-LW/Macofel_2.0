@@ -4,9 +4,7 @@ const path = require('path');
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   output: process.env.NEXT_OUTPUT_MODE,
-  experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../'),
-  },
+  // Removido outputFileTracingRoot experimental que causa erro routes-manifest.json na Vercel
   eslint: {
     ignoreDuringBuilds: true,
   },
