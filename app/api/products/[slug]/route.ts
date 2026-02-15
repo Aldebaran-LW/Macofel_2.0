@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import mongoPrisma from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const product = await prisma.product.findUnique({
+    const product = await mongoPrisma.product.findUnique({
       where: { slug: params?.slug },
       include: { category: true },
     });

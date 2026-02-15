@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
-import { ShoppingCart, User, LogOut, Package, Menu, X } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Menu, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ export default function Header() {
   const { data: session, status } = useSession() ?? {};
   const [cartCount, setCartCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
 
@@ -25,6 +26,14 @@ export default function Header() {
       fetchCartCount();
     }
   }, [mounted, session]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const fetchCartCount = async () => {
     try {
@@ -49,133 +58,137 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 shadow-sm">
-      <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3">
-            <div className="relative h-10 w-32">
+    <nav className={`fixed w-full z-50 glass-nav transition-all ${scrolled ? 'shadow-xl' : ''}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-24">
+          {/* Logo Macofel */}
+          <Link href="/" className="flex items-center gap-4">
+            <div className="relative h-16 w-auto">
               <Image
-                src="/logo.jpeg"
-                alt="MACOFEL Logo"
-                fill
-                className="object-contain"
-                priority
+                src="/logo-macofel.png"
+                alt="Logo MACOFEL"
+                width={64}
+                height={64}
+                className="h-16 w-auto object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
+            </div>
+            <div className="flex flex-col leading-none">
+              <span className="text-3xl font-black font-title tracking-tighter text-slate-900 italic">
+                MACO<span className="macofel-red">FEL</span>
+              </span>
+              <span className="text-[9px] font-bold tracking-[0.2em] text-slate-500 uppercase">Materiais para Construção</span>
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link
-              href="/"
-              className="text-sm font-medium text-gray-700 hover:text-red-600 transition-colors"
-            >
-              Início
-            </Link>
-            <Link
-              href="/catalogo"
-              className="text-sm font-medium text-gray-700 hover:text-red-600 transition-colors"
-            >
-              Catálogo
-            </Link>
+          {/* Desktop Menu */}
+          <div className="hidden lg:flex items-center space-x-8 font-bold text-xs uppercase tracking-widest">
+            <Link href="#inicio" className="macofel-red">Início</Link>
+            <Link href="#categorias" className="hover:text-red-600 transition-colors">Categorias</Link>
+            <Link href="#produtos" className="hover:text-red-600 transition-colors">Produtos</Link>
+            <Link href="#orcamento" className="hover:text-red-600 transition-colors">Orçamentos</Link>
             {session?.user && (
-              <Link
-                href="/meus-pedidos"
-                className="text-sm font-medium text-gray-700 hover:text-red-600 transition-colors"
-              >
-                Meus Pedidos
-              </Link>
+              <Link href="/meus-pedidos" className="hover:text-red-600 transition-colors">Meus Pedidos</Link>
             )}
-          </nav>
+            {isAdmin && (
+              <Link href="/admin" className="hover:text-red-600 transition-colors">Admin</Link>
+            )}
+          </div>
 
           {/* Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4">
+            <button className="p-2 hover:bg-slate-100 rounded-full transition-colors relative">
+              <Search className="w-5 h-5" />
+            </button>
+            
             {status === 'loading' ? (
               <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
             ) : session?.user ? (
               <>
-                {isAdmin && (
-                  <Link href="/admin">
-                    <Button variant="outline" size="sm" className="hidden sm:flex">
-                      <Package className="h-4 w-4 mr-2" />
-                      Painel Admin
-                    </Button>
-                  </Link>
-                )}
                 {!isAdmin && (
-                  <Link href="/carrinho" className="relative">
-                    <Button variant="outline" size="icon">
-                      <ShoppingCart className="h-5 w-5" />
-                      {cartCount > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {cartCount}
-                        </span>
-                      )}
-                    </Button>
+                  <Link href="/carrinho" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <ShoppingCart className="w-5 h-5" />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {cartCount}
+                      </span>
+                    )}
                   </Link>
                 )}
-                <Link href="/perfil">
-                  <Button variant="outline" size="icon">
-                    <User className="h-5 w-5" />
-                  </Button>
+                <Link href="/perfil" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <User className="w-5 h-5" />
                 </Link>
-                <Button variant="ghost" size="icon" onClick={handleLogout}>
-                  <LogOut className="h-5 w-5" />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-slate-100 rounded-full"
+                >
+                  <LogOut className="w-5 h-5" />
                 </Button>
               </>
             ) : (
-              <div className="flex items-center space-x-2">
-                <Link href="/login">
-                  <Button variant="outline" size="sm">
-                    Entrar
-                  </Button>
+              <>
+                <Link href="/login" className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all active:scale-95">
+                  Falar com Consultor
                 </Link>
-                <Link href="/cadastro">
-                  <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                    Cadastrar
-                  </Button>
-                </Link>
-              </div>
+                <button 
+                  className="lg:hidden p-2"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                >
+                  {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+              </>
             )}
 
-            {/* Mobile Menu Toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </Button>
+            {!session?.user && (
+              <button 
+                className="lg:hidden p-2"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-2 border-t">
+          <div className="lg:hidden py-4 space-y-2 border-t border-slate-200">
             <Link
-              href="/"
-              className="block py-2 text-sm font-medium text-gray-700 hover:text-red-600"
+              href="#inicio"
+              className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
               onClick={() => setMobileMenuOpen(false)}
             >
               Início
             </Link>
             <Link
-              href="/catalogo"
-              className="block py-2 text-sm font-medium text-gray-700 hover:text-red-600"
+              href="#categorias"
+              className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Catálogo
+              Categorias
+            </Link>
+            <Link
+              href="#produtos"
+              className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Produtos
+            </Link>
+            <Link
+              href="#orcamento"
+              className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Orçamentos
             </Link>
             {session?.user && (
               <Link
                 href="/meus-pedidos"
-                className="block py-2 text-sm font-medium text-gray-700 hover:text-red-600"
+                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Meus Pedidos
@@ -184,15 +197,33 @@ export default function Header() {
             {isAdmin && (
               <Link
                 href="/admin"
-                className="block py-2 text-sm font-medium text-gray-700 hover:text-red-600"
+                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Painel Admin
+                Admin
               </Link>
+            )}
+            {!session?.user && (
+              <div className="pt-4 border-t border-slate-200 space-y-2">
+                <Link
+                  href="/login"
+                  className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Entrar
+                </Link>
+                <Link
+                  href="/cadastro"
+                  className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Cadastrar
+                </Link>
+              </div>
             )}
           </div>
         )}
       </div>
-    </header>
+    </nav>
   );
 }

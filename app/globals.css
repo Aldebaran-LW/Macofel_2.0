@@ -4,6 +4,21 @@
 
 @layer base {
   :root {
+    --font-inter: 'Inter', sans-serif;
+    --font-montserrat: 'Montserrat', sans-serif;
+  }
+  
+  body {
+    font-family: var(--font-inter);
+  }
+  
+  .font-title {
+    font-family: var(--font-montserrat);
+  }
+}
+
+@layer base {
+  :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -93,4 +108,39 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #b91c1c;
+}
+
+/* MACOFEL Brand Colors */
+.macofel-red {
+  color: #E31E24;
+}
+
+.bg-macofel-red {
+  background-color: #E31E24;
+}
+
+.border-macofel-red {
+  border-color: #E31E24;
+}
+
+.red-glow {
+  box-shadow: 0 0 20px rgba(227, 30, 36, 0.3);
+}
+
+/* Glass Navigation */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Hero Gradient */
+.hero-gradient {
+  background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+}
+
+/* Product Card Hover */
+.product-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }

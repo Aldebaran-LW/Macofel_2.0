@@ -1,71 +1,100 @@
 import Link from 'next/link';
-import { MapPin, Phone, Mail } from 'lucide-react';
+import Image from 'next/image';
+import { MapPin, Clock, Instagram, Linkedin, Facebook, Send } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-300 border-t border-gray-700">
-      <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-          {/* Sobre */}
-          <div>
-            <h3 className="text-white font-bold text-2xl mb-4 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
-              MACOFEL
-            </h3>
-            <p className="text-sm leading-relaxed text-gray-400">
-              Sua loja completa de materiais para construção. Qualidade e confiança há anos no mercado.
-              Transforme seus projetos em realidade com os melhores produtos.
+    <footer className="bg-white pt-24 pb-12 border-t border-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-16 mb-20">
+          <div className="col-span-1">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="relative h-12 w-auto">
+                <Image
+                  src="/logo-macofel.png"
+                  alt="Logo MACOFEL"
+                  width={48}
+                  height={48}
+                  className="h-12 w-auto object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="text-3xl font-black font-title tracking-tighter text-slate-900 italic uppercase">
+                  MACO<span className="text-red-600">FEL</span>
+                </span>
+              </div>
+            </div>
+            <p className="text-slate-500 text-sm leading-relaxed mb-8">
+              Desde 1998 a construir relações de confiança com os profissionais da construção em todo o país.
             </p>
+            <div className="flex gap-4">
+              <a href="#" className="w-10 h-10 bg-slate-950 text-white flex items-center justify-center rounded-lg hover:bg-red-600 transition-all">
+                <Instagram className="w-5 h-5" />
+              </a>
+              <a href="#" className="w-10 h-10 bg-slate-950 text-white flex items-center justify-center rounded-lg hover:bg-red-600 transition-all">
+                <Linkedin className="w-5 h-5" />
+              </a>
+              <a href="#" className="w-10 h-10 bg-slate-950 text-white flex items-center justify-center rounded-lg hover:bg-red-600 transition-all">
+                <Facebook className="w-5 h-5" />
+              </a>
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-black text-slate-900 mb-8 uppercase text-xs tracking-[0.2em]">Departamentos</h4>
+            <ul className="space-y-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+              <li><Link href="/catalogo" className="hover:text-red-600 transition-colors">Venda a Grosso</Link></li>
+              <li><Link href="/catalogo" className="hover:text-red-600 transition-colors">Retalho Técnico</Link></li>
+              <li><Link href="#orcamento" className="hover:text-red-600 transition-colors">Logística Integrada</Link></li>
+              <li><Link href="#orcamento" className="hover:text-red-600 transition-colors">Consultoria Técnica</Link></li>
+            </ul>
           </div>
 
-          {/* Links */}
           <div>
-            <h3 className="text-white font-bold text-lg mb-6">Links Rápidos</h3>
-            <ul className="space-y-3">
-              <li>
-                <Link href="/" className="text-sm hover:text-red-400 transition-colors flex items-center group">
-                  <span className="w-0 group-hover:w-2 h-0.5 bg-red-500 mr-0 group-hover:mr-2 transition-all duration-300"></span>
-                  Início
-                </Link>
+            <h4 className="font-black text-slate-900 mb-8 uppercase text-xs tracking-[0.2em]">Onde Estamos</h4>
+            <ul className="space-y-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+              <li className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>Armazém Central - Zona Industrial</span>
               </li>
-              <li>
-                <Link href="/catalogo" className="text-sm hover:text-red-400 transition-colors flex items-center group">
-                  <span className="w-0 group-hover:w-2 h-0.5 bg-red-500 mr-0 group-hover:mr-2 transition-all duration-300"></span>
-                  Catálogo
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="text-sm hover:text-red-400 transition-colors flex items-center group">
-                  <span className="w-0 group-hover:w-2 h-0.5 bg-red-500 mr-0 group-hover:mr-2 transition-all duration-300"></span>
-                  Entrar
-                </Link>
+              <li className="flex items-start gap-2">
+                <Clock className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>Seg-Sex: 08:00 - 19:00</span>
               </li>
             </ul>
           </div>
 
-          {/* Contato */}
           <div>
-            <h3 className="text-white font-bold text-lg mb-6">Contato</h3>
-            <ul className="space-y-4">
-              <li className="flex items-start space-x-3 group">
-                <MapPin className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm text-gray-400 group-hover:text-white transition-colors">São Paulo, SP - Brasil</span>
-              </li>
-              <li className="flex items-center space-x-3 group">
-                <Phone className="h-5 w-5 text-red-500 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="text-sm text-gray-400 group-hover:text-white transition-colors">(11) 3333-3333</span>
-              </li>
-              <li className="flex items-center space-x-3 group">
-                <Mail className="h-5 w-5 text-red-500 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="text-sm text-gray-400 group-hover:text-white transition-colors">contato@macofel.com</span>
-              </li>
-            </ul>
+            <h4 className="font-black text-slate-900 mb-8 uppercase text-xs tracking-[0.2em]">Newsletter Profissional</h4>
+            <form className="flex gap-2" action="/api/newsletter" method="POST">
+              <input 
+                type="email" 
+                name="email"
+                placeholder="Email" 
+                className="flex-1 bg-slate-100 border-none rounded-lg px-4 py-4 text-xs focus:ring-1 focus:ring-red-600 outline-none"
+                required
+              />
+              <button 
+                type="submit"
+                className="bg-red-600 text-white p-4 rounded-lg hover:bg-red-700 transition-all"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </form>
+            <p className="text-[10px] text-slate-400 mt-4 uppercase font-bold tracking-tighter">Ofertas exclusivas para profissionais cadastrados.</p>
           </div>
         </div>
-
-        <div className="mt-12 pt-8 border-t border-gray-700 text-center">
-          <p className="text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} MACOFEL. Todos os direitos reservados.
-          </p>
+        
+        <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">
+          <p>&copy; 2026 MACOFEL - MATERIAIS PARA CONSTRUÇÃO, LDA. DESENVOLVIDO PARA PERFORMANCE.</p>
+          <div className="flex gap-8">
+            <Link href="#" className="hover:text-red-600">Privacidade</Link>
+            <Link href="#" className="hover:text-red-600">Certificações</Link>
+            <Link href="#" className="hover:text-red-600">Brasil</Link>
+          </div>
         </div>
       </div>
     </footer>

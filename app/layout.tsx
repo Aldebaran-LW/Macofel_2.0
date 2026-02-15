@@ -1,11 +1,22 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Montserrat } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
 import SessionProviderWrapper from '@/components/session-provider-wrapper';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ 
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const montserrat = Montserrat({ 
+  subsets: ['latin'],
+  weight: ['700', '800', '900'],
+  variable: '--font-montserrat',
+  display: 'swap',
+});
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +50,7 @@ export default function RootLayout({
       <head>
         <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${montserrat.variable} font-sans`}>
         <SessionProviderWrapper>
           <ThemeProvider
             attribute="class"
