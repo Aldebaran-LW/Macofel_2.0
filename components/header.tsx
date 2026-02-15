@@ -65,7 +65,7 @@ export default function Header() {
           <Link href="/" className="flex items-center gap-4">
             <div className="relative h-16 w-auto">
               <Image
-                src="/logo-macofel.png"
+src="/logo-macofel.jpeg"
                 alt="Logo MACOFEL"
                 width={64}
                 height={64}
