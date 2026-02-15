@@ -3,19 +3,14 @@ import Image from 'next/image';
 import { Package, Truck, ShieldCheck, Clock, ArrowRight, Award, Users, Search, ShoppingCart, Menu, Phone, Mail, MapPin, Instagram, Linkedin, Facebook, Send, HardHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ClientLayoutWrapper from '@/components/client-layout-wrapper';
-import prisma from '@/lib/db';
+import { getProducts, getCategories } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
 async function getFeaturedProducts() {
   try {
-    const products = await prisma.product.findMany({
-      where: { featured: true },
-      include: { category: true },
-      take: 4,
-      orderBy: { createdAt: 'desc' },
-    });
-    return products ?? [];
+    const result = await getProducts({ featured: true, limit: 4 });
+    return result.products ?? [];
   } catch (error) {
     console.error('Erro ao buscar produtos em destaque:', error);
     return [];
@@ -24,11 +19,8 @@ async function getFeaturedProducts() {
 
 async function getCategories() {
   try {
-    const categories = await prisma.category.findMany({
-      take: 3,
-      orderBy: { name: 'asc' },
-    });
-    return categories ?? [];
+    const categories = await getCategories();
+    return categories.slice(0, 3) ?? [];
   } catch (error) {
     console.error('Erro ao buscar categorias:', error);
     return [];

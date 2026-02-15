@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoPrisma from '@/lib/mongodb';
+import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,59 +14,27 @@ export async function GET(req: NextRequest) {
     const maxPrice = parseFloat(searchParams.get('maxPrice') ?? '999999');
     const featured = searchParams.get('featured') === 'true';
 
-    const skip = (page - 1) * limit;
-
-    const where: any = {};
-    
-    // Aplicar filtro de preço apenas se valores válidos forem fornecidos
-    if (minPrice > 0 || maxPrice < 999999) {
-      where.price = {};
-      if (minPrice > 0) where.price.gte = minPrice;
-      if (maxPrice < 999999) where.price.lte = maxPrice;
-    }
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    if (categorySlug) {
-      where.category = { slug: categorySlug };
-    }
-
-    if (featured) {
-      where.featured = true;
-    }
-
-    const [products, total] = await Promise.all([
-      mongoPrisma.product.findMany({
-        where,
-        include: { category: true },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      mongoPrisma.product.count({ where }),
-    ]);
+    const result = await getProducts({
+      search: search || undefined,
+      categorySlug: categorySlug || undefined,
+      minPrice: minPrice > 0 ? minPrice : undefined,
+      maxPrice: maxPrice < 999999 ? maxPrice : undefined,
+      featured: featured || undefined,
+      page,
+      limit,
+    });
 
     return NextResponse.json({
-      products,
+      products: result.products,
       pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
       },
     });
   } catch (error: any) {
     console.error('Erro ao buscar produtos:', error);
-    console.error('Detalhes do erro:', {
-      message: error?.message,
-      code: error?.code,
-      meta: error?.meta,
-    });
     
     return NextResponse.json(
       { 

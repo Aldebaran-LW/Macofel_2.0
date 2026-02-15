@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoPrisma from '@/lib/mongodb';
+import { getProductBySlug } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,10 +8,7 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const product = await mongoPrisma.product.findUnique({
-      where: { slug: params?.slug },
-      include: { category: true },
-    });
+    const product = await getProductBySlug(params?.slug || '');
 
     if (!product) {
       return NextResponse.json(
