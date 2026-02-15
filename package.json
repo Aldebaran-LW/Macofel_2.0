@@ -3,11 +3,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "npm run prisma:generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && next build"
+    "postinstall": "npm run prisma:generate",
+    "vercel-build": "npm run prisma:generate && next build",
+    "prisma:generate": "prisma generate --schema=./prisma/schema-mongodb.prisma && prisma generate --schema=./prisma/schema-postgres.prisma",
+    "prisma:migrate": "tsx --require dotenv/config scripts/migrate-to-mongodb.ts",
+    "prisma:seed": "tsx --require dotenv/config scripts/seed.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

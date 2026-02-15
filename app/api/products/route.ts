@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import mongoPrisma from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,14 +41,14 @@ export async function GET(req: NextRequest) {
     }
 
     const [products, total] = await Promise.all([
-      prisma.product.findMany({
+      mongoPrisma.product.findMany({
         where,
         include: { category: true },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.product.count({ where }),
+      mongoPrisma.product.count({ where }),
     ]);
 
     return NextResponse.json({
