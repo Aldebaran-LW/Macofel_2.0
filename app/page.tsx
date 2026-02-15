@@ -218,15 +218,9 @@ export default async function HomePage() {
                     </h3>
                     <div className="flex items-end justify-between">
                       <p className="text-2xl font-black text-slate-900">R$ {product.price.toFixed(2)}</p>
-                      <button 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.location.href = `/produto/${product.slug}`;
-                        }}
-                        className="bg-slate-900 text-white p-3 rounded-lg hover:bg-red-600 transition-colors"
-                      >
+                      <div className="bg-slate-900 text-white p-3 rounded-lg hover:bg-red-600 transition-colors">
                         <ShoppingCart className="w-5 h-5" />
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </Link>
