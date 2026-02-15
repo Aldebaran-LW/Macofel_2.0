@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import mongoPrisma from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await mongoPrisma.category.findMany({
       orderBy: { name: 'asc' },
       include: {
         _count: {

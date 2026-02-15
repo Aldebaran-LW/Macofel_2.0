@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import prisma from '@/lib/db';
+import mongoPrisma from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,7 @@ export async function PATCH(
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';
 
-    const product = await prisma.product.update({
+    const product = await mongoPrisma.product.update({
       where: { id: params?.productId },
       data: updateData,
       include: { category: true },
@@ -67,7 +67,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
-    await prisma.product.delete({
+    await mongoPrisma.product.delete({
       where: { id: params?.productId },
     });
 

@@ -2,11 +2,11 @@
 
 ## 📋 Estrutura dos Branches
 
-### Branch `main` - Supabase (PostgreSQL)
-- ✅ Usa apenas **Supabase PostgreSQL**
-- ✅ Schema: `prisma/schema.prisma`
-- ✅ Cliente: `lib/db.ts` (Prisma padrão)
-- ✅ Produtos e categorias no PostgreSQL
+### Branch `main` - Frontend Supabase + Backend MongoDB
+- ✅ **Frontend (páginas):** Supabase PostgreSQL (`lib/db.ts`)
+- ✅ **Backend (APIs):** MongoDB (`lib/mongodb.ts`)
+- ✅ Schemas: `prisma/schema-mongodb.prisma` + `prisma/schema-postgres.prisma`
+- ✅ Frontend usa Supabase, APIs de produtos usam MongoDB
 
 ### Branch `mongodb` - Arquitetura Híbrida
 - ✅ Usa **MongoDB** para produtos/categorias
@@ -18,7 +18,7 @@
 
 ### Opção 1: Dois Projetos Separados (Recomendado)
 
-#### Projeto 1: Main (Supabase)
+#### Projeto 1: Main (Frontend Supabase + Backend MongoDB)
 1. Acesse: https://vercel.com
 2. **Add New Project**
 3. Importe: `Aldebaran-LW/Materiais_de_Construcao`
@@ -28,6 +28,7 @@
    - **Framework:** Next.js
 5. **Environment Variables:**
    ```
+   MONGODB_URI=mongodb+srv://Vercel-Admin-materiais_de_construcao:O8ooXYIy89sb5cfR@materiais-de-construcao.zhnnw7g.mongodb.net/?retryWrites=true&w=majority
    DATABASE_URL=postgresql://postgres.vedrmtowoosqxzqxgxpb:LW_Digital_Forge%2F123@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
    NEXTAUTH_URL=https://macofel-main.vercel.app
    NEXTAUTH_SECRET=HED6F6715Emf+xOoK+JVpChsa0WaodxP0tlNmn5/G+Y=
@@ -96,7 +97,7 @@ https://macofel-mongodb.vercel.app
 - [ ] Projeto criado na Vercel
 - [ ] Branch: `main`
 - [ ] Root Directory: `nextjs_space`
-- [ ] 6 variáveis de ambiente (sem MONGODB_URI)
+- [ ] 7 variáveis de ambiente (com MONGODB_URI)
 - [ ] Deploy concluído
 
 ### Branch MongoDB
