@@ -20,7 +20,6 @@ model Category {
   products    Product[]
 
   @@map("categories")
-  @@index([slug])
 }
 
 model Product {
@@ -41,5 +40,4 @@ model Product {
   @@map("products")
   @@index([categoryId])
   @@index([featured])
-  @@index([slug])
 }
