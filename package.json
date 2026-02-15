@@ -10,7 +10,8 @@
     "vercel-build": "npm run prisma:generate && next build",
     "prisma:generate": "prisma generate --schema=./prisma/schema-mongodb.prisma && prisma generate --schema=./prisma/schema-postgres.prisma",
     "prisma:migrate": "tsx --require dotenv/config scripts/migrate-to-mongodb.ts",
-    "prisma:seed": "tsx --require dotenv/config scripts/seed.ts"
+    "prisma:seed": "tsx --require dotenv/config scripts/seed.ts",
+    "seed-mongodb": "tsx --require dotenv/config scripts/seed-mongodb.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

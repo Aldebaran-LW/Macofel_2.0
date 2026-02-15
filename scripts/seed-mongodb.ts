@@ -1,11 +1,5 @@
 // Script para popular MongoDB com produtos iniciais
-// @ts-ignore
-import { PrismaClient as MongoPrisma } from '../.prisma/mongodb-client';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const mongoPrisma = new MongoPrisma();
+import { mongoPrisma } from '../lib/mongodb';
 
 async function main() {
   console.log('🌱 Iniciando seed do MongoDB...\n');
