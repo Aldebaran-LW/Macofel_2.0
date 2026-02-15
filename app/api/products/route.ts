@@ -62,8 +62,17 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Erro ao buscar produtos:', error);
+    console.error('Detalhes do erro:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
+    
     return NextResponse.json(
-      { error: 'Erro ao buscar produtos' },
+      { 
+        error: 'Erro ao buscar produtos',
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      },
       { status: 500 }
     );
   }
