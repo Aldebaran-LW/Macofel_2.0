@@ -16,9 +16,14 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {
-      price: { gte: minPrice, lte: maxPrice },
-    };
+    const where: any = {};
+    
+    // Aplicar filtro de preço apenas se valores válidos forem fornecidos
+    if (minPrice > 0 || maxPrice < 999999) {
+      where.price = {};
+      if (minPrice > 0) where.price.gte = minPrice;
+      if (maxPrice < 999999) where.price.lte = maxPrice;
+    }
 
     if (search) {
       where.OR = [

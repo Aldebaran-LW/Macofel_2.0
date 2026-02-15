@@ -50,7 +50,8 @@ export default function CatalogoPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [page, search, selectedCategory, minPrice, maxPrice]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, selectedCategory]);
 
   const fetchCategories = async () => {
     try {
@@ -74,20 +75,28 @@ export default function CatalogoPage() {
 
       if (search) params.append('search', search);
       if (selectedCategory) params.append('category', selectedCategory);
-      if (minPrice) params.append('minPrice', minPrice);
-      if (maxPrice) params.append('maxPrice', maxPrice);
+      if (minPrice && minPrice !== '') params.append('minPrice', minPrice);
+      if (maxPrice && maxPrice !== '') params.append('maxPrice', maxPrice);
 
       const res = await fetch(`/api/products?${params}`);
+      const data = await res.json();
+      
       if (res.ok) {
-        const data = await res.json();
         setProducts(data?.products ?? []);
         setTotalPages(data?.pagination?.totalPages ?? 1);
+        
+        if ((data?.products ?? []).length === 0) {
+          console.log('Nenhum produto encontrado com os filtros aplicados');
+        }
       } else {
-        toast.error('Erro ao buscar produtos');
+        console.error('Erro na API:', data);
+        toast.error(data?.error || 'Erro ao buscar produtos');
+        setProducts([]);
       }
     } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao buscar produtos');
+      console.error('Erro ao buscar produtos:', error);
+      toast.error('Erro ao buscar produtos. Verifique a conexão.');
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -254,8 +263,25 @@ export default function CatalogoPage() {
                 ))}
               </div>
             ) : (products?.length ?? 0) === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">Nenhum produto encontrado</p>
+              <div className="text-center py-16">
+                <div className="max-w-md mx-auto">
+                  <div className="text-6xl mb-4">📦</div>
+                  <p className="text-gray-500 text-xl font-semibold mb-2">Nenhum produto encontrado</p>
+                  <p className="text-gray-400 text-sm mb-6">
+                    {search || selectedCategory || minPrice || maxPrice
+                      ? 'Tente ajustar os filtros de busca'
+                      : 'Nenhum produto cadastrado no momento'}
+                  </p>
+                  {(search || selectedCategory || minPrice || maxPrice) && (
+                    <Button
+                      onClick={clearFilters}
+                      variant="outline"
+                      className="bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Limpar Filtros
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <>
