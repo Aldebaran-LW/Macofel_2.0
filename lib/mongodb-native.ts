@@ -97,8 +97,13 @@ export async function getProducts(filters?: {
   // Buscar categorias para cada produto
   const productsWithCategories = await Promise.all(
     products.map(async (product: any) => {
+      // Converter categoryId para ObjectId se necessário
+      const categoryId = product.categoryId instanceof ObjectId 
+        ? product.categoryId 
+        : new ObjectId(product.categoryId);
+      
       const category = await categoriesCollection.findOne({
-        _id: product.categoryId,
+        _id: categoryId,
       });
       return {
         id: product._id.toString(),
