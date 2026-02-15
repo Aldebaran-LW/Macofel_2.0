@@ -17,7 +17,7 @@ async function getFeaturedProducts() {
   }
 }
 
-async function getCategories() {
+async function getHomeCategories() {
   try {
     const categories = await getCategories();
     return categories.slice(0, 3) ?? [];
@@ -29,7 +29,7 @@ async function getCategories() {
 
 export default async function HomePage() {
   const featuredProducts = await getFeaturedProducts();
-  const categories = await getCategories();
+  const categories = await getHomeCategories();
 
   // Mapear categorias para imagens
   const categoryImages: Record<string, string> = {
