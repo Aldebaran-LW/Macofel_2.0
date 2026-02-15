@@ -3,13 +3,13 @@ import Image from 'next/image';
 import { Package, Truck, ShieldCheck, Clock, ArrowRight, Award, Users, Search, ShoppingCart, Menu, Phone, Mail, MapPin, Instagram, Linkedin, Facebook, Send, HardHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ClientLayoutWrapper from '@/components/client-layout-wrapper';
-import mongoPrisma from '@/lib/mongodb';
+import prisma from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 async function getFeaturedProducts() {
   try {
-    const products = await mongoPrisma.product.findMany({
+    const products = await prisma.product.findMany({
       where: { featured: true },
       include: { category: true },
       take: 4,
@@ -24,7 +24,7 @@ async function getFeaturedProducts() {
 
 async function getCategories() {
   try {
-    const categories = await mongoPrisma.category.findMany({
+    const categories = await prisma.category.findMany({
       take: 3,
       orderBy: { name: 'asc' },
     });
