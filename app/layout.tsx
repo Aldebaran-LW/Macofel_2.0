@@ -16,7 +16,14 @@ export const metadata: Metadata = {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
   },
-  metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
+  metadataBase: (() => {
+    const url = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+    // Garantir que a URL tenha protocolo
+    const urlWithProtocol = url.startsWith('http://') || url.startsWith('https://') 
+      ? url 
+      : `https://${url}`;
+    return new URL(urlWithProtocol);
+  })(),
   openGraph: {
     images: ['/og-image.png'],
   },
