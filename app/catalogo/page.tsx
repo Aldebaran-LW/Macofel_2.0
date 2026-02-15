@@ -264,36 +264,42 @@ export default function CatalogoPage() {
                     <Link
                       key={product?.id}
                       href={`/produto/${product?.slug}`}
-                      className="group bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow overflow-hidden"
+                      className="group bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-red-200 transform hover:-translate-y-2"
                     >
-                      <div className="relative aspect-square bg-gray-100">
+                      <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
                         {product?.imageUrl && (
                           <Image
                             src={product.imageUrl}
                             alt={product?.name ?? 'Produto'}
                             fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        {(product?.stock ?? 0) > 0 && (
+                          <span className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                            Em Estoque
+                          </span>
+                        )}
                       </div>
-                      <div className="p-4">
-                        <span className="text-xs text-red-600 font-medium">
+                      <div className="p-5">
+                        <span className="text-xs text-red-600 font-semibold uppercase tracking-wide">
                           {product?.category?.name}
                         </span>
-                        <h3 className="font-semibold text-lg mt-1 mb-2 line-clamp-2">
+                        <h3 className="font-bold text-lg mt-2 mb-3 line-clamp-2 text-gray-900 group-hover:text-red-600 transition-colors">
                           {product?.name}
                         </h3>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl font-bold text-red-600">
-                            R$ {product?.price?.toFixed?.(2)}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {(product?.stock ?? 0) > 0 ? (
-                              <span className="text-green-600">Em estoque</span>
-                            ) : (
-                              <span className="text-red-600">Indisponível</span>
-                            )}
-                          </span>
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <div>
+                            <span className="text-3xl font-extrabold text-red-600">
+                              R$ {product?.price?.toFixed?.(2)}
+                            </span>
+                          </div>
+                          {(product?.stock ?? 0) === 0 && (
+                            <span className="text-sm font-medium text-red-600 bg-red-50 px-3 py-1 rounded-full">
+                              Indisponível
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Link>
