@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/db';
+import { enrichOrderItems } from '@/lib/order-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,13 +46,17 @@ export async function PATCH(
       where: { id: params?.orderId },
       data: { status },
       include: {
-        items: {
-          include: { product: true },
-        },
+        items: true, // Não incluir product aqui, vamos buscar do MongoDB
       },
     });
 
-    return NextResponse.json(order);
+    // Enriquecer itens com produtos do MongoDB
+    const orderWithProducts = {
+      ...order,
+      items: await enrichOrderItems(order.items),
+    };
+
+    return NextResponse.json(orderWithProducts);
   } catch (error: any) {
     console.error('Erro ao atualizar pedido:', error);
     return NextResponse.json(
