@@ -11,7 +11,9 @@
     "prisma:generate": "prisma generate --schema=./prisma/schema-mongodb.prisma && prisma generate --schema=./prisma/schema-postgres.prisma",
     "prisma:migrate": "tsx --require dotenv/config scripts/migrate-to-mongodb.ts",
     "prisma:seed": "tsx --require dotenv/config scripts/seed.ts",
-    "seed-mongodb": "tsx --require dotenv/config scripts/seed-mongodb.ts"
+    "seed-mongodb": "tsx --require dotenv/config scripts/seed-mongodb.ts",
+    "seed-users": "tsx --require dotenv/config scripts/seed-users-only.ts",
+    "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"
