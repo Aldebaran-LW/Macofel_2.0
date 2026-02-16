@@ -1,11 +1,13 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/db';
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Não usamos PrismaAdapter porque:
+  // 1. Estamos usando CredentialsProvider (não OAuth)
+  // 2. Estamos usando strategy: 'jwt' (sessões no token, não no banco)
+  // 3. O cliente PostgreSQL não tem todos os modelos (category/product estão no MongoDB)
   providers: [
     CredentialsProvider({
       name: 'credentials',
