@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/db';
+import { connectToDatabase } from '@/lib/mongodb-native';
+import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +30,6 @@ export async function PATCH(
 
     const item = await prisma.cartItem.findUnique({
       where: { id: params?.itemId },
-      include: { product: true },
     });
 
     if (!item) {
@@ -38,7 +39,30 @@ export async function PATCH(
       );
     }
 
-    if (quantity > (item?.product?.stock ?? 0)) {
+    // Buscar produto do MongoDB para verificar estoque
+    const db = await connectToDatabase();
+    const productsCollection = db.collection('products');
+    
+    let productId: ObjectId;
+    try {
+      productId = new ObjectId(item.productId);
+    } catch {
+      return NextResponse.json(
+        { error: 'ID do produto inválido' },
+        { status: 400 }
+      );
+    }
+
+    const product = await productsCollection.findOne({ _id: productId });
+
+    if (!product) {
+      return NextResponse.json(
+        { error: 'Produto não encontrado' },
+        { status: 404 }
+      );
+    }
+
+    if (quantity > (product.stock ?? 0)) {
       return NextResponse.json(
         { error: 'Estoque insuficiente' },
         { status: 400 }
