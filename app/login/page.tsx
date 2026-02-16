@@ -47,9 +47,9 @@ export default function LoginPage() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="relative h-16 w-48">
+            <div className="relative h-20 w-64">
               <Image
-                src="/logo.jpeg"
+                src="/logo-macofel.jpeg"
                 alt="MACOFEL"
                 fill
                 className="object-contain"
