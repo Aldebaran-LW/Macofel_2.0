@@ -91,7 +91,7 @@ export default function CadastroPage() {
           <div className="flex justify-center mb-6">
             <div className="relative h-14 w-44">
               <Image
-                src="/logo.jpeg"
+                src="/logo-macofel.png"
                 alt="MACOFEL"
                 fill
                 className="object-contain"

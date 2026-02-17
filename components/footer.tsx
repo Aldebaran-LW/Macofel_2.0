@@ -11,7 +11,7 @@ export default function Footer() {
             <div className="flex items-center gap-4 mb-8">
               <div className="relative h-12 w-auto">
                 <Image
-                  src="/logo-macofel.jpeg"
+                  src="/logo-macofel.png"
                   alt="Logo MACOFEL"
                   width={48}
                   height={48}
