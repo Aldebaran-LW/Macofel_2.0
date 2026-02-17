@@ -13,7 +13,8 @@
     "prisma:seed": "tsx --require dotenv/config scripts/seed.ts",
     "seed-mongodb": "tsx --require dotenv/config scripts/seed-mongodb.ts",
     "seed-users": "tsx --require dotenv/config scripts/seed-users-only.ts",
-    "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts"
+    "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts",
+    "test-all": "tsx --require dotenv/config scripts/test-all.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

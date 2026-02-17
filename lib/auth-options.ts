@@ -16,33 +16,47 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Credenciais inválidas');
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            console.error('[AUTH] Credenciais vazias');
+            return null;
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
+
+          if (!user) {
+            console.error(`[AUTH] Usuário não encontrado: ${credentials.email}`);
+            return null;
+          }
+
+          if (!user.password) {
+            console.error(`[AUTH] Usuário sem senha: ${credentials.email}`);
+            return null;
+          }
+
+          const isCorrectPassword = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isCorrectPassword) {
+            console.error(`[AUTH] Senha incorreta para: ${credentials.email}`);
+            return null;
+          }
+
+          console.log(`[AUTH] Login bem-sucedido para: ${credentials.email}`);
+          return {
+            id: user.id,
+            email: user.email,
+            name: `${user.firstName} ${user.lastName}`,
+            role: user.role,
+          };
+        } catch (error: any) {
+          console.error('[AUTH] Erro no authorize:', error);
+          return null;
         }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user || !user?.password) {
-          throw new Error('Usuário não encontrado');
-        }
-
-        const isCorrectPassword = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isCorrectPassword) {
-          throw new Error('Senha incorreta');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: `${user.firstName} ${user.lastName}`,
-          role: user.role,
-        };
       },
     }),
   ],
