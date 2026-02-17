@@ -28,7 +28,7 @@ export default function RotatingImages() {
 
   return (
     <div
-      className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-2xl border-l-8 border-red-600"
+      className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-2xl border-l-8 border-red-600 bg-black"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -61,6 +61,18 @@ export default function RotatingImages() {
             </div>
           );
         })}
+      </div>
+
+      {/* Logo MACOFEL centralizada e rotacionando */}
+      <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+        <div className="relative w-64 h-64 animate-spin-slow">
+          <Image
+            src="/logo-macofel.png"
+            alt="MACOFEL"
+            fill
+            className="object-contain opacity-80"
+          />
+        </div>
       </div>
 
       {/* Indicadores de imagem */}
