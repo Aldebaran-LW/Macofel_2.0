@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Package, Truck, ShieldCheck, Clock, ArrowRight, Award, Users, Search, ShoppingCart, Menu, Phone, Mail, MapPin, Instagram, Linkedin, Facebook, Send, HardHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ClientLayoutWrapper from '@/components/client-layout-wrapper';
+import RotatingImages from '@/components/rotating-images';
 import { getProducts, getCategories } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -91,22 +92,7 @@ export default async function HomePage() {
               </div>
             </div>
             <div className="hidden lg:block relative mt-12 lg:mt-0">
-              <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-2xl border-l-8 border-red-600">
-                <Image 
-                  src="https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=1000" 
-                  alt="Obra de Engenharia" 
-                  fill
-                  className="object-cover grayscale-[30%] brightness-75"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
-                <div className="absolute bottom-10 left-10 right-10">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-[1px] flex-1 bg-red-600"></div>
-                    <span className="text-red-600 font-black text-xs uppercase tracking-widest">Especialistas</span>
-                  </div>
-                  <p className="text-white text-3xl font-black font-title leading-none uppercase italic">Qualidade de<br />Nível Industrial</p>
-                </div>
-              </div>
+              <RotatingImages />
             </div>
           </div>
         </div>
