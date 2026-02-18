@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,6 +55,8 @@ export default function AdminProdutosPage() {
     categoryId: '',
     featured: false,
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -99,6 +101,51 @@ export default function AdminProdutosPage() {
       featured: false,
     });
     setEditingProduct(null);
+    setImagePreview(null);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione um arquivo de imagem');
+      return;
+    }
+
+    // Validar tamanho (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Tamanho máximo: 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/admin/products/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFormData((prev) => ({ ...prev, imageUrl: data.imageUrl }));
+        setImagePreview(data.imageUrl);
+        toast.success('Imagem enviada com sucesso!');
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Erro ao fazer upload da imagem');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      toast.error('Erro ao fazer upload da imagem');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleOpenDialog = (product?: Product) => {
@@ -113,8 +160,10 @@ export default function AdminProdutosPage() {
         categoryId: product.categoryId,
         featured: product.featured,
       });
+      setImagePreview(product.imageUrl || null);
     } else {
       resetForm();
+      setImagePreview(null);
     }
     setIsDialogOpen(true);
   };
@@ -405,13 +454,72 @@ export default function AdminProdutosPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">URL da Imagem</label>
+              <label className="block text-sm font-medium mb-1">Imagem do Produto</label>
+              
+              {/* Preview da imagem */}
+              {imagePreview && (
+                <div className="mb-3 relative w-32 h-32 rounded-lg overflow-hidden border border-gray-200">
+                  <Image
+                    src={imagePreview}
+                    alt="Preview"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Upload de arquivo */}
+              <div className="mb-2">
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {uploadingImage ? (
+                      <>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></div>
+                        <p className="text-sm text-gray-500">Enviando...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                        <p className="mb-2 text-sm text-gray-500">
+                          <span className="font-semibold">Clique para fazer upload</span> ou arraste e solte
+                        </p>
+                        <p className="text-xs text-gray-500">PNG, JPG, WEBP (máx. 5MB)</p>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
+                </label>
+              </div>
+
+              {/* Ou URL alternativa */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">ou</span>
+                </div>
+              </div>
+
               <Input
                 type="url"
                 value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, imageUrl: e.target.value });
+                  setImagePreview(e.target.value || null);
+                }}
                 placeholder="https://exemplo.com/imagem.jpg"
+                className="mt-2"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Cole uma URL de imagem ou faça upload de um arquivo acima
+              </p>
             </div>
 
             <div className="flex items-center space-x-2">
