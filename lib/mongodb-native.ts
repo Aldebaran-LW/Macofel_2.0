@@ -210,3 +210,101 @@ export async function getCategories() {
 
   return categoriesWithCount;
 }
+
+export async function getHeroImages() {
+  const db = await connectToDatabase();
+  const heroImagesCollection = db.collection('hero_images');
+
+  const images = await heroImagesCollection
+    .find({ active: true })
+    .sort({ order: 1 })
+    .toArray();
+
+  return images.map((image: any) => ({
+    id: image._id.toString(),
+    imageUrl: image.imageUrl,
+    alt: image.alt,
+    order: image.order,
+    active: image.active,
+    createdAt: image.createdAt,
+    updatedAt: image.updatedAt,
+  }));
+}
+
+export async function getAllHeroImages() {
+  const db = await connectToDatabase();
+  const heroImagesCollection = db.collection('hero_images');
+
+  const images = await heroImagesCollection
+    .find({})
+    .sort({ order: 1 })
+    .toArray();
+
+  return images.map((image: any) => ({
+    id: image._id.toString(),
+    imageUrl: image.imageUrl,
+    alt: image.alt,
+    order: image.order,
+    active: image.active,
+    createdAt: image.createdAt,
+    updatedAt: image.updatedAt,
+  }));
+}
+
+export async function createHeroImage(data: {
+  imageUrl: string;
+  alt?: string;
+  order?: number;
+  active?: boolean;
+}) {
+  const db = await connectToDatabase();
+  const heroImagesCollection = db.collection('hero_images');
+
+  const result = await heroImagesCollection.insertOne({
+    imageUrl: data.imageUrl,
+    alt: data.alt || 'Imagem do Hero',
+    order: data.order ?? 0,
+    active: data.active ?? true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  return result.insertedId.toString();
+}
+
+export async function deleteHeroImage(id: string) {
+  const db = await connectToDatabase();
+  const heroImagesCollection = db.collection('hero_images');
+
+  const result = await heroImagesCollection.deleteOne({
+    _id: new ObjectId(id),
+  });
+
+  return result.deletedCount > 0;
+}
+
+export async function updateHeroImage(id: string, data: {
+  imageUrl?: string;
+  alt?: string;
+  order?: number;
+  active?: boolean;
+}) {
+  const db = await connectToDatabase();
+  const heroImagesCollection = db.collection('hero_images');
+
+  const updateData: any = {
+    updatedAt: new Date(),
+  };
+
+  if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
+  if (data.alt !== undefined) updateData.alt = data.alt;
+  if (data.order !== undefined) updateData.order = data.order;
+  if (data.active !== undefined) updateData.active = data.active;
+
+  const result = await heroImagesCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updateData }
+  );
+
+  return result.modifiedCount > 0;
+}

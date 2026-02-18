@@ -142,15 +142,6 @@ export default function Header() {
                 </button>
               </>
             )}
-
-            {!session?.user && (
-              <button 
-                className="lg:hidden p-2"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            )}
           </div>
         </div>
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Home } from 'lucide-react';
+import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Home, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -11,6 +11,7 @@ const menuItems = [
   { href: '/admin/categorias', label: 'Categorias', icon: FolderTree },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
+  { href: '/admin/hero-images', label: 'Imagens Hero', icon: ImageIcon },
 ];
 
 export default function AdminSidebar() {
