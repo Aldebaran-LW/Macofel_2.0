@@ -32,6 +32,8 @@ export default async function HomePage() {
               alt="Campanha Primavera"
               fill
               className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
+              sizes="(max-width: 1024px) 100vw, 66vw"
+              priority
             />
             <div className="absolute inset-0 p-10 flex flex-col justify-center text-white">
               <span className="bg-red-600 self-start px-3 py-1 text-[9px] font-bold uppercase tracking-widest rounded mb-6">
@@ -59,6 +61,7 @@ export default async function HomePage() {
                 alt="Power Tools"
                 fill
                 className="object-cover opacity-20 grayscale group-hover:rotate-12 transition-transform"
+                sizes="(max-width: 1024px) 0vw, 33vw"
               />
               <p className="text-xs font-bold text-red-600 mb-2 relative z-10">Power Tools</p>
               <h3 className="text-2xl font-bold mb-4 italic leading-none relative z-10">
@@ -210,6 +213,7 @@ export default async function HomePage() {
               width={800}
               height={600}
               className="rounded-2xl shadow-2xl rotate-2"
+              sizes="(max-width: 768px) 100vw, 33vw"
             />
           </div>
         </div>

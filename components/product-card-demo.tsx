@@ -34,7 +34,7 @@ export default function ProductCardDemo({
   badgeText = 'Novo',
   badgeColor = 'green' 
 }: ProductCardDemoProps) {
-  const { data: session } = useSession();
+  const { data: session } = useSession() ?? {};
   const router = useRouter();
   const [adding, setAdding] = useState(false);
 
@@ -84,13 +84,14 @@ export default function ProductCardDemo({
       href={`/produto/${product.slug}`}
       className="product-card bg-white rounded-2xl border border-slate-100 overflow-hidden relative"
     >
-      <div className="aspect-square bg-slate-50 p-8 flex items-center justify-center relative">
+      <div className="aspect-square bg-slate-50 p-8 flex items-center justify-center relative overflow-hidden">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
             alt={product.name}
             fill
             className="object-contain mix-blend-multiply"
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

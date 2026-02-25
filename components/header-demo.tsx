@@ -25,6 +25,9 @@ export default function HeaderDemo() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
     fetchCategories();
   }, []);
 
