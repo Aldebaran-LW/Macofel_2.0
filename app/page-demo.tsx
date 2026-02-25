@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Truck, Store, CreditCard, ShieldCheck, MapPin, Clock } from 'lucide-react';
+import { Truck, Store, CreditCard, ShieldCheck, MapPin, Clock, Percent } from 'lucide-react';
 import ClientLayoutWrapperDemo from '@/components/client-layout-wrapper-demo';
 import ProductCardDemo from '@/components/product-card-demo';
-import { getProducts } from '@/lib/mongodb-native';
+import { getProducts, getCategories } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ async function getFeaturedProducts() {
   }
 }
 
-export default async function HomePage() {
+export default async function HomePageDemo() {
   const featuredProducts = await getFeaturedProducts();
 
   return (

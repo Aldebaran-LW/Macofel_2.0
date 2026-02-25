@@ -6,6 +6,8 @@
   :root {
     --font-inter: 'Inter', sans-serif;
     --font-montserrat: 'Montserrat', sans-serif;
+    --font-plus-jakarta: 'Plus Jakarta Sans', sans-serif;
+    --font-playfair: 'Playfair Display', serif;
   }
   
   body {
@@ -14,6 +16,14 @@
   
   .font-title {
     font-family: var(--font-montserrat);
+  }
+
+  .font-demo {
+    font-family: var(--font-plus-jakarta);
+  }
+
+  .font-demo-title {
+    font-family: var(--font-playfair);
   }
 }
 
@@ -169,4 +179,43 @@ html {
 .product-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Demo Layout Styles */
+:root {
+  --macofel-red: #E31E24;
+  --macofel-dark: #1A1A1B;
+}
+
+body {
+  background-color: #fcfcfc;
+  color: var(--macofel-dark);
+}
+
+.promo-banner {
+  background: linear-gradient(90deg, #E31E24 0%, #9b1418 100%);
+}
+
+.product-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.category-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.badge-pickup {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.selection\:bg-red-600 *::selection {
+  background-color: #dc2626;
+  color: white;
 }

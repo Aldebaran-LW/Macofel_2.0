@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Montserrat } from 'next/font/google';
+import { Inter, Montserrat, Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
@@ -15,6 +15,21 @@ const montserrat = Montserrat({
   subsets: ['latin'],
   weight: ['700', '800', '900'],
   variable: '--font-montserrat',
+  display: 'swap',
+});
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '600', '700', '800'],
+  variable: '--font-plus-jakarta',
+  display: 'swap',
+});
+
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['700'],
+  style: ['normal', 'italic'],
+  variable: '--font-playfair',
   display: 'swap',
 });
 
@@ -50,7 +65,7 @@ export default function RootLayout({
       <head>
         <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
       </head>
-      <body className={`${inter.variable} ${montserrat.variable} font-sans`}>
+      <body className={`${inter.variable} ${montserrat.variable} ${plusJakartaSans.variable} ${playfairDisplay.variable} font-sans`}>
         <SessionProviderWrapper>
           <ThemeProvider
             attribute="class"
