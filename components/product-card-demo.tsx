@@ -127,7 +127,7 @@ export default function ProductCardDemo({
         </h3>
         <div className="flex items-baseline gap-2 mb-6">
           <span className="text-xl font-black text-slate-900">
-            {product.price.toFixed(2)}€
+            R$ {product.price.toFixed(2).replace('.', ',')}
           </span>
         </div>
         <button

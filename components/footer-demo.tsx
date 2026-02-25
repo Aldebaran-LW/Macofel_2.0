@@ -41,8 +41,8 @@ export default function FooterDemo() {
             <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-10 text-slate-900">Empresa</h4>
             <ul className="space-y-4 text-xs font-bold uppercase tracking-widest text-slate-400">
               <li><Link href="#" className="hover:text-red-600 transition-colors">Sobre Nós</Link></li>
-              <li><Link href="#" className="hover:text-red-600 transition-colors">Contactos em Loja</Link></li>
-              <li><Link href="#" className="hover:text-red-600 transition-colors">Recrutamento</Link></li>
+              <li><Link href="#" className="hover:text-red-600 transition-colors">Contatos em Loja</Link></li>
+              <li><Link href="#" className="hover:text-red-600 transition-colors">Trabalhe Conosco</Link></li>
               <li><Link href="#" className="hover:text-red-600 transition-colors">Portal do Fornecedor</Link></li>
             </ul>
           </div>

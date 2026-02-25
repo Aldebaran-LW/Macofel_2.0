@@ -43,7 +43,7 @@ export default async function HomePage() {
                 Tudo para a sua <br /> Fundação.
               </h2>
               <p className="text-slate-300 max-w-md mb-8 hidden md:block">
-                Garanta os melhores preços em cimento, ferro e agregados com entrega imediata em estaleiro.
+                Garanta os melhores preços em cimento, ferro e agregados com entrega imediata na obra.
               </p>
               <Link
                 href="/catalogo"
@@ -79,7 +79,7 @@ export default async function HomePage() {
                 <p className="text-[10px] font-bold text-slate-400 mb-2 tracking-[0.3em]">PRO SERVICE</p>
                 <h3 className="text-2xl font-bold mb-4 italic leading-none">Cálculo de <br /> Materiais</h3>
                 <p className="text-xs text-slate-400 mb-6">
-                  Deixe que os nossos técnicos façam a conta por si.
+                  Deixe que nossos técnicos façam a conta por você.
                 </p>
                 <Link
                   href="/login"
@@ -111,7 +111,7 @@ export default async function HomePage() {
             </div>
             <div>
               <p className="text-xs font-bold">Click & Collect</p>
-              <p className="text-[9px] text-slate-400 uppercase">Levante em loja</p>
+              <p className="text-[9px] text-slate-400 uppercase">Retire em loja</p>
             </div>
           </div>
           <div className="flex items-center gap-4 p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
@@ -183,20 +183,20 @@ export default async function HomePage() {
           </div>
           <div className="relative z-10 flex-1">
             <h2 className="text-4xl font-bold text-white mb-6 italic">
-              Visite o nosso <br />
-              <span className="text-red-600">Centro de Aveiro.</span>
+              Visite a nossa <br />
+              <span className="text-red-600">Loja Física.</span>
             </h2>
             <p className="text-slate-400 mb-8 max-w-lg leading-relaxed">
-              Mais de 5.000m² de showroom com soluções reais para o seu projeto. Fale com os nossos especialistas e sinta a qualidade dos materiais antes de comprar.
+              Mais de 5.000m² de showroom com soluções reais para o seu projeto. Fale com nossos especialistas e sinta a qualidade dos materiais antes de comprar.
             </p>
             <div className="flex flex-wrap gap-6 text-white text-xs font-bold uppercase tracking-widest mb-10">
               <div className="flex items-center gap-3">
                 <MapPin className="w-4 h-4 text-red-600" />
-                Zona Industrial Sul
+                Zona Industrial - São Paulo
               </div>
               <div className="flex items-center gap-3">
                 <Clock className="w-4 h-4 text-red-600" />
-                Seg a Sex: 08:30 - 19:00
+                Seg a Sex: 08:00 - 18:00
               </div>
             </div>
             <Link

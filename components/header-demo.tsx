@@ -82,7 +82,7 @@ export default function HeaderDemo() {
     <>
       {/* Promo Top Bar */}
       <div className="promo-banner text-white text-[10px] font-bold uppercase tracking-[0.2em] py-2 text-center">
-        Compre online e levante em loja em menos de 2 horas • Frete grátis em compras acima de 150€
+        Compre online e retire em loja em menos de 2 horas • Frete grátis em compras acima de R$ 150,00
       </div>
 
       {/* Main Header */}
@@ -128,9 +128,9 @@ export default function HeaderDemo() {
 
             {/* Account/Cart */}
             <div className="flex items-center gap-6">
-              <a href="tel:+351234000000" className="hidden lg:flex flex-col items-end leading-none">
+              <a href="tel:+551133333333" className="hidden lg:flex flex-col items-end leading-none">
                 <span className="text-[9px] font-bold text-slate-400 uppercase">Apoio ao Cliente</span>
-                <span className="text-sm font-black">+351 234 000</span>
+                <span className="text-sm font-black">(11) 3333-3333</span>
               </a>
               {status === 'loading' ? (
                 <div className="h-6 w-6 animate-pulse rounded-full bg-gray-200" />
