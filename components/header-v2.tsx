@@ -156,7 +156,7 @@ export default function HeaderV2() {
 
       {/* Main Header */}
       <header
-        className={`sticky top-0 z-50 bg-white transition-shadow duration-300 ${
+        className={`sticky top-0 z-[100] bg-white transition-shadow duration-300 ${
           scrolled ? 'shadow-lg shadow-black/5' : 'border-b border-slate-100'
         }`}
       >
@@ -317,7 +317,7 @@ export default function HeaderV2() {
 
               {/* Mega Dropdown */}
               {megaMenuOpen && (
-                <div className="absolute top-full left-0 z-50 bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2">
+                <div className="absolute top-full left-0 z-[100] bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2">
                   {categories.map((cat) => (
                     <Link
                       key={cat.id}
