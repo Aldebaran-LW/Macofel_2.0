@@ -665,7 +665,6 @@ export default async function HomePage() {
       <ServicesBar />
       <CategoryShowcase />
       <StatsSection />
-      {/* @ts-expect-error Server Component */}
       <FeaturedProducts />
       <WhyUsSection />
       <TestimonialsSection />
