@@ -156,7 +156,7 @@ export default function HeaderV2() {
 
       {/* Main Header */}
       <header
-        className={`sticky top-0 z-[100] isolate bg-white transition-shadow duration-300 ${
+        className={`sticky top-0 z-[9999] isolate bg-white transition-shadow duration-300 ${
           scrolled ? 'shadow-lg shadow-black/5' : 'border-b border-slate-100'
         }`}
       >
@@ -301,7 +301,7 @@ export default function HeaderV2() {
           </div>
 
           {/* Categories Nav */}
-          <nav className="hidden md:flex items-center gap-0 border-t border-slate-100 overflow-x-auto relative z-[100]">
+          <nav className="hidden md:flex items-center gap-0 border-t border-slate-100 overflow-x-auto relative z-[9999] bg-white">
             {/* Mega menu trigger */}
             <div ref={megaRef} className="relative">
               <button
@@ -338,7 +338,7 @@ export default function HeaderV2() {
               {megaMenuOpen && categories.length > 0 && (
                 <div
                   id="mega-menu-departamentos"
-                  className="absolute top-full left-0 z-[100] bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-200"
+                  className="absolute top-full left-0 z-[9999] bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-200"
                 >
                   {categories.map((cat) => (
                     <Link
