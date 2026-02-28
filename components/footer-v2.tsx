@@ -107,7 +107,7 @@ export default function FooterV2() {
                 <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
                   <MapPin className="w-4 h-4 text-red-500" />
                 </div>
-                <span>Zona Industrial — São Paulo, SP</span>
+                <span>Av. São Paulo, 699 - Centro, Parapuã - SP, 17730-000</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-400">
                 <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center shrink-0">

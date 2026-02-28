@@ -396,7 +396,7 @@ export default function ProductPage() {
                 {
                   icon: <CheckCircle2 className="w-5 h-5 text-emerald-600" />,
                   title: 'Click & Collect',
-                  desc: 'Retire na nossa loja física na Zona Industrial de São Paulo em até 2 horas após a compra.',
+                  desc: 'Retire na nossa loja física na Av. São Paulo, 699 - Centro, Parapuã - SP, 17730-000 em até 2 horas após a compra.',
                 },
               ].map((item, i) => (
                 <div key={i} className="flex gap-4 p-5 bg-white rounded-2xl border border-slate-100">

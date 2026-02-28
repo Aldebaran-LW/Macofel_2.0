@@ -58,7 +58,7 @@ export default function Footer() {
             <ul className="space-y-4 text-xs font-bold uppercase tracking-widest text-slate-400">
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <span>Armazém Central - Zona Industrial</span>
+                <span>Av. São Paulo, 699 - Centro, Parapuã - SP, 17730-000</span>
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />

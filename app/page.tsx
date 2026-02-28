@@ -629,7 +629,7 @@ function StoreVisitSection() {
 
           <div className="space-y-4">
             {[
-              { icon: <MapPin className="w-4 h-4 text-red-600" />, text: 'Zona Industrial — São Paulo, SP' },
+              { icon: <MapPin className="w-4 h-4 text-red-600" />, text: 'Av. São Paulo, 699 - Centro, Parapuã - SP, 17730-000' },
               { icon: <Clock className="w-4 h-4 text-red-600" />, text: 'Seg a Sex: 08:00 — 18:00 | Sáb: 08:00 — 13:00' },
               { icon: <Phone className="w-4 h-4 text-red-600" />, text: '(11) 3333-3333 | (11) 99999-9999' },
             ].map((item, i) => (

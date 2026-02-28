@@ -189,7 +189,7 @@ export default async function HomePageDemo() {
             <div className="flex flex-wrap gap-6 text-white text-xs font-bold uppercase tracking-widest mb-10">
               <div className="flex items-center gap-3">
                 <MapPin className="w-4 h-4 text-red-600" />
-                Zona Industrial Sul
+                Av. São Paulo, 699 - Centro, Parapuã - SP, 17730-000
               </div>
               <div className="flex items-center gap-3">
                 <Clock className="w-4 h-4 text-red-600" />
