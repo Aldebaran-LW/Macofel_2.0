@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import {
   ShoppingCart,
@@ -38,6 +39,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 };
 
 export default function HeaderV2() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const { data: session, status } = useSession() ?? {};
   const [cartCount, setCartCount] = useState(0);
@@ -82,6 +84,29 @@ export default function HeaderV2() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Atualizar posição do dropdown quando scroll ou resize
+  useEffect(() => {
+    if (!megaMenuOpen || !megaRef.current) return;
+
+    const updatePosition = () => {
+      if (megaRef.current) {
+        const rect = megaRef.current.getBoundingClientRect();
+        setDropdownPos({ top: rect.bottom, left: rect.left });
+      }
+    };
+
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    
+    // Atualizar posição inicial
+    updatePosition();
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [megaMenuOpen]);
 
   const fetchCategories = async () => {
     try {
@@ -358,11 +383,15 @@ export default function HeaderV2() {
                   className="bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2"
                 >
                   {categories.map((cat) => (
-                    <Link
+                    <button
                       key={cat.id}
-                      href={`/catalogo?category=${cat.slug}`}
-                      onClick={() => setMegaMenuOpen(false)}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all group"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        // Navegar programaticamente e fechar o menu após navegação
+                        router.push(`/catalogo?category=${cat.slug}`);
+                        setMegaMenuOpen(false);
+                      }}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all group w-full text-left"
                     >
                       <span className="w-9 h-9 bg-slate-100 group-hover:bg-red-100 rounded-lg flex items-center justify-center text-slate-500 group-hover:text-red-600 transition-all shrink-0">
                         {getCategoryIcon(cat.slug)}
@@ -370,7 +399,7 @@ export default function HeaderV2() {
                       <span className="text-sm font-semibold text-slate-700 group-hover:text-red-600">
                         {cat.name}
                       </span>
-                    </Link>
+                    </button>
                   ))}
                   <Link
                     href="/catalogo"

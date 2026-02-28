@@ -6,7 +6,7 @@ import { X, MessageCircle, Send } from 'lucide-react';
 export default function WhatsAppButton() {
   const [open, setOpen] = useState(false);
 
-  const whatsappNumber = '5511933333333';
+  const whatsappNumber = '5518998145495';
   const defaultMessage = encodeURIComponent(
     'Olá! Vim pelo site da MACOFEL e gostaria de mais informações.'
   );

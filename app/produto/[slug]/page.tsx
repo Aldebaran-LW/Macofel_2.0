@@ -300,7 +300,7 @@ export default function ProductPage() {
                 </button>
 
                 <a
-                  href="https://wa.me/5511933333333"
+                  href="https://wa.me/5518998145495"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#20b858] text-white font-bold text-sm uppercase tracking-wider py-4 rounded-2xl transition-all"
