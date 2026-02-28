@@ -307,10 +307,14 @@ export default function HeaderV2() {
               container overflow-x-auto. Se ficar dentro, o overflow-y fica
               implicitamente "auto" e clipa o mega-menu que abre para baixo.
           */}
-          <nav className="hidden md:flex items-center border-t border-slate-100 bg-white">
+          <nav 
+            style={{ position: 'relative', zIndex: 9999 }}
+            className="hidden md:flex items-center border-t border-slate-100 bg-white"
+          >
             {/* Mega menu trigger — FORA do overflow */}
-            <div ref={megaRef} className="relative shrink-0">
+            <div ref={megaRef} style={{ position: 'relative', zIndex: 9999 }} className="shrink-0">
               <button
+                style={{ position: 'relative', zIndex: 9999 }}
                 onClick={() => {
                   if (!megaMenuOpen && megaRef.current) {
                     const rect = megaRef.current.getBoundingClientRect();
