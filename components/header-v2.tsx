@@ -306,18 +306,40 @@ export default function HeaderV2() {
             <div ref={megaRef} className="relative">
               <button
                 onClick={() => setMegaMenuOpen(!megaMenuOpen)}
-                className="flex items-center gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-700 transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setMegaMenuOpen(false);
+                }}
+                aria-label="Abrir menu de departamentos"
+                aria-expanded={megaMenuOpen}
+                aria-haspopup="true"
+                aria-controls="mega-menu-departamentos"
+                disabled={categories.length === 0}
+                className={`flex items-center gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-red-600 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  megaMenuOpen
+                    ? 'bg-red-700 shadow-lg'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
               >
                 <Menu className="w-4 h-4" />
                 Departamentos
+                {categories.length > 0 && (
+                  <span className="ml-1 bg-white/20 text-white text-[9px] px-1.5 py-0.5 rounded-full">
+                    {categories.length}
+                  </span>
+                )}
                 <ChevronDown
-                  className={`w-3 h-3 transition-transform ${megaMenuOpen ? 'rotate-180' : ''}`}
+                  className={`w-3 h-3 transition-transform duration-200 ${
+                    megaMenuOpen ? 'rotate-180' : ''
+                  }`}
                 />
               </button>
 
               {/* Mega Dropdown */}
-              {megaMenuOpen && (
-                <div className="absolute top-full left-0 z-[100] bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2">
+              {megaMenuOpen && categories.length > 0 && (
+                <div
+                  id="mega-menu-departamentos"
+                  className="absolute top-full left-0 z-[100] bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-200"
+                >
                   {categories.map((cat) => (
                     <Link
                       key={cat.id}
