@@ -48,6 +48,7 @@ export default function HeaderV2() {
   const [scrolled, setScrolled] = useState(false);
   const [megaMenuOpen, setMegaMenuOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 155, left: 32 });
   const megaRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
@@ -156,7 +157,8 @@ export default function HeaderV2() {
 
       {/* Main Header */}
       <header
-        className={`sticky top-0 z-[9999] isolate bg-white transition-shadow duration-300 ${
+        style={{ position: 'sticky', top: 0, zIndex: 9999 }}
+        className={`bg-white transition-shadow duration-300 ${
           scrolled ? 'shadow-lg shadow-black/5' : 'border-b border-slate-100'
         }`}
       >
@@ -300,12 +302,22 @@ export default function HeaderV2() {
             </div>
           </div>
 
-          {/* Categories Nav */}
-          <nav className="hidden md:flex items-center gap-0 border-t border-slate-100 overflow-x-auto relative z-[9999] bg-white">
-            {/* Mega menu trigger */}
-            <div ref={megaRef} className="relative">
+          {/* Categories Nav
+              ⚠️ IMPORTANTE: O botão DEPARTAMENTOS e seu dropdown ficam FORA do
+              container overflow-x-auto. Se ficar dentro, o overflow-y fica
+              implicitamente "auto" e clipa o mega-menu que abre para baixo.
+          */}
+          <nav className="hidden md:flex items-center border-t border-slate-100 bg-white">
+            {/* Mega menu trigger — FORA do overflow */}
+            <div ref={megaRef} className="relative shrink-0">
               <button
-                onClick={() => setMegaMenuOpen(!megaMenuOpen)}
+                onClick={() => {
+                  if (!megaMenuOpen && megaRef.current) {
+                    const rect = megaRef.current.getBoundingClientRect();
+                    setDropdownPos({ top: rect.bottom, left: rect.left });
+                  }
+                  setMegaMenuOpen(!megaMenuOpen);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') setMegaMenuOpen(false);
                 }}
@@ -334,11 +346,12 @@ export default function HeaderV2() {
                 />
               </button>
 
-              {/* Mega Dropdown */}
+              {/* Mega Dropdown — position fixed para não ser clipado por nenhum ancestral */}
               {megaMenuOpen && categories.length > 0 && (
                 <div
                   id="mega-menu-departamentos"
-                  className="absolute top-full left-0 z-[9999] bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-200"
+                  style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                  className="bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2"
                 >
                   {categories.map((cat) => (
                     <Link
@@ -366,8 +379,8 @@ export default function HeaderV2() {
               )}
             </div>
 
-            {/* Quick nav links */}
-            <div className="flex items-center overflow-x-auto">
+            {/* Quick nav links — dentro do scroll horizontal */}
+            <div className="flex items-center overflow-x-auto flex-1">
               {categories.slice(0, 5).map((cat) => (
                 <Link
                   key={cat.id}
