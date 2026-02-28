@@ -156,7 +156,7 @@ export default function HeaderV2() {
 
       {/* Main Header */}
       <header
-        className={`sticky top-0 z-[100] bg-white transition-shadow duration-300 ${
+        className={`sticky top-0 z-[100] isolate bg-white transition-shadow duration-300 ${
           scrolled ? 'shadow-lg shadow-black/5' : 'border-b border-slate-100'
         }`}
       >
@@ -301,7 +301,7 @@ export default function HeaderV2() {
           </div>
 
           {/* Categories Nav */}
-          <nav className="hidden md:flex items-center gap-0 border-t border-slate-100 overflow-x-auto">
+          <nav className="hidden md:flex items-center gap-0 border-t border-slate-100 overflow-x-auto relative z-[100]">
             {/* Mega menu trigger */}
             <div ref={megaRef} className="relative">
               <button

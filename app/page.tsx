@@ -37,7 +37,7 @@ async function getFeaturedProducts() {
 
 function HeroSection() {
   return (
-    <section className="hero-v2-bg relative overflow-hidden min-h-[88vh] flex items-center">
+    <section className="hero-v2-bg relative overflow-hidden min-h-[88vh] flex items-center z-0">
       {/* Radial glow */}
       <div className="hero-v2-accent absolute inset-0 pointer-events-none" />
 
