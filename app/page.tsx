@@ -643,10 +643,12 @@ function StoreVisitSection() {
           </div>
 
           <a
-            href="#"
+            href="https://www.google.com/maps/search/?api=1&query=Av.+São+Paulo,+699+-+Centro,+Parapuã+-+SP,+17730-000"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-3 bg-slate-900 hover:bg-red-600 text-white font-bold text-sm uppercase tracking-widest px-8 py-4 rounded-2xl transition-all"
           >
-            Ver no Mapa
+            VER NO MAPA
             <MapPin className="w-4 h-4" />
           </a>
         </div>
