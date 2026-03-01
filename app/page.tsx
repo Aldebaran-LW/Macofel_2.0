@@ -593,41 +593,48 @@ function StoreVisitSection() {
   return (
     <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
       <div className="grid md:grid-cols-2 gap-8 items-center">
-        {/* Image - Clickable to open Google Maps */}
-        <a
-          href="https://www.google.com/maps/search/?api=1&query=Av.+São+Paulo,+699+-+Centro,+Parapuã+-+SP,+17730-000"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="relative rounded-2xl overflow-hidden aspect-[4/3] group cursor-pointer block"
-        >
-          <Image
-            src="https://images.unsplash.com/photo-1541888946425-d81bb19480c5?q=80&w=1200&auto=format&fit=crop"
-            alt="Loja MACOFEL - Clique para ver no mapa"
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-700"
-            sizes="50vw"
+        {/* Google Maps Preview */}
+        <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group shadow-xl">
+          {/* Map iframe embed */}
+          <iframe
+            src="https://maps.google.com/maps?q=-21.7792205,-50.7915996&z=17&output=embed&hl=pt-BR"
+            className="absolute inset-0 w-full h-full border-0 pointer-events-none"
+            loading="lazy"
+            title="Localização da Loja MACOFEL"
+            allowFullScreen
           />
-          {/* Multi-layer gradient overlay for visual depth and impact */}
-          {/* Radial gradient from center - creates dramatic focus effect */}
-          <div 
-            className="absolute inset-0 transition-all duration-500 group-hover:opacity-100"
-            style={{
-              background: 'radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.6) 100%)'
-            }}
-          />
-          {/* Diagonal gradient overlay - top-right to bottom-left with red accent */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-red-900/20 to-transparent group-hover:from-black/60 group-hover:via-red-900/30 transition-all duration-500" />
-          {/* Bottom gradient for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
-          {/* Top-left subtle red accent for brand color */}
-          <div className="absolute inset-0 bg-gradient-to-br from-red-600/15 via-transparent to-transparent group-hover:from-red-600/20 transition-all duration-500" />
-          {/* Edge glow effect */}
-          <div className="absolute inset-0 ring-1 ring-inset ring-white/5 rounded-2xl pointer-events-none" />
-          <div className="absolute bottom-6 left-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4 group-hover:bg-white/15 transition-all duration-300">
-            <p className="text-white font-black text-lg">5.000m²</p>
-            <p className="text-white/70 text-xs font-bold uppercase">de Showroom</p>
+
+          {/* Bottom bar with address + CTA */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 px-5 pb-5">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Aberto agora</span>
+                </div>
+                <p className="text-white font-black text-base leading-tight">MACOFEL Parapuã</p>
+                <p className="text-white/60 text-xs mt-0.5">Av. São Paulo, 699 — Centro</p>
+              </div>
+              <a
+                href="https://www.google.com/maps/place/Macofel+Parapu%C3%A3/@-21.7792204,-50.7964705,17z/data=!4m15!1m8!3m7!1s0x94942f5400b5375b:0x698d25456ba379a4!2sMacofel+Parapu%C3%A3!8m2!3d-21.7792205!4d-50.7915996!10e1!16s%2Fg%2F11vbkfnwr2!3m5!1s0x94942f5400b5375b:0x698d25456ba379a4!8m2!3d-21.7792205!4d-50.7915996!16s%2Fg%2F11vbkfnwr2?entry=ttu&g_ep=EgoyMDI2MDIyNS4wIKXMDSoASAFQAw%3D%3D"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-red-600/40 active:scale-95"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                Abrir
+              </a>
+            </div>
           </div>
-        </a>
+
+          {/* Top badge */}
+          <div className="absolute top-4 left-4 flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-md">
+            <div className="w-5 h-5 bg-red-600 rounded-lg flex items-center justify-center">
+              <MapPin className="w-3 h-3 text-white" />
+            </div>
+            <span className="text-xs font-black text-slate-800">Ver no Google Maps</span>
+          </div>
+        </div>
 
         {/* Text */}
         <div className="space-y-6">
