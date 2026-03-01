@@ -39,8 +39,8 @@ export const metadata: Metadata = {
   title: 'MACOFEL - Materiais para Construção',
   description: 'Loja completa de materiais para construção. Cimento, tijolos, tintas, ferramentas e muito mais.',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
+    icon: 'https://vedrmtowoosqxzqxgxpb.supabase.co/storage/v1/object/public/Macofel/Macofel.jpg',
+    shortcut: 'https://vedrmtowoosqxzqxgxpb.supabase.co/storage/v1/object/public/Macofel/Macofel.jpg',
   },
   metadataBase: (() => {
     const url = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
