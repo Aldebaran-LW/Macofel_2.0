@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Image as ImageIcon, Plus, Trash2, Edit2, Save, X, Eye, ExternalLink } from 'lucide-react';
+import { Image as ImageIcon, Plus, Trash2, Edit2, Save, X, Eye, ExternalLink, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 
@@ -22,6 +22,9 @@ export default function AdminHeroImagesPage() {
   const [editForm, setEditForm] = useState<Partial<HeroImage>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [newImage, setNewImage] = useState({ imageUrl: '', alt: 'Imagem do Hero', order: 0, active: true });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     fetchImages();
@@ -61,9 +64,79 @@ export default function AdminHeroImagesPage() {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement> | File) => {
+    const file = e instanceof File ? e : (e.target as HTMLInputElement).files?.[0];
+    
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Tipo de arquivo não permitido. Use JPEG, PNG ou WebP');
+      return;
+    }
+
+    // Validar tamanho (máximo 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error('Arquivo muito grande. Tamanho máximo: 10MB');
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/admin/hero-images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setNewImage({ ...newImage, imageUrl: data.imageUrl });
+        setImagePreview(data.imageUrl);
+        toast.success('Imagem enviada com sucesso!');
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Erro ao fazer upload da imagem');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      toast.error('Erro ao fazer upload da imagem');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  };
+
   const handleAddImage = async () => {
     if (!newImage.imageUrl.trim()) {
-      toast.error('URL da imagem é obrigatória');
+      toast.error('URL da imagem é obrigatória ou faça upload de um arquivo');
       return;
     }
 
@@ -77,6 +150,7 @@ export default function AdminHeroImagesPage() {
       if (res.ok) {
         toast.success('Imagem adicionada com sucesso');
         setNewImage({ imageUrl: '', alt: 'Imagem do Hero', order: 0, active: true });
+        setImagePreview(null);
         setShowAddForm(false);
         fetchImages();
       } else {
@@ -178,6 +252,69 @@ export default function AdminHeroImagesPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Adicionar Nova Imagem</h2>
           <div className="space-y-4">
+            {/* Preview da imagem */}
+            {(imagePreview || newImage.imageUrl) && (
+              <div className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                <Image
+                  src={imagePreview || newImage.imageUrl}
+                  alt="Preview"
+                  fill
+                  className="object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Upload de arquivo com drag and drop */}
+            <div>
+              <label
+                className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                  isDragging
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  {uploadingImage ? (
+                    <>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></div>
+                      <p className="text-sm text-gray-500">Enviando...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Clique para fazer upload</span> ou arraste e solte
+                      </p>
+                      <p className="text-xs text-gray-500">PNG, JPG, WEBP (máx. 10MB)</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                />
+              </label>
+            </div>
+
+            {/* Ou URL alternativa */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">ou</span>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 URL da Imagem
@@ -185,7 +322,10 @@ export default function AdminHeroImagesPage() {
               <input
                 type="text"
                 value={newImage.imageUrl}
-                onChange={(e) => setNewImage({ ...newImage, imageUrl: e.target.value })}
+                onChange={(e) => {
+                  setNewImage({ ...newImage, imageUrl: e.target.value });
+                  setImagePreview(e.target.value || null);
+                }}
                 placeholder="https://exemplo.com/imagem.jpg"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
               />
@@ -242,6 +382,7 @@ export default function AdminHeroImagesPage() {
                 onClick={() => {
                   setShowAddForm(false);
                   setNewImage({ imageUrl: '', alt: 'Imagem do Hero', order: 0, active: true });
+                  setImagePreview(null);
                 }}
                 className="flex items-center gap-2 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
               >
