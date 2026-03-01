@@ -3,29 +3,30 @@ import { getHeroImages } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
-// GET - Listar imagens ativas do hero (público)
+// GET - Listar imagens ativas do hero (pública, sem autenticação)
 export async function GET() {
   try {
     const images = await getHeroImages();
-    return NextResponse.json(images);
+    
+    // Separar imagens por tipo de display
+    const gridImages = images
+      .filter(img => img.displayType === 'grid')
+      .sort((a, b) => (a.animationOrder ?? 0) - (b.animationOrder ?? 0));
+    
+    const largeImages = images
+      .filter(img => img.displayType === 'large')
+      .sort((a, b) => (a.animationOrder ?? 0) - (b.animationOrder ?? 0));
+
+    return NextResponse.json({
+      grid: gridImages,
+      large: largeImages,
+      all: images,
+    });
   } catch (error: any) {
     console.error('Erro ao buscar imagens do hero:', error);
-    // Retornar imagens padrão em caso de erro
-    const defaultImages = [
-      'https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=1000',
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=1000',
-      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=1000',
-      'https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&q=80&w=1000',
-      'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=1000',
-    ];
     return NextResponse.json(
-      defaultImages.map((url, index) => ({
-        id: `default-${index}`,
-        imageUrl: url,
-        alt: `Obra de Engenharia ${index + 1}`,
-        order: index,
-        active: true,
-      }))
+      { error: 'Erro ao buscar imagens do hero', images: [] },
+      { status: 500 }
     );
   }
 }

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import LayoutWrapperV2 from '@/components/layout-wrapper-v2';
 import ProductCardV2 from '@/components/product-card-v2';
+import HeroSectionAnimated from '@/components/hero-section-animated';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -690,7 +691,7 @@ function StoreVisitSection() {
 export default async function HomePage() {
   return (
     <LayoutWrapperV2>
-      <HeroSection />
+      <HeroSectionAnimated />
       <ServicesBar />
       <CategoryShowcase />
       <StatsSection />

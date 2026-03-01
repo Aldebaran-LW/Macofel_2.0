@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { imageUrl, alt, order, active, linkType, productId, categorySlug, linkUrl } = body;
+    const { imageUrl, alt, order, active, linkType, productId, categorySlug, linkUrl, displayType, animationOrder } = body;
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
       productId: productId || null,
       categorySlug: categorySlug || null,
       linkUrl: linkUrl || null,
+      displayType: displayType || 'grid',
+      animationOrder: animationOrder ?? 0,
     });
 
     return NextResponse.json({ id, success: true }, { status: 201 });
@@ -90,7 +92,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, imageUrl, alt, order, active, linkType, productId, categorySlug, linkUrl } = body;
+    const { id, imageUrl, alt, order, active, linkType, productId, categorySlug, linkUrl, displayType, animationOrder } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -108,6 +110,8 @@ export async function PUT(req: NextRequest) {
       productId,
       categorySlug,
       linkUrl,
+      displayType,
+      animationOrder,
     });
 
     if (!updated) {

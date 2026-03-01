@@ -230,6 +230,8 @@ export async function getHeroImages() {
     productId: image.productId || null,
     categorySlug: image.categorySlug || null,
     linkUrl: image.linkUrl || null,
+    displayType: image.displayType || 'grid', // 'grid' ou 'large'
+    animationOrder: image.animationOrder ?? 0, // Ordem na animação
     createdAt: image.createdAt,
     updatedAt: image.updatedAt,
   }));
@@ -250,6 +252,12 @@ export async function getAllHeroImages() {
     alt: image.alt,
     order: image.order,
     active: image.active,
+    linkType: image.linkType || null,
+    productId: image.productId || null,
+    categorySlug: image.categorySlug || null,
+    linkUrl: image.linkUrl || null,
+    displayType: image.displayType || 'grid',
+    animationOrder: image.animationOrder ?? 0,
     createdAt: image.createdAt,
     updatedAt: image.updatedAt,
   }));
@@ -264,6 +272,8 @@ export async function createHeroImage(data: {
   productId?: string | null;
   categorySlug?: string | null;
   linkUrl?: string | null;
+  displayType?: 'grid' | 'large';
+  animationOrder?: number;
 }) {
   const db = await connectToDatabase();
   const heroImagesCollection = db.collection('hero_images');
@@ -277,6 +287,8 @@ export async function createHeroImage(data: {
     productId: data.productId || null,
     categorySlug: data.categorySlug || null,
     linkUrl: data.linkUrl || null,
+    displayType: data.displayType || 'grid',
+    animationOrder: data.animationOrder ?? 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -304,6 +316,8 @@ export async function updateHeroImage(id: string, data: {
   productId?: string | null;
   categorySlug?: string | null;
   linkUrl?: string | null;
+  displayType?: 'grid' | 'large';
+  animationOrder?: number;
 }) {
   const db = await connectToDatabase();
   const heroImagesCollection = db.collection('hero_images');
@@ -320,6 +334,8 @@ export async function updateHeroImage(id: string, data: {
   if (data.productId !== undefined) updateData.productId = data.productId;
   if (data.categorySlug !== undefined) updateData.categorySlug = data.categorySlug;
   if (data.linkUrl !== undefined) updateData.linkUrl = data.linkUrl;
+  if (data.displayType !== undefined) updateData.displayType = data.displayType;
+  if (data.animationOrder !== undefined) updateData.animationOrder = data.animationOrder;
 
   const result = await heroImagesCollection.updateOne(
     { _id: new ObjectId(id) },

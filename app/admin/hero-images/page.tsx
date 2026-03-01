@@ -15,6 +15,8 @@ interface HeroImage {
   productId?: string | null;
   categorySlug?: string | null;
   linkUrl?: string | null;
+  displayType?: 'grid' | 'large';
+  animationOrder?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +48,8 @@ export default function AdminHeroImagesPage() {
     productId: null as string | null,
     categorySlug: null as string | null,
     linkUrl: null as string | null,
+    displayType: 'grid' as 'grid' | 'large',
+    animationOrder: 0,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -211,6 +215,8 @@ export default function AdminHeroImagesPage() {
           productId: null,
           categorySlug: null,
           linkUrl: null,
+          displayType: 'grid',
+          animationOrder: 0,
         });
         setImagePreview(null);
         setShowAddForm(false);
@@ -259,6 +265,8 @@ export default function AdminHeroImagesPage() {
       productId: image.productId || null,
       categorySlug: image.categorySlug || null,
       linkUrl: image.linkUrl || null,
+      displayType: image.displayType || 'grid',
+      animationOrder: image.animationOrder ?? 0,
     });
   };
 
@@ -494,10 +502,45 @@ export default function AdminHeroImagesPage() {
               </div>
             )}
 
+            {/* Tipo de Exibição e Ordem de Animação */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ordem
+                  Tipo de Exibição
+                </label>
+                <select
+                  value={newImage.displayType}
+                  onChange={(e) => setNewImage({ ...newImage, displayType: e.target.value as 'grid' | 'large' })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                >
+                  <option value="grid">Grid (4 quadrados)</option>
+                  <option value="large">Imagem Grande</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Grid: aparece primeiro na animação | Large: aparece depois
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ordem na Animação
+                </label>
+                <input
+                  type="number"
+                  value={newImage.animationOrder}
+                  onChange={(e) => setNewImage({ ...newImage, animationOrder: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Ordem de exibição dentro do mesmo tipo
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ordem Geral
                 </label>
                 <input
                   type="number"
@@ -539,6 +582,8 @@ export default function AdminHeroImagesPage() {
                     productId: null,
                     categorySlug: null,
                     linkUrl: null,
+                    displayType: 'grid',
+                    animationOrder: 0,
                   });
                   setImagePreview(null);
                 }}
@@ -702,10 +747,39 @@ export default function AdminHeroImagesPage() {
                       </div>
                     )}
 
+                    {/* Tipo de Exibição e Ordem de Animação */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Ordem
+                          Tipo de Exibição
+                        </label>
+                        <select
+                          value={editForm.displayType || 'grid'}
+                          onChange={(e) => setEditForm({ ...editForm, displayType: e.target.value as 'grid' | 'large' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                        >
+                          <option value="grid">Grid (4 quadrados)</option>
+                          <option value="large">Imagem Grande</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Ordem na Animação
+                        </label>
+                        <input
+                          type="number"
+                          value={editForm.animationOrder ?? 0}
+                          onChange={(e) => setEditForm({ ...editForm, animationOrder: parseInt(e.target.value) || 0 })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Ordem Geral
                         </label>
                         <input
                           type="number"
@@ -793,11 +867,17 @@ export default function AdminHeroImagesPage() {
                       <p className="text-sm font-medium text-gray-900 mb-1 truncate" title={image.alt}>
                         {image.alt}
                       </p>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                         <span>Ordem: {image.order}</span>
                         <span className={`px-2 py-0.5 rounded ${image.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                           {image.active ? 'Ativa' : 'Inativa'}
                         </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className={`px-2 py-0.5 rounded ${image.displayType === 'grid' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                          {image.displayType === 'grid' ? 'Grid' : 'Large'}
+                        </span>
+                        <span>Anim: {image.animationOrder ?? 0}</span>
                       </div>
                     {image.imageUrl && (
                       <a
