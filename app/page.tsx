@@ -279,7 +279,7 @@ function CategoryShowcase() {
           <Link
             key={cat.slug}
             href={`/catalogo?category=${cat.slug}`}
-            className="group relative rounded-2xl overflow-hidden aspect-[3/4] category-card"
+            className="group relative rounded-2xl overflow-hidden aspect-[3/4] category-card cursor-pointer block"
             style={{ animationDelay: `${i * 60}ms` }}
           >
             <Image
@@ -290,9 +290,9 @@ function CategoryShowcase() {
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 16vw"
             />
             <div
-              className={`absolute inset-0 bg-gradient-to-t ${cat.color} via-black/40 to-transparent opacity-80 group-hover:opacity-70 transition-opacity`}
+              className={`absolute inset-0 bg-gradient-to-t ${cat.color} via-black/40 to-transparent opacity-80 group-hover:opacity-70 transition-opacity pointer-events-none`}
             />
-            <div className="absolute inset-x-0 bottom-0 p-4">
+            <div className="absolute inset-x-0 bottom-0 p-4 z-10 pointer-events-none">
               <p className="text-white font-black text-sm leading-tight">{cat.name}</p>
               <div className="flex items-center gap-1 text-white/60 text-[10px] font-bold uppercase mt-1 group-hover:text-white/80 transition-colors">
                 Ver produtos <ArrowRight className="w-3 h-3" />
