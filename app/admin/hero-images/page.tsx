@@ -11,8 +11,24 @@ interface HeroImage {
   alt: string;
   order: number;
   active: boolean;
+  linkType?: 'product' | 'category' | 'url' | null;
+  productId?: string | null;
+  categorySlug?: string | null;
+  linkUrl?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 export default function AdminHeroImagesPage() {
@@ -21,14 +37,51 @@ export default function AdminHeroImagesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<HeroImage>>({});
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newImage, setNewImage] = useState({ imageUrl: '', alt: 'Imagem do Hero', order: 0, active: true });
+  const [newImage, setNewImage] = useState({ 
+    imageUrl: '', 
+    alt: 'Imagem do Hero', 
+    order: 0, 
+    active: true,
+    linkType: null as 'product' | 'category' | 'url' | null,
+    productId: null as string | null,
+    categorySlug: null as string | null,
+    linkUrl: null as string | null,
+  });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     fetchImages();
+    fetchProducts();
+    fetchCategories();
   }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch('/api/products?limit=1000');
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data?.products ?? []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data ?? []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+    }
+  };
 
   const fetchImages = async () => {
     try {
@@ -149,7 +202,16 @@ export default function AdminHeroImagesPage() {
 
       if (res.ok) {
         toast.success('Imagem adicionada com sucesso');
-        setNewImage({ imageUrl: '', alt: 'Imagem do Hero', order: 0, active: true });
+        setNewImage({ 
+          imageUrl: '', 
+          alt: 'Imagem do Hero', 
+          order: 0, 
+          active: true,
+          linkType: null,
+          productId: null,
+          categorySlug: null,
+          linkUrl: null,
+        });
         setImagePreview(null);
         setShowAddForm(false);
         fetchImages();
@@ -193,6 +255,10 @@ export default function AdminHeroImagesPage() {
       alt: image.alt,
       order: image.order,
       active: image.active,
+      linkType: image.linkType || null,
+      productId: image.productId || null,
+      categorySlug: image.categorySlug || null,
+      linkUrl: image.linkUrl || null,
     });
   };
 
@@ -345,6 +411,89 @@ export default function AdminHeroImagesPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
               />
             </div>
+            {/* Link da Imagem */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de Link
+              </label>
+              <select
+                value={newImage.linkType || ''}
+                onChange={(e) => {
+                  const linkType = e.target.value as 'product' | 'category' | 'url' | '';
+                  const newData: any = { 
+                    ...newImage, 
+                    linkType: linkType || null,
+                  };
+                  // Limpar campos que não são do tipo selecionado
+                  if (linkType !== 'product') newData.productId = null;
+                  if (linkType !== 'category') newData.categorySlug = null;
+                  if (linkType !== 'url') newData.linkUrl = null;
+                  setNewImage(newData);
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+              >
+                <option value="">Nenhum link</option>
+                <option value="product">Link para Produto</option>
+                <option value="category">Link para Categoria</option>
+                <option value="url">URL Personalizada</option>
+              </select>
+            </div>
+
+            {newImage.linkType === 'product' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selecionar Produto
+                </label>
+                <select
+                  value={newImage.productId || ''}
+                  onChange={(e) => setNewImage({ ...newImage, productId: e.target.value || null })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                >
+                  <option value="">Selecione um produto</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {newImage.linkType === 'category' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selecionar Categoria
+                </label>
+                <select
+                  value={newImage.categorySlug || ''}
+                  onChange={(e) => setNewImage({ ...newImage, categorySlug: e.target.value || null })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {newImage.linkType === 'url' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  URL Personalizada
+                </label>
+                <input
+                  type="text"
+                  value={newImage.linkUrl || ''}
+                  onChange={(e) => setNewImage({ ...newImage, linkUrl: e.target.value || null })}
+                  placeholder="https://exemplo.com"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -381,7 +530,16 @@ export default function AdminHeroImagesPage() {
               <button
                 onClick={() => {
                   setShowAddForm(false);
-                  setNewImage({ imageUrl: '', alt: 'Imagem do Hero', order: 0, active: true });
+                  setNewImage({ 
+                    imageUrl: '', 
+                    alt: 'Imagem do Hero', 
+                    order: 0, 
+                    active: true,
+                    linkType: null,
+                    productId: null,
+                    categorySlug: null,
+                    linkUrl: null,
+                  });
                   setImagePreview(null);
                 }}
                 className="flex items-center gap-2 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
@@ -464,6 +622,86 @@ export default function AdminHeroImagesPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
                       />
                     </div>
+                    {/* Link da Imagem */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tipo de Link
+                      </label>
+                      <select
+                        value={editForm.linkType || ''}
+                        onChange={(e) => {
+                          const linkType = e.target.value as 'product' | 'category' | 'url' | '';
+                          const newForm: any = { ...editForm, linkType: linkType || null };
+                          // Limpar campos que não são do tipo selecionado
+                          if (linkType !== 'product') newForm.productId = null;
+                          if (linkType !== 'category') newForm.categorySlug = null;
+                          if (linkType !== 'url') newForm.linkUrl = null;
+                          setEditForm(newForm);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                      >
+                        <option value="">Nenhum link</option>
+                        <option value="product">Link para Produto</option>
+                        <option value="category">Link para Categoria</option>
+                        <option value="url">URL Personalizada</option>
+                      </select>
+                    </div>
+
+                    {editForm.linkType === 'product' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Selecionar Produto
+                        </label>
+                        <select
+                          value={editForm.productId || ''}
+                          onChange={(e) => setEditForm({ ...editForm, productId: e.target.value || null })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                        >
+                          <option value="">Selecione um produto</option>
+                          {products.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {editForm.linkType === 'category' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Selecionar Categoria
+                        </label>
+                        <select
+                          value={editForm.categorySlug || ''}
+                          onChange={(e) => setEditForm({ ...editForm, categorySlug: e.target.value || null })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                        >
+                          <option value="">Selecione uma categoria</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.slug}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {editForm.linkType === 'url' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          URL Personalizada
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.linkUrl || ''}
+                          onChange={(e) => setEditForm({ ...editForm, linkUrl: e.target.value || null })}
+                          placeholder="https://exemplo.com"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                        />
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -572,6 +810,31 @@ export default function AdminHeroImagesPage() {
                         <ExternalLink className="w-3 h-3" />
                         Abrir imagem
                       </a>
+                    )}
+                    {image.linkType && (
+                      <div className="mt-2 text-xs">
+                        <span className="font-semibold text-gray-700">Link: </span>
+                        {image.linkType === 'product' && image.productId && (
+                          <span className="text-blue-600">
+                            Produto: {products.find(p => p.id === image.productId)?.name || image.productId}
+                          </span>
+                        )}
+                        {image.linkType === 'category' && image.categorySlug && (
+                          <span className="text-blue-600">
+                            Categoria: {categories.find(c => c.slug === image.categorySlug)?.name || image.categorySlug}
+                          </span>
+                        )}
+                        {image.linkType === 'url' && image.linkUrl && (
+                          <a
+                            href={image.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            {image.linkUrl}
+                          </a>
+                        )}
+                      </div>
                     )}
                     </div>
                     <div className="flex gap-2">

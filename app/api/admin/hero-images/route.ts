@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { imageUrl, alt, order, active } = body;
+    const { imageUrl, alt, order, active, linkType, productId, categorySlug, linkUrl } = body;
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -59,6 +59,10 @@ export async function POST(req: NextRequest) {
       alt,
       order: order ?? 0,
       active: active ?? true,
+      linkType: linkType || null,
+      productId: productId || null,
+      categorySlug: categorySlug || null,
+      linkUrl: linkUrl || null,
     });
 
     return NextResponse.json({ id, success: true }, { status: 201 });
@@ -86,7 +90,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, imageUrl, alt, order, active } = body;
+    const { id, imageUrl, alt, order, active, linkType, productId, categorySlug, linkUrl } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -100,6 +104,10 @@ export async function PUT(req: NextRequest) {
       alt,
       order,
       active,
+      linkType,
+      productId,
+      categorySlug,
+      linkUrl,
     });
 
     if (!updated) {

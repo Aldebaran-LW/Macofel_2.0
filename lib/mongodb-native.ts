@@ -226,6 +226,10 @@ export async function getHeroImages() {
     alt: image.alt,
     order: image.order,
     active: image.active,
+    linkType: image.linkType || null,
+    productId: image.productId || null,
+    categorySlug: image.categorySlug || null,
+    linkUrl: image.linkUrl || null,
     createdAt: image.createdAt,
     updatedAt: image.updatedAt,
   }));
@@ -256,6 +260,10 @@ export async function createHeroImage(data: {
   alt?: string;
   order?: number;
   active?: boolean;
+  linkType?: 'product' | 'category' | 'url' | null;
+  productId?: string | null;
+  categorySlug?: string | null;
+  linkUrl?: string | null;
 }) {
   const db = await connectToDatabase();
   const heroImagesCollection = db.collection('hero_images');
@@ -265,6 +273,10 @@ export async function createHeroImage(data: {
     alt: data.alt || 'Imagem do Hero',
     order: data.order ?? 0,
     active: data.active ?? true,
+    linkType: data.linkType || null,
+    productId: data.productId || null,
+    categorySlug: data.categorySlug || null,
+    linkUrl: data.linkUrl || null,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -288,6 +300,10 @@ export async function updateHeroImage(id: string, data: {
   alt?: string;
   order?: number;
   active?: boolean;
+  linkType?: 'product' | 'category' | 'url' | null;
+  productId?: string | null;
+  categorySlug?: string | null;
+  linkUrl?: string | null;
 }) {
   const db = await connectToDatabase();
   const heroImagesCollection = db.collection('hero_images');
@@ -300,6 +316,10 @@ export async function updateHeroImage(id: string, data: {
   if (data.alt !== undefined) updateData.alt = data.alt;
   if (data.order !== undefined) updateData.order = data.order;
   if (data.active !== undefined) updateData.active = data.active;
+  if (data.linkType !== undefined) updateData.linkType = data.linkType;
+  if (data.productId !== undefined) updateData.productId = data.productId;
+  if (data.categorySlug !== undefined) updateData.categorySlug = data.categorySlug;
+  if (data.linkUrl !== undefined) updateData.linkUrl = data.linkUrl;
 
   const result = await heroImagesCollection.updateOne(
     { _id: new ObjectId(id) },
