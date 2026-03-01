@@ -593,11 +593,16 @@ function StoreVisitSection() {
   return (
     <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
       <div className="grid md:grid-cols-2 gap-8 items-center">
-        {/* Image */}
-        <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group cursor-pointer">
+        {/* Image - Clickable to open Google Maps */}
+        <a
+          href="https://www.google.com/maps/search/?api=1&query=Av.+São+Paulo,+699+-+Centro,+Parapuã+-+SP,+17730-000"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative rounded-2xl overflow-hidden aspect-[4/3] group cursor-pointer block"
+        >
           <Image
             src="https://images.unsplash.com/photo-1541888946425-d81bb19480c5?q=80&w=1200&auto=format&fit=crop"
-            alt="Loja MACOFEL"
+            alt="Loja MACOFEL - Clique para ver no mapa"
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-700"
             sizes="50vw"
@@ -610,7 +615,7 @@ function StoreVisitSection() {
             <p className="text-white font-black text-lg">5.000m²</p>
             <p className="text-white/70 text-xs font-bold uppercase">de Showroom</p>
           </div>
-        </div>
+        </a>
 
         {/* Text */}
         <div className="space-y-6">

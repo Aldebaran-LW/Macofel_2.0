@@ -387,9 +387,10 @@ export default function HeaderV2() {
                       key={cat.id}
                       onClick={(e) => {
                         e.preventDefault();
-                        // Navegar programaticamente e fechar o menu após navegação
-                        router.push(`/catalogo?category=${cat.slug}`);
+                        // Fechar menu primeiro
                         setMegaMenuOpen(false);
+                        // Usar window.location.href para garantir recarga completa e evitar problemas de cache
+                        window.location.href = `/catalogo?category=${cat.slug}`;
                       }}
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all group w-full text-left"
                     >
