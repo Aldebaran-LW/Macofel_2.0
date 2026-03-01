@@ -643,7 +643,7 @@ function StoreVisitSection() {
           </div>
 
           <a
-            href="https://www.google.com/maps/search/?api=1&query=Av.+São+Paulo,+699+-+Centro,+Parapuã+-+SP,+17730-000"
+            href="https://www.google.com/maps/place/Macofel+Parapu%C3%A3/@-21.7792204,-50.7964705,17z/data=!4m15!1m8!3m7!1s0x94942f5400b5375b:0x698d25456ba379a4!2sMacofel+Parapu%C3%A3!8m2!3d-21.7792205!4d-50.7915996!10e1!16s%2Fg%2F11vbkfnwr2!3m5!1s0x94942f5400b5375b:0x698d25456ba379a4!8m2!3d-21.7792205!4d-50.7915996!16s%2Fg%2F11vbkfnwr2?entry=ttu&g_ep=EgoyMDI2MDIyNS4wIKXMDSoASAFQAw%3D%3D"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-3 bg-slate-900 hover:bg-red-600 text-white font-bold text-sm uppercase tracking-widest px-8 py-4 rounded-2xl transition-all"
