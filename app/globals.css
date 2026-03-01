@@ -303,3 +303,10 @@ html {
 .whatsapp-btn {
   box-shadow: 0 8px 24px rgba(37, 211, 102, 0.4);
 }
+
+/* ─────────────────────────────────────────
+   RADIAL GRADIENT UTILITY
+───────────────────────────────────────── */
+.bg-gradient-radial {
+  background-image: radial-gradient(circle, var(--tw-gradient-stops));
+}

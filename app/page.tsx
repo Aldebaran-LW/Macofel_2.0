@@ -607,10 +607,22 @@ function StoreVisitSection() {
             className="object-cover group-hover:scale-105 transition-transform duration-700"
             sizes="50vw"
           />
-          {/* Enhanced gradient overlay with hover effect */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-black/30 to-transparent group-hover:from-black/70 group-hover:via-black/40 transition-all duration-500" />
-          {/* Additional gradient for better text readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20" />
+          {/* Multi-layer gradient overlay for visual depth and impact */}
+          {/* Radial gradient from center - creates dramatic focus effect */}
+          <div 
+            className="absolute inset-0 transition-all duration-500 group-hover:opacity-100"
+            style={{
+              background: 'radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.6) 100%)'
+            }}
+          />
+          {/* Diagonal gradient overlay - top-right to bottom-left with red accent */}
+          <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-red-900/20 to-transparent group-hover:from-black/60 group-hover:via-red-900/30 transition-all duration-500" />
+          {/* Bottom gradient for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
+          {/* Top-left subtle red accent for brand color */}
+          <div className="absolute inset-0 bg-gradient-to-br from-red-600/15 via-transparent to-transparent group-hover:from-red-600/20 transition-all duration-500" />
+          {/* Edge glow effect */}
+          <div className="absolute inset-0 ring-1 ring-inset ring-white/5 rounded-2xl pointer-events-none" />
           <div className="absolute bottom-6 left-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4 group-hover:bg-white/15 transition-all duration-300">
             <p className="text-white font-black text-lg">5.000m²</p>
             <p className="text-white/70 text-xs font-bold uppercase">de Showroom</p>
