@@ -594,7 +594,7 @@ function StoreVisitSection() {
     <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
       <div className="grid md:grid-cols-2 gap-8 items-center">
         {/* Image */}
-        <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group">
+        <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group cursor-pointer">
           <Image
             src="https://images.unsplash.com/photo-1541888946425-d81bb19480c5?q=80&w=1200&auto=format&fit=crop"
             alt="Loja MACOFEL"
@@ -602,8 +602,11 @@ function StoreVisitSection() {
             className="object-cover group-hover:scale-105 transition-transform duration-700"
             sizes="50vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-tr from-black/50 to-transparent" />
-          <div className="absolute bottom-6 left-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4">
+          {/* Enhanced gradient overlay with hover effect */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-black/30 to-transparent group-hover:from-black/70 group-hover:via-black/40 transition-all duration-500" />
+          {/* Additional gradient for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20" />
+          <div className="absolute bottom-6 left-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4 group-hover:bg-white/15 transition-all duration-300">
             <p className="text-white font-black text-lg">5.000m²</p>
             <p className="text-white/70 text-xs font-bold uppercase">de Showroom</p>
           </div>
