@@ -220,6 +220,41 @@ export async function getHeroImages() {
     .sort({ order: 1 })
     .toArray();
 
+  // Atualizar automaticamente imagens antigas que não têm os novos campos
+  const updatePromises = images
+    .filter((image: any) => 
+      image.displayType === undefined || 
+      image.animationOrder === undefined ||
+      image.linkType === undefined ||
+      image.productId === undefined ||
+      image.categorySlug === undefined ||
+      image.linkUrl === undefined
+    )
+    .map(async (image: any) => {
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (image.displayType === undefined) updateData.displayType = 'grid';
+      if (image.animationOrder === undefined || image.animationOrder === null) updateData.animationOrder = 0;
+      if (image.linkType === undefined) updateData.linkType = null;
+      if (image.productId === undefined) updateData.productId = null;
+      if (image.categorySlug === undefined) updateData.categorySlug = null;
+      if (image.linkUrl === undefined) updateData.linkUrl = null;
+
+      await heroImagesCollection.updateOne(
+        { _id: image._id },
+        { $set: updateData }
+      );
+    });
+
+  // Executar atualizações em paralelo (não bloquear a resposta)
+  if (updatePromises.length > 0) {
+    Promise.all(updatePromises).catch((error) => {
+      console.error('Erro ao atualizar imagens antigas:', error);
+    });
+  }
+
   return images.map((image: any) => ({
     id: image._id.toString(),
     imageUrl: image.imageUrl,
@@ -245,6 +280,41 @@ export async function getAllHeroImages() {
     .find({})
     .sort({ order: 1 })
     .toArray();
+
+  // Atualizar automaticamente imagens antigas que não têm os novos campos
+  const updatePromises = images
+    .filter((image: any) => 
+      image.displayType === undefined || 
+      image.animationOrder === undefined ||
+      image.linkType === undefined ||
+      image.productId === undefined ||
+      image.categorySlug === undefined ||
+      image.linkUrl === undefined
+    )
+    .map(async (image: any) => {
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (image.displayType === undefined) updateData.displayType = 'grid';
+      if (image.animationOrder === undefined || image.animationOrder === null) updateData.animationOrder = 0;
+      if (image.linkType === undefined) updateData.linkType = null;
+      if (image.productId === undefined) updateData.productId = null;
+      if (image.categorySlug === undefined) updateData.categorySlug = null;
+      if (image.linkUrl === undefined) updateData.linkUrl = null;
+
+      await heroImagesCollection.updateOne(
+        { _id: image._id },
+        { $set: updateData }
+      );
+    });
+
+  // Executar atualizações em paralelo (não bloquear a resposta)
+  if (updatePromises.length > 0) {
+    Promise.all(updatePromises).catch((error) => {
+      console.error('Erro ao atualizar imagens antigas:', error);
+    });
+  }
 
   return images.map((image: any) => ({
     id: image._id.toString(),

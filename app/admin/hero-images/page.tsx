@@ -56,7 +56,6 @@ export default function AdminHeroImagesPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [migrating, setMigrating] = useState(false);
 
   useEffect(() => {
     fetchImages();
@@ -64,28 +63,6 @@ export default function AdminHeroImagesPage() {
     fetchCategories();
   }, []);
 
-  const handleMigrate = async () => {
-    setMigrating(true);
-    try {
-      const res = await fetch('/api/admin/hero-images/migrate', {
-        method: 'POST',
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(data.message || 'Migração concluída com sucesso');
-        fetchImages(); // Recarregar imagens
-      } else {
-        const error = await res.json();
-        toast.error(error.error || 'Erro ao executar migração');
-      }
-    } catch (error) {
-      console.error('Erro ao executar migração:', error);
-      toast.error('Erro ao executar migração');
-    } finally {
-      setMigrating(false);
-    }
-  };
 
   const fetchProducts = async () => {
     try {
@@ -337,33 +314,13 @@ export default function AdminHeroImagesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Imagens do Hero</h1>
           <p className="text-gray-600 mt-2">Gerencie as imagens exibidas no hero da página inicial</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleMigrate}
-            disabled={migrating}
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Atualizar imagens antigas com novos campos (displayType, animationOrder)"
-          >
-            {migrating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Migrando...
-              </>
-            ) : (
-              <>
-                <Upload className="w-5 h-5" />
-                Migrar Imagens
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-bold"
-          >
-            <Plus className="w-5 h-5" />
-            Adicionar Imagem
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-bold"
+        >
+          <Plus className="w-5 h-5" />
+          Adicionar Imagem
+        </button>
       </div>
 
       {showAddForm && (
