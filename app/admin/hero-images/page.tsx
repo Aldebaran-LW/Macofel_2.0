@@ -58,7 +58,7 @@ export default function AdminHeroImagesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    fetchImages();
+    fetchImages(true); // true = fazer seed automático se não houver imagens
     fetchProducts();
     fetchCategories();
   }, []);
@@ -88,7 +88,7 @@ export default function AdminHeroImagesPage() {
     }
   };
 
-  const fetchImages = async () => {
+  const fetchImages = async (autoSeed = false) => {
     try {
       setLoading(true);
       const res = await fetch('/api/admin/hero-images');
@@ -106,9 +106,24 @@ export default function AdminHeroImagesPage() {
       
       if (res.ok) {
         const data = await res.json();
-        setImages(Array.isArray(data) ? data : []);
-        if (data && data.length === 0) {
-          toast.info('Nenhuma imagem cadastrada ainda.');
+        const imageList = Array.isArray(data) ? data : [];
+        setImages(imageList);
+
+        // Se não há imagens, fazer seed automático das imagens padrão (apenas na primeira vez)
+        if (imageList.length === 0 && autoSeed) {
+          const seedRes = await fetch('/api/admin/hero-images/seed', { method: 'POST' });
+          if (seedRes.ok) {
+            const seedData = await seedRes.json();
+            if (seedData.success) {
+              toast.success('Imagens padrão carregadas com sucesso!');
+              // Buscar as imagens novamente após o seed
+              const refetchRes = await fetch('/api/admin/hero-images');
+              if (refetchRes.ok) {
+                const refetchData = await refetchRes.json();
+                setImages(Array.isArray(refetchData) ? refetchData : []);
+              }
+            }
+          }
         }
       } else {
         const errorData = await res.json().catch(() => ({}));
