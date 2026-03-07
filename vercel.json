@@ -4,7 +4,6 @@
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
   "regions": ["iad1"],
-  "rootDirectory": "nextjs_space",
   "env": {
     "NODE_ENV": "production"
   }

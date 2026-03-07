@@ -186,14 +186,16 @@ Na tela de configuração, defina:
 
 - **Project Name:** `materiais-de-construcao-decar` (ou o nome que preferir)
 - **Framework Preset:** Next.js (deve detectar automaticamente)
-- **Root Directory:** `nextjs_space` ⚠️ **MUITO IMPORTANTE!**
+- **Root Directory:** `nextjs_space` ⚠️ **MUITO IMPORTANTE!** (Configure no Dashboard da Vercel, não no vercel.json)
 - **Build Command:** `npm run build` (já configurado no `vercel.json`)
 - **Output Directory:** `.next` (padrão do Next.js)
 - **Install Command:** `npm install --legacy-peer-deps` (já configurado)
 
 #### ⚠️ ATENÇÃO: Root Directory
 
-**CRÍTICO:** Configure o **Root Directory** como `nextjs_space`
+**CRÍTICO:** Configure o **Root Directory** como `nextjs_space` **NO DASHBOARD DA VERCEL**
+
+⚠️ **IMPORTANTE:** A propriedade `rootDirectory` NÃO deve estar no arquivo `vercel.json`. Configure-a apenas no Dashboard da Vercel em **Settings** > **General** > **Root Directory**.
 
 Se não configurar, a Vercel vai procurar o `package.json` na raiz e não vai encontrar!
 
