@@ -35,7 +35,7 @@ async function getFeaturedProducts() {
 
 async function getProductsByCategory(categorySlug: string, limit: number = 4) {
   try {
-    const result = await getProducts({ category: categorySlug, limit });
+    const result = await getProducts({ categorySlug: categorySlug, limit });
     return result.products ?? [];
   } catch {
     return [];
