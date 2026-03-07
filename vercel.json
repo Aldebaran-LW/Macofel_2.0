@@ -1,12 +1,10 @@
 ﻿{
-    "buildCommand":  "npm run vercel-build",
-    "devCommand":  "npm run dev",
-    "installCommand":  "npm install --legacy-peer-deps",
-    "framework":  "nextjs",
-    "regions":  [
-                    "iad1"
-                ],
-    "env":  {
-                "NODE_ENV":  "production"
-            }
+  "buildCommand": "npm run vercel-build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install --legacy-peer-deps",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
