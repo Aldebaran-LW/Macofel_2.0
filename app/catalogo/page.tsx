@@ -14,9 +14,11 @@ import {
   ShoppingCart,
   Star,
   Heart,
+  MessageCircle,
+  Truck,
+  CreditCard,
+  ShieldCheck,
 } from 'lucide-react';
-import HeaderV2 from '@/components/header-v2';
-import FooterV2 from '@/components/footer-v2';
 import WhatsAppButton from '@/components/whatsapp-button';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
@@ -154,31 +156,106 @@ function CatalogoContent() {
   const hasFilters = search || selectedCategory || minPrice || maxPrice;
 
   return (
-    <>
-      <HeaderV2 />
+    <div className="min-h-screen bg-white">
+      {/* Top Bar Azul */}
+      <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">
+        <span>Compre com 10% OFF no PIX!</span>
+        <span className="mx-2">/</span>
+        <span>Enviamos para todo o Brasil</span>
+      </div>
 
-      {/* Page header */}
-      <div className="bg-slate-950 text-white py-12">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-8">
-          <nav className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Link href="/" className="hover:text-white transition-colors">Início</Link>
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-8">
+            <Link href="/" className="flex items-center gap-2 shrink-0">
+              <Image src="/logo-macofel.png" alt="MACOFEL" width={60} height={60} className="h-14 w-auto object-contain" />
+              <div className="flex flex-col">
+                <span className="text-2xl font-black text-gray-800 tracking-tight">MACO<span className="text-red-600">FEL</span></span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Materiais para Construção</span>
+              </div>
+            </Link>
+            <div className="flex-1 max-w-2xl">
+              <form onSubmit={handleSearch} className="relative">
+                <input
+                  type="text"
+                  placeholder="Faça uma pesquisa..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-lg py-3 px-4 pr-12 focus:border-red-500 focus:outline-none"
+                />
+                <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600">
+                  <Search className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
+            <div className="flex items-center gap-6 shrink-0">
+              <Link href="/login" className="text-sm text-gray-600 hover:text-red-600">
+                <span className="font-bold">Entre</span> ou<br /><span className="font-bold">Cadastre-se</span>
+              </Link>
+              <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-red-600">
+                <ShoppingCart className="w-6 h-6" /><span className="font-bold">0</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+        <nav className="border-t border-gray-100">
+          <div className="max-w-7xl mx-auto px-4">
+            <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
+              <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
+              <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
+              <li><Link href="/catalogo?category=material-eletrico" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
+              <li><Link href="/catalogo?category=material-hidraulico" className="hover:text-red-600 transition-colors">Materiais Hidráulicos</Link></li>
+              <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
+              <li><Link href="/catalogo?category=tintas-acessorios" className="hover:text-red-600 transition-colors">Tintas</Link></li>
+              <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>
+            </ul>
+          </div>
+        </nav>
+      </header>
+
+      {/* Service Badges */}
+      <div className="bg-white py-4 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+              <Truck className="w-5 h-5 text-red-600" />
+              <span className="text-sm font-semibold text-gray-700">Entrega rápida</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+              <CreditCard className="w-5 h-5 text-amber-600" />
+              <span className="text-sm font-semibold text-gray-700">Desconto no Pix</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+              <MessageCircle className="w-5 h-5 text-green-600" />
+              <span className="text-sm font-semibold text-gray-700">Fale pelo WhatsApp</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Breadcrumb */}
+      <div className="bg-gray-50 py-4">
+        <div className="max-w-7xl mx-auto px-4">
+          <nav className="text-sm text-gray-500 font-medium flex items-center gap-2">
+            <Link href="/" className="hover:text-red-600 transition-colors">Início</Link>
             <span>/</span>
-            <span className="text-white">Catálogo</span>
+            <span className="text-gray-800">Catálogo</span>
             {selectedCategory && (
               <>
                 <span>/</span>
-                <span className="text-red-400">
+                <span className="text-red-600 font-bold">
                   {categories.find((c) => c.slug === selectedCategory)?.name ?? selectedCategory}
                 </span>
               </>
             )}
           </nav>
-          <h1 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter">
+          <h1 className="text-3xl font-bold text-gray-800 mt-2">
             {selectedCategory
               ? categories.find((c) => c.slug === selectedCategory)?.name ?? 'Catálogo'
-              : 'Catálogo Completo'}
+              : 'Todos os Produtos'}
           </h1>
-          <p className="text-slate-400 mt-2 text-sm">
+          <p className="text-gray-500 mt-1">
             {totalProducts > 0
               ? `${totalProducts} produto${totalProducts !== 1 ? 's' : ''} encontrado${totalProducts !== 1 ? 's' : ''}`
               : 'Explore nossa linha completa de materiais'}
@@ -186,7 +263,7 @@ function CatalogoContent() {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex gap-8">
           {/* ── SIDEBAR ─────────────────────── */}
           <aside
@@ -624,9 +701,62 @@ function CatalogoContent() {
         </div>
       </div>
 
-      <FooterV2 />
-      <WhatsAppButton />
-    </>
+      {/* Footer estilo Decar */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl font-black">MACO<span className="text-red-500">FEL</span></span>
+              </div>
+              <p className="text-gray-400 text-sm mb-4">Materiais para Construção de qualidade em Parapuã e região.</p>
+              <div className="text-sm text-gray-400 space-y-1">
+                <p>📍 Av. São Paulo, 699 - Centro</p>
+                <p>Parapuã - SP, 17730-000</p>
+                <p>📞 (18) 99814-5495</p>
+              </div>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4">Institucional</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link href="#" className="hover:text-white">Sobre nós</Link></li>
+                <li><Link href="#" className="hover:text-white">Política de Privacidade</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4">Atendimento</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link href="#" className="hover:text-white">Fale Conosco</Link></li>
+                <li><Link href="/meus-pedidos" className="hover:text-white">Meus Pedidos</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4">Formas de Pagamento</h4>
+              <div className="flex gap-2 flex-wrap">
+                <span className="bg-white/10 px-3 py-1 rounded text-xs">Visa</span>
+                <span className="bg-white/10 px-3 py-1 rounded text-xs">Master</span>
+                <span className="bg-green-600 px-3 py-1 rounded text-xs">Pix</span>
+                <span className="bg-white/10 px-3 py-1 rounded text-xs">Boleto</span>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
+            <p>© 2026 MACOFEL - Materiais para Construção. Todos os direitos reservados.</p>
+          </div>
+        </div>
+      </footer>
+      
+      {/* WhatsApp Floating */}
+      <a
+        href="https://wa.me/5518998145495?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20MACOFEL%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es."
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-lg transition-colors"
+      >
+        <MessageCircle className="w-5 h-5" />
+        <span className="font-bold text-sm">Fale conosco</span>
+      </a>
+    </div>
   );
 }
 

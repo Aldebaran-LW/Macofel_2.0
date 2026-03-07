@@ -18,9 +18,6 @@ cd nextjs_space
 # Fazer login com o token
 vercel login --token vck_484rYySwGJvKi4RqkIvHxPLwzYzkeLfJH5iEFI0jUUpVL3pzWL2TJcLk
 
-# OU usar o script automático
-.\deploy-vercel-decar.ps1
-
 # Deploy para preview
 vercel
 

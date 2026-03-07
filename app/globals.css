@@ -310,30 +310,3 @@ html {
 .bg-gradient-radial {
   background-image: radial-gradient(circle, var(--tw-gradient-stops));
 }
-
-/* ─────────────────────────────────────────
-   DECAR INSPIRED LAYOUT STYLES
-───────────────────────────────────────── */
-.decar-pix-banner {
-  background: linear-gradient(90deg, #059669 0%, #10b981 50%, #059669 100%);
-  background-size: 200% 100%;
-  animation: shimmer 4s linear infinite;
-}
-
-.decar-section-title {
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-
-.decar-product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-@media (max-width: 640px) {
-  .decar-product-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-}

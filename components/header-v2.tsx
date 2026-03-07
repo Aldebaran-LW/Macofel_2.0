@@ -241,7 +241,7 @@ export default function HeaderV2() {
             <div className="flex items-center gap-1 sm:gap-4 shrink-0">
               {/* Phone (desktop) */}
               <a
-                href="tel:+551133333333"
+                href="tel:+5518998145495"
                 className="hidden xl:flex flex-col items-end leading-none text-right"
               >
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
@@ -249,7 +249,7 @@ export default function HeaderV2() {
                 </span>
                 <span className="text-sm font-black text-slate-800 flex items-center gap-1">
                   <Phone className="w-3 h-3 text-red-600" />
-                  (11) 3333-3333
+                  (18) 99814-5495
                 </span>
               </a>
 
@@ -339,6 +339,7 @@ export default function HeaderV2() {
             {/* Mega menu trigger — FORA do overflow */}
             <div ref={megaRef} style={{ position: 'relative', zIndex: 9999 }} className="shrink-0">
               <button
+                data-testid="departments-menu-button"
                 style={{ position: 'relative', zIndex: 9999 }}
                 onClick={() => {
                   if (!megaMenuOpen && megaRef.current) {
@@ -354,8 +355,7 @@ export default function HeaderV2() {
                 aria-expanded={megaMenuOpen}
                 aria-haspopup="true"
                 aria-controls="mega-menu-departamentos"
-                disabled={categories.length === 0}
-                className={`flex items-center gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-red-600 disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`flex items-center gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-red-600 ${
                   megaMenuOpen
                     ? 'bg-red-700 shadow-lg'
                     : 'bg-red-600 hover:bg-red-700'
@@ -376,39 +376,46 @@ export default function HeaderV2() {
               </button>
 
               {/* Mega Dropdown — position fixed para não ser clipado por nenhum ancestral */}
-              {megaMenuOpen && categories.length > 0 && (
+              {megaMenuOpen && (
                 <div
                   id="mega-menu-departamentos"
-                  style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                  data-testid="departments-dropdown"
+                  style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 99999 }}
                   className="bg-white shadow-2xl rounded-b-2xl border border-slate-100 w-[600px] p-6 grid grid-cols-2 gap-2"
                 >
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        // Fechar menu primeiro
-                        setMegaMenuOpen(false);
-                        // Usar window.location.href para garantir recarga completa e evitar problemas de cache
-                        window.location.href = `/catalogo?category=${cat.slug}`;
-                      }}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all group w-full text-left"
-                    >
-                      <span className="w-9 h-9 bg-slate-100 group-hover:bg-red-100 rounded-lg flex items-center justify-center text-slate-500 group-hover:text-red-600 transition-all shrink-0">
-                        {getCategoryIcon(cat.slug)}
-                      </span>
-                      <span className="text-sm font-semibold text-slate-700 group-hover:text-red-600">
-                        {cat.name}
-                      </span>
-                    </button>
-                  ))}
-                  <Link
-                    href="/catalogo"
-                    onClick={() => setMegaMenuOpen(false)}
-                    className="col-span-2 mt-2 flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-red-400 text-xs font-bold uppercase text-slate-400 hover:text-red-600 transition-all"
-                  >
-                    Ver todas as categorias →
-                  </Link>
+                  {categories.length > 0 ? (
+                    <>
+                      {categories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setMegaMenuOpen(false);
+                            window.location.href = `/catalogo?category=${cat.slug}`;
+                          }}
+                          className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all group w-full text-left"
+                        >
+                          <span className="w-9 h-9 bg-slate-100 group-hover:bg-red-100 rounded-lg flex items-center justify-center text-slate-500 group-hover:text-red-600 transition-all shrink-0">
+                            {getCategoryIcon(cat.slug)}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-700 group-hover:text-red-600">
+                            {cat.name}
+                          </span>
+                        </button>
+                      ))}
+                      <Link
+                        href="/catalogo"
+                        onClick={() => setMegaMenuOpen(false)}
+                        className="col-span-2 mt-2 flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-red-400 text-xs font-bold uppercase text-slate-400 hover:text-red-600 transition-all"
+                      >
+                        Ver todas as categorias →
+                      </Link>
+                    </>
+                  ) : (
+                    <div className="col-span-2 text-center py-4 text-slate-400">
+                      Carregando categorias...
+                    </div>
+                  )}
                 </div>
               )}
             </div>

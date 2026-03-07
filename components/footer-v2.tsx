@@ -86,13 +86,13 @@ export default function FooterV2() {
             {/* Contact Info */}
             <div className="space-y-3 mb-8">
               <a
-                href="tel:+551133333333"
+                href="tel:+5518998145495"
                 className="flex items-center gap-3 text-sm text-slate-400 hover:text-white transition-colors group"
               >
                 <div className="w-8 h-8 bg-white/5 group-hover:bg-red-600/20 rounded-lg flex items-center justify-center transition-colors">
                   <Phone className="w-4 h-4 text-red-500" />
                 </div>
-                (11) 3333-3333
+                (18) 99814-5495
               </a>
               <a
                 href="mailto:contato@macofel.com.br"
@@ -113,7 +113,7 @@ export default function FooterV2() {
                 <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center shrink-0">
                   <Clock className="w-4 h-4 text-red-500" />
                 </div>
-                Seg–Sex: 08:00–18:00
+                Seg–Sex: 08:00–18:00 | Sáb: 08:00–13:00
               </div>
             </div>
 

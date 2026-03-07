@@ -3,22 +3,13 @@ import Image from 'next/image';
 import {
   Truck,
   ShieldCheck,
-  Clock,
   CreditCard,
-  MapPin,
+  MessageCircle,
+  ShoppingCart,
   Star,
-  ArrowRight,
-  CheckCircle2,
-  Zap,
-  Users,
-  Award,
-  Package,
+  ChevronLeft,
   ChevronRight,
-  Phone,
 } from 'lucide-react';
-import LayoutWrapperV2 from '@/components/layout-wrapper-v2';
-import ProductCardV2 from '@/components/product-card-v2';
-import HeroSectionAnimated from '@/components/hero-section-animated';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -32,674 +23,373 @@ async function getFeaturedProducts() {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  COMPONENTS INLINE (server-safe, sem estado)
-// ─────────────────────────────────────────────────────────
+async function getRecentProducts() {
+  try {
+    const result = await getProducts({ limit: 8 });
+    return result.products ?? [];
+  } catch {
+    return [];
+  }
+}
 
-function HeroSection() {
+// Componentes no estilo Decar
+function TopBar() {
   return (
-    <section className="hero-v2-bg relative overflow-hidden min-h-[88vh] flex items-center">
-      {/* Radial glow */}
-      <div className="hero-v2-accent absolute inset-0 pointer-events-none" />
-
-      {/* Grid texture overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
-      />
-
-      <div className="relative max-w-[1600px] mx-auto px-4 md:px-8 w-full py-20 lg:py-0">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left: Text */}
-          <div className="animate-slide-in">
-            {/* Tag badge */}
-            <div className="inline-flex items-center gap-2 bg-red-600/20 border border-red-600/30 text-red-400 rounded-full px-4 py-2 text-xs font-bold uppercase tracking-widest mb-8">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              Campanha — Inverno 2026
-            </div>
-
-            <h1 className="text-5xl md:text-6xl xl:text-7xl font-black text-white leading-[0.95] tracking-tighter mb-8 italic uppercase">
-              Construa com
-              <br />
-              <span className="text-red-500">Confiança.</span>
-            </h1>
-
-            <p className="text-slate-400 text-lg md:text-xl leading-relaxed max-w-lg mb-10">
-              Mais de 5.000 produtos em estoque — cimento, ferramentas, elétrica, hidráulica e
-              muito mais. Entrega direta na sua obra em até 48h.
-            </p>
-
-            {/* CTAs */}
-            <div className="flex flex-wrap gap-4 mb-12">
-              <Link
-                href="/catalogo"
-                className="flex items-center gap-3 bg-red-600 hover:bg-red-500 text-white font-bold px-8 py-4 rounded-2xl transition-all hover:shadow-lg hover:shadow-red-600/30 hover:-translate-y-0.5 text-sm uppercase tracking-wider"
-              >
-                Ver Catálogo Completo
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <a
-                href="tel:+551133333333"
-                className="flex items-center gap-3 bg-white/10 hover:bg-white/20 text-white font-bold px-8 py-4 rounded-2xl transition-all border border-white/10 text-sm uppercase tracking-wider"
-              >
-                <Phone className="w-4 h-4" />
-                Falar com Consultor
-              </a>
-            </div>
-
-            {/* Trust bullets */}
-            <div className="flex flex-wrap gap-6 text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {[
-                '✓ Desde 1998',
-                '✓ +10.000 Clientes',
-                '✓ 5.000m² de Estoque',
-                '✓ Garantia Técnica',
-              ].map((t) => (
-                <span key={t}>{t}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: Image grid */}
-          <div className="hidden lg:grid grid-cols-2 gap-4 animate-fade-in" style={{ animationDelay: '200ms' }}>
-            <div className="space-y-4">
-              <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group">
-                <Image
-                  src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=800&auto=format&fit=crop"
-                  alt="Construção"
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-700"
-                  sizes="25vw"
-                  priority
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-3 left-3 bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg tracking-wider">
-                  Fundação
-                </div>
-              </div>
-              <div className="relative rounded-2xl overflow-hidden aspect-square group">
-                <Image
-                  src="https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=800&auto=format&fit=crop"
-                  alt="Ferramentas"
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-700"
-                  sizes="25vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg tracking-wider">
-                  Ferramentas Pro
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4 mt-8">
-              <div className="relative rounded-2xl overflow-hidden aspect-square group">
-                <Image
-                  src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=800&auto=format&fit=crop"
-                  alt="Elétrica"
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-700"
-                  sizes="25vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-3 left-3 bg-amber-500 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg tracking-wider">
-                  Elétrica
-                </div>
-              </div>
-              <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group">
-                <Image
-                  src="https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?q=80&w=800&auto=format&fit=crop"
-                  alt="Acabamentos"
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-700"
-                  sizes="25vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-3 left-3 bg-emerald-600 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg tracking-wider">
-                  Acabamentos
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom wave */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg viewBox="0 0 1440 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0 60H1440V20C1200 60 960 0 720 20C480 40 240 0 0 20V60Z" fill="#f9fafb" />
-        </svg>
-      </div>
-    </section>
+    <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">
+      <span>Compre com 10% OFF no PIX!</span>
+      <span className="mx-2">/</span>
+      <span>Enviamos para todo o Brasil</span>
+      <span className="mx-2">/</span>
+      <span>Envie sua lista de materiais</span>
+    </div>
   );
 }
 
-function ServicesBar() {
-  const services = [
-    { icon: <Truck className="w-5 h-5" />, title: 'Entrega na Obra', sub: 'Em 24h ou 48h' },
-    { icon: <ShieldCheck className="w-5 h-5" />, title: 'Compra Segura', sub: '100% protegida' },
-    { icon: <CreditCard className="w-5 h-5" />, title: 'Até 12x Sem Juros', sub: 'No cartão' },
-    { icon: <Clock className="w-5 h-5" />, title: 'Retire em 2 Horas', sub: 'Click & Collect' },
-  ];
-
+function Header() {
   return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 -mt-6 relative z-10 mb-16">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        {services.map((s, i) => (
-          <div
-            key={i}
-            className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-red-600 shrink-0">
-              {s.icon}
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">{s.title}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider">{s.sub}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CategoryShowcase() {
-  const categories = [
-    {
-      name: 'Cimento & Argamassa',
-      slug: 'cimento',
-      image:
-        'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop',
-      color: 'from-slate-800',
-    },
-    {
-      name: 'Ferramentas',
-      slug: 'ferramentas',
-      image:
-        'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=600&auto=format&fit=crop',
-      color: 'from-red-900',
-    },
-    {
-      name: 'Elétrica',
-      slug: 'eletrica',
-      image:
-        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=600&auto=format&fit=crop',
-      color: 'from-amber-900',
-    },
-    {
-      name: 'Hidráulica',
-      slug: 'hidraulica',
-      image:
-        'https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=80&w=600&auto=format&fit=crop',
-      color: 'from-blue-900',
-    },
-    {
-      name: 'Acabamentos',
-      slug: 'acabamentos',
-      image:
-        'https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?q=80&w=600&auto=format&fit=crop',
-      color: 'from-emerald-900',
-    },
-    {
-      name: 'Tintas & Vernizes',
-      slug: 'tintas',
-      image:
-        'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=80&w=600&auto=format&fit=crop',
-      color: 'from-purple-900',
-    },
-  ];
-
-  return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
-      {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
-            Departamentos
-          </p>
-          <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
-            O que você está
-            <br />
-            <span className="text-red-600">procurando?</span>
-          </h2>
-        </div>
-        <Link
-          href="/catalogo"
-          className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-red-600 transition-colors"
-        >
-          Ver todas <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {categories.map((cat, i) => (
-          <Link
-            key={cat.slug}
-            href={`/catalogo?category=${cat.slug}`}
-            className="group relative rounded-2xl overflow-hidden aspect-[3/4] category-card cursor-pointer block"
-            style={{ animationDelay: `${i * 60}ms` }}
-          >
+    <header className="bg-white shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center justify-between gap-8">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 shrink-0">
             <Image
-              src={cat.image}
-              alt={cat.name}
-              fill
-              className="object-cover group-hover:scale-110 transition-transform duration-600"
-              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 16vw"
+              src="/logo-macofel.png"
+              alt="MACOFEL"
+              width={60}
+              height={60}
+              className="h-14 w-auto object-contain"
             />
-            <div
-              className={`absolute inset-0 bg-gradient-to-t ${cat.color} via-black/40 to-transparent opacity-80 group-hover:opacity-70 transition-opacity pointer-events-none`}
-            />
-            <div className="absolute inset-x-0 bottom-0 p-4 z-10 pointer-events-none">
-              <p className="text-white font-black text-sm leading-tight">{cat.name}</p>
-              <div className="flex items-center gap-1 text-white/60 text-[10px] font-bold uppercase mt-1 group-hover:text-white/80 transition-colors">
-                Ver produtos <ArrowRight className="w-3 h-3" />
-              </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-black text-gray-800 tracking-tight">
+                MACO<span className="text-red-600">FEL</span>
+              </span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+                Materiais para Construção
+              </span>
             </div>
           </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
 
-function StatsSection() {
-  const stats = [
-    { value: '28+', label: 'Anos de Experiência', icon: <Award className="w-6 h-6" /> },
-    { value: '+10K', label: 'Clientes Satisfeitos', icon: <Users className="w-6 h-6" /> },
-    { value: '+5K', label: 'Produtos em Estoque', icon: <Package className="w-6 h-6" /> },
-    { value: '98%', label: 'Entregas no Prazo', icon: <Truck className="w-6 h-6" /> },
-  ];
-
-  return (
-    <section className="bg-slate-950 py-20 mb-24">
-      <div className="max-w-[1600px] mx-auto px-4 md:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
-          {stats.map((s, i) => (
-            <div
-              key={i}
-              className="flex flex-col items-center text-center border-r border-white/5 last:border-r-0 px-4"
-            >
-              <div className="w-12 h-12 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-500 mb-4">
-                {s.icon}
-              </div>
-              <p className="text-4xl md:text-5xl font-black text-white stat-number mb-2">
-                {s.value}
-              </p>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-async function FeaturedProducts() {
-  const products = await getFeaturedProducts();
-
-  const badges = [
-    { text: 'Mais Vendido', color: 'red' as const },
-    { text: 'Destaque', color: 'amber' as const },
-    { text: 'Novo', color: 'green' as const },
-  ];
-
-  return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
-            Selecionados para Você
-          </p>
-          <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
-            Produtos em
-            <br />
-            <span className="text-red-600">Destaque</span>
-          </h2>
-        </div>
-        <Link
-          href="/catalogo"
-          className="hidden md:flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-6 py-3 rounded-xl transition-all"
-        >
-          Ver Todos <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
-
-      {products.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {products.map((product: any, index: number) => (
-            <ProductCardV2
-              key={product.id}
-              product={product}
-              badgeText={index < 3 ? badges[index]?.text : undefined}
-              badgeColor={index < 3 ? badges[index]?.color : undefined}
-              priority={index < 4}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="col-span-4 text-center py-20 text-slate-400">
-          <div className="text-5xl mb-4">📦</div>
-          <p className="font-bold">Nenhum produto em destaque encontrado.</p>
-        </div>
-      )}
-
-      <div className="flex justify-center mt-10 md:hidden">
-        <Link
-          href="/catalogo"
-          className="flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 px-8 py-3 rounded-xl"
-        >
-          Ver Todos os Produtos
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function WhyUsSection() {
-  const reasons = [
-    {
-      icon: <Award className="w-7 h-7 text-red-600" />,
-      title: 'Qualidade Certificada',
-      desc: 'Todos os nossos materiais são provenientes de fornecedores homologados e possuem certificação de qualidade.',
-    },
-    {
-      icon: <Truck className="w-7 h-7 text-red-600" />,
-      title: 'Entrega Rápida',
-      desc: 'Frota própria para entregas em São Paulo. Seu pedido na obra em 24h ou 48h com rastreamento em tempo real.',
-    },
-    {
-      icon: <Users className="w-7 h-7 text-red-600" />,
-      title: 'Assessoria Técnica',
-      desc: 'Equipe de engenheiros e técnicos especializados prontos para calcular e orientar o seu projeto.',
-    },
-    {
-      icon: <ShieldCheck className="w-7 h-7 text-red-600" />,
-      title: 'Garantia de 30 Dias',
-      desc: 'Compra protegida e suporte completo. Em caso de problemas, trocamos ou reembolsamos sem burocracia.',
-    },
-    {
-      icon: <Zap className="w-7 h-7 text-red-600" />,
-      title: 'Orçamento em Minutos',
-      desc: 'Envie as medidas do seu projeto e receba um orçamento completo e personalizado em minutos.',
-    },
-    {
-      icon: <CreditCard className="w-7 h-7 text-red-600" />,
-      title: 'Condições Especiais',
-      desc: 'Até 12x sem juros no cartão, boleto parcelado, PIX com desconto e crédito especial para empresas.',
-    },
-  ];
-
-  return (
-    <section className="bg-slate-50 py-24 mb-24">
-      <div className="max-w-[1600px] mx-auto px-4 md:px-8">
-        <div className="text-center mb-16">
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
-            Por que escolher a MACOFEL?
-          </p>
-          <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
-            A diferença está nos
-            <br />
-            <span className="text-red-600">Detalhes.</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {reasons.map((r, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-2xl p-8 border border-slate-100 hover:border-red-200 hover:shadow-lg transition-all group"
-            >
-              <div className="w-14 h-14 bg-red-50 group-hover:bg-red-100 rounded-2xl flex items-center justify-center mb-6 transition-colors">
-                {r.icon}
-              </div>
-              <h3 className="text-lg font-black text-slate-900 mb-3">{r.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{r.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TestimonialsSection() {
-  const testimonials = [
-    {
-      name: 'Carlos Eduardo',
-      role: 'Mestre de Obras',
-      avatar: 'CE',
-      stars: 5,
-      text: 'Trabalho com a MACOFEL há 8 anos. O material é sempre de primeira e a entrega nunca falha. Recomendo para todos os colegas da área.',
-    },
-    {
-      name: 'Mariana Alves',
-      role: 'Arquiteta',
-      avatar: 'MA',
-      stars: 5,
-      text: 'Fornecedor indispensável para meus projetos. A assessoria técnica me ajudou a economizar materiais e tempo de obra.',
-    },
-    {
-      name: 'João Roberto',
-      role: 'Empreiteiro',
-      avatar: 'JR',
-      stars: 5,
-      text: 'Preços competitivos, catálogo enorme e atendimento excelente. A compra online ficou muito prática — recebo os pedidos em 24h.',
-    },
-  ];
-
-  return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
-      <div className="text-center mb-12">
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
-          Depoimentos
-        </p>
-        <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
-          Quem constrói com a gente
-          <br />
-          <span className="text-red-600">não troca.</span>
-        </h2>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        {testimonials.map((t, i) => (
-          <div
-            key={i}
-            className="bg-white rounded-2xl p-8 border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
-          >
-            {/* Stars */}
-            <div className="flex gap-1 mb-6">
-              {[...Array(t.stars)].map((_, j) => (
-                <Star key={j} className="w-4 h-4 fill-amber-400 text-amber-400" />
-              ))}
-            </div>
-            <p className="text-slate-600 text-sm leading-relaxed mb-8 italic">"{t.text}"</p>
-            <div className="flex items-center gap-4 border-t border-slate-100 pt-6">
-              <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-black text-sm">
-                {t.avatar}
-              </div>
-              <div>
-                <p className="text-sm font-black text-slate-900">{t.name}</p>
-                <p className="text-xs text-slate-400">{t.role}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CtaBanner() {
-  return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
-      <div className="relative bg-slate-950 rounded-[2rem] overflow-hidden p-10 md:p-16">
-        {/* Decorative shapes */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-red-600/10 rounded-full -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-red-600/5 rounded-full translate-y-1/2 -translate-x-1/4 pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-red-500 mb-4">
-              Pro Service · Exclusivo MACOFEL
-            </p>
-            <h2 className="text-3xl md:text-5xl font-black text-white italic uppercase tracking-tighter leading-tight mb-6">
-              Precisa de um
-              <br />
-              <span className="text-red-500">Orçamento?</span>
-            </h2>
-            <p className="text-slate-400 max-w-xl leading-relaxed">
-              Envie as medidas do seu projeto e receba um orçamento detalhado com os melhores preços
-              e orientação técnica gratuita.
-            </p>
-
-            <div className="flex flex-wrap gap-4 mt-4 text-xs font-bold text-slate-500 uppercase">
-              {['Resposta em minutos', 'Sem compromisso', 'Técnicos especializados'].map((t) => (
-                <span key={t} className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  {t}
-                </span>
-              ))}
+          {/* Busca */}
+          <div className="flex-1 max-w-2xl">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Faça uma pesquisa..."
+                className="w-full border-2 border-gray-200 rounded-lg py-3 px-4 pr-12 focus:border-red-500 focus:outline-none"
+              />
+              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 shrink-0">
-            <Link
-              href="/login"
-              className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white font-black text-sm uppercase tracking-widest px-10 py-5 rounded-2xl transition-all hover:shadow-xl hover:shadow-red-600/30 hover:-translate-y-0.5"
-            >
-              Solicitar Orçamento Grátis
-              <ArrowRight className="w-4 h-4" />
+          {/* Ações */}
+          <div className="flex items-center gap-6 shrink-0">
+            <Link href="/login" className="text-sm text-gray-600 hover:text-red-600">
+              <span className="font-bold">Entre</span> ou<br />
+              <span className="font-bold">Cadastre-se</span>
             </Link>
-            <a
-              href="tel:+551133333333"
-              className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white font-bold text-sm border border-white/10 px-10 py-5 rounded-2xl transition-all"
-            >
-              <Phone className="w-4 h-4" />
-              Ligar Agora: (11) 3333-3333
-            </a>
+            <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-red-600">
+              <ShoppingCart className="w-6 h-6" />
+              <span className="font-bold">0</span>
+            </Link>
           </div>
         </div>
+      </div>
+
+      {/* Menu de Categorias */}
+      <nav className="border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4">
+          <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
+            <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
+            <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
+            <li><Link href="/catalogo?category=eletrica" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
+            <li><Link href="/catalogo?category=hidraulica" className="hover:text-red-600 transition-colors">Materiais Hidráulicos</Link></li>
+            <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
+            <li><Link href="/catalogo?category=tintas" className="hover:text-red-600 transition-colors">Tintas</Link></li>
+            <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>
+          </ul>
+        </div>
+      </nav>
+    </header>
+  );
+}
+
+function HeroBanner() {
+  return (
+    <section className="bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-400 relative overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 py-16 relative z-10">
+        <div className="text-center">
+          <p className="text-xl font-bold text-gray-800 mb-2">RESGATE SEU CUPOM</p>
+          <h1 className="text-6xl md:text-7xl font-black text-blue-800 mb-4 tracking-tight">
+            PRIMEIRACOMPRA
+          </h1>
+          <p className="text-2xl font-bold text-gray-800 mb-8">E APROVEITE OFERTAS EM TODO O SITE</p>
+          <div className="flex items-center justify-center gap-3 text-xl font-bold text-gray-800">
+            <ShoppingCart className="w-8 h-8" />
+            ENTREGAS PARA TODO O BRASIL
+          </div>
+        </div>
+      </div>
+      {/* Decorações */}
+      <div className="absolute left-10 top-10 opacity-80">
+        <Image src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=200&h=200&fit=crop" alt="" width={200} height={200} className="rounded-lg shadow-xl" />
+      </div>
+      <div className="absolute right-10 top-10 opacity-80">
+        <Image src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=200&h=200&fit=crop" alt="" width={200} height={200} className="rounded-lg shadow-xl" />
       </div>
     </section>
   );
 }
 
-function StoreVisitSection() {
+function ServiceBadges() {
+  const services = [
+    { icon: <Truck className="w-5 h-5" />, text: 'Entrega rápida', color: 'text-red-600' },
+    { icon: <MessageCircle className="w-5 h-5" />, text: 'Envie sua lista de materiais', color: 'text-blue-600' },
+    { icon: <CreditCard className="w-5 h-5" />, text: 'Desconto no Pix', color: 'text-amber-600' },
+    { icon: <ShieldCheck className="w-5 h-5" />, text: 'Fale pelo WhatsApp', color: 'text-green-600' },
+  ];
+
   return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
-      <div className="grid md:grid-cols-2 gap-8 items-center">
-        {/* Google Maps Preview */}
-        <div className="relative rounded-2xl overflow-hidden aspect-[4/3] group shadow-xl">
-          {/* Map iframe embed */}
-          <iframe
-            src="https://maps.google.com/maps?q=-21.7792205,-50.7915996&z=17&output=embed&hl=pt-BR"
-            className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-            loading="lazy"
-            title="Localização da Loja MACOFEL"
-            allowFullScreen
-          />
-
-          {/* Bottom bar with address + CTA */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 px-5 pb-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Aberto agora</span>
-                </div>
-                <p className="text-white font-black text-base leading-tight">MACOFEL Parapuã</p>
-                <p className="text-white/60 text-xs mt-0.5">Av. São Paulo, 699 — Centro</p>
-              </div>
-              <a
-                href="https://www.google.com/maps/place/Macofel+Parapu%C3%A3/@-21.7792204,-50.7964705,17z/data=!4m15!1m8!3m7!1s0x94942f5400b5375b:0x698d25456ba379a4!2sMacofel+Parapu%C3%A3!8m2!3d-21.7792205!4d-50.7915996!10e1!16s%2Fg%2F11vbkfnwr2!3m5!1s0x94942f5400b5375b:0x698d25456ba379a4!8m2!3d-21.7792205!4d-50.7915996!16s%2Fg%2F11vbkfnwr2?entry=ttu&g_ep=EgoyMDI2MDIyNS4wIKXMDSoASAFQAw%3D%3D"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-red-600/40 active:scale-95"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                Abrir
-              </a>
+    <div className="bg-white py-4 border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+          {services.map((s, i) => (
+            <div key={i} className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+              <span className={s.color}>{s.icon}</span>
+              <span className="text-sm font-semibold text-gray-700">{s.text}</span>
             </div>
-          </div>
-
-          {/* Top badge */}
-          <div className="absolute top-4 left-4 flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-md">
-            <div className="w-5 h-5 bg-red-600 rounded-lg flex items-center justify-center">
-              <MapPin className="w-3 h-3 text-white" />
-            </div>
-            <span className="text-xs font-black text-slate-800">Ver no Google Maps</span>
-          </div>
+          ))}
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* Text */}
-        <div className="space-y-6">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
-              Loja Física
-            </p>
-            <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
-              Visite o nosso
-              <br />
-              <span className="text-red-600">Showroom.</span>
-            </h2>
+function ProductCard({ product }: { product: any }) {
+  const pixPrice = (product.price * 0.9).toFixed(2).replace('.', ',');
+  const installment = (product.price / 12).toFixed(2).replace('.', ',');
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow group">
+      {/* Imagem */}
+      <div className="relative aspect-square mb-4 overflow-hidden rounded-lg bg-gray-50">
+        {product.imageUrl ? (
+          <Image
+            src={product.imageUrl}
+            alt={product.name}
+            fill
+            className="object-contain p-4 group-hover:scale-105 transition-transform"
+            sizes="(max-width: 768px) 50vw, 25vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-300">
+            <span className="text-5xl">📦</span>
           </div>
+        )}
+      </div>
 
-          <p className="text-slate-500 leading-relaxed">
-            Mais de 5.000m² com soluções reais para o seu projeto. Toque e sinta a qualidade dos
-            nossos materiais antes de comprar. Nossos especialistas estão prontos para orientar.
-          </p>
+      {/* Info */}
+      <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 min-h-[40px]">
+        {product.name}
+      </h3>
 
-          <div className="space-y-4">
-            {[
-              { icon: <MapPin className="w-4 h-4 text-red-600" />, text: 'Av. São Paulo, 699 - Centro, Parapuã - SP, 17730-000' },
-              { icon: <Clock className="w-4 h-4 text-red-600" />, text: 'Seg a Sex: 08:00 — 18:00 | Sáb: 08:00 — 13:00' },
-              { icon: <Phone className="w-4 h-4 text-red-600" />, text: '(11) 3333-3333 | (11) 99999-9999' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-4 text-sm text-slate-600 font-medium">
-                <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
-                  {item.icon}
-                </div>
-                {item.text}
-              </div>
+      {/* Rating */}
+      <div className="flex items-center gap-1 mb-3">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+        ))}
+        <span className="text-xs text-gray-500 ml-1">(0)</span>
+      </div>
+
+      {/* Preço */}
+      <div className="mb-4">
+        <p className="text-xl font-black text-blue-600">
+          R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
+        </p>
+        <p className="text-xs text-gray-500">
+          12x de R$ {installment} no cartão s/ juros
+        </p>
+      </div>
+
+      {/* Botão Comprar */}
+      <Link
+        href={`/produto/${product.slug}`}
+        className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center font-bold py-3 rounded-lg transition-colors"
+      >
+        Comprar
+      </Link>
+    </div>
+  );
+}
+
+async function ProductSection({ title, products }: { title: string; products: any[] }) {
+  return (
+    <section className="py-10">
+      <div className="max-w-7xl mx-auto px-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">{title}</h2>
+        
+        {products.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {products.slice(0, 4).map((product: any) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
+        ) : (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-5xl mb-4">📦</p>
+            <p>Nenhum produto encontrado</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
-          <a
-            href="https://www.google.com/maps/place/Macofel+Parapu%C3%A3/@-21.7792204,-50.7964705,17z/data=!4m15!1m8!3m7!1s0x94942f5400b5375b:0x698d25456ba379a4!2sMacofel+Parapu%C3%A3!8m2!3d-21.7792205!4d-50.7915996!10e1!16s%2Fg%2F11vbkfnwr2!3m5!1s0x94942f5400b5375b:0x698d25456ba379a4!8m2!3d-21.7792205!4d-50.7915996!16s%2Fg%2F11vbkfnwr2?entry=ttu&g_ep=EgoyMDI2MDIyNS4wIKXMDSoASAFQAw%3D%3D"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 bg-slate-900 hover:bg-red-600 text-white font-bold text-sm uppercase tracking-widest px-8 py-4 rounded-2xl transition-all"
-          >
-            VER NO MAPA
-            <MapPin className="w-4 h-4" />
-          </a>
+function CategoryCards() {
+  const categories = [
+    { name: 'Chuveiros Elétricos', slug: 'chuveiros', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
+    { name: 'Iluminação', slug: 'iluminacao', image: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?w=300&h=300&fit=crop' },
+    { name: 'Jardinagem', slug: 'jardim', image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=300&h=300&fit=crop' },
+    { name: 'Materiais Elétricos', slug: 'eletrica', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop' },
+    { name: 'Materiais Hidráulicos', slug: 'hidraulica', image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=300&h=300&fit=crop' },
+    { name: 'Torneiras Elétrica', slug: 'torneiras', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
+    { name: 'Ventiladores', slug: 'ventiladores', image: 'https://images.unsplash.com/photo-1600857544200-b2f666a9a2ec?w=300&h=300&fit=crop' },
+  ];
+
+  return (
+    <section className="py-10 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">Compre por Categorias</h2>
+        
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
+          {categories.map((cat) => (
+            <Link
+              key={cat.slug}
+              href={`/catalogo?category=${cat.slug}`}
+              className="flex flex-col items-center text-center group"
+            >
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden mb-3 border-2 border-transparent group-hover:border-red-500 transition-colors">
+                <Image
+                  src={cat.image}
+                  alt={cat.name}
+                  width={112}
+                  height={112}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="text-xs font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
+                {cat.name}
+              </span>
+            </Link>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-// ─────────────────────────────────────────────────────────
-//  MAIN PAGE
-// ─────────────────────────────────────────────────────────
-export default async function HomePage() {
+function Footer() {
   return (
-    <LayoutWrapperV2>
-      <HeroSectionAnimated />
-      <ServicesBar />
-      <CategoryShowcase />
-      <StatsSection />
-      <FeaturedProducts />
-      <WhyUsSection />
-      <TestimonialsSection />
-      <CtaBanner />
-      <StoreVisitSection />
-    </LayoutWrapperV2>
+    <footer className="bg-gray-900 text-white py-12">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          {/* Logo e Info */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl font-black">
+                MACO<span className="text-red-500">FEL</span>
+              </span>
+            </div>
+            <p className="text-gray-400 text-sm mb-4">
+              Materiais para Construção de qualidade em Parapuã e região.
+            </p>
+            <div className="text-sm text-gray-400 space-y-1">
+              <p>📍 Av. São Paulo, 699 - Centro</p>
+              <p>Parapuã - SP, 17730-000</p>
+              <p>📞 (18) 99814-5495</p>
+            </div>
+          </div>
+
+          {/* Links */}
+          <div>
+            <h4 className="font-bold mb-4">Institucional</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="#" className="hover:text-white">Sobre nós</Link></li>
+              <li><Link href="#" className="hover:text-white">Política de Privacidade</Link></li>
+              <li><Link href="#" className="hover:text-white">Termos de Uso</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold mb-4">Atendimento</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="#" className="hover:text-white">Fale Conosco</Link></li>
+              <li><Link href="#" className="hover:text-white">Trocas e Devoluções</Link></li>
+              <li><Link href="/meus-pedidos" className="hover:text-white">Meus Pedidos</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold mb-4">Formas de Pagamento</h4>
+            <div className="flex gap-2 flex-wrap">
+              <span className="bg-white/10 px-3 py-1 rounded text-xs">Visa</span>
+              <span className="bg-white/10 px-3 py-1 rounded text-xs">Master</span>
+              <span className="bg-green-600 px-3 py-1 rounded text-xs">Pix</span>
+              <span className="bg-white/10 px-3 py-1 rounded text-xs">Boleto</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
+          <p>© 2026 MACOFEL - Materiais para Construção. Todos os direitos reservados.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function WhatsAppFloating() {
+  return (
+    <a
+      href="https://wa.me/5518998145495?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20MACOFEL%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es."
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-lg transition-colors"
+    >
+      <MessageCircle className="w-5 h-5" />
+      <span className="font-bold text-sm">Fale conosco</span>
+    </a>
+  );
+}
+
+export default async function HomePageDecarStyle() {
+  const featuredProducts = await getFeaturedProducts();
+  const recentProducts = await getRecentProducts();
+
+  return (
+    <div className="min-h-screen bg-white">
+      <TopBar />
+      <Header />
+      <HeroBanner />
+      <ServiceBadges />
+      
+      <ProductSection 
+        title="Produtos Tigre para fazer bonito na obra com economia" 
+        products={featuredProducts} 
+      />
+      
+      <ProductSection 
+        title="Os melhores produtos com ofertas imperdíveis para construir ou reformar" 
+        products={recentProducts} 
+      />
+      
+      <CategoryCards />
+      
+      <Footer />
+      <WhatsAppFloating />
+    </div>
   );
 }
