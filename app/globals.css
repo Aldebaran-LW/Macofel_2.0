@@ -1,0 +1,312 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────
+   FONTS
+───────────────────────────────────────── */
+@layer base {
+  :root {
+    --font-inter: 'Inter', sans-serif;
+    --font-montserrat: 'Montserrat', sans-serif;
+    --font-plus-jakarta: 'Plus Jakarta Sans', sans-serif;
+    --font-playfair: 'Playfair Display', serif;
+  }
+
+  body {
+    font-family: var(--font-inter);
+  }
+
+  .font-title {
+    font-family: var(--font-montserrat);
+  }
+
+  .font-demo {
+    font-family: var(--font-plus-jakarta);
+  }
+
+  .font-demo-title {
+    font-family: var(--font-playfair);
+  }
+}
+
+/* ─────────────────────────────────────────
+   SHADCN / UI TOKENS
+───────────────────────────────────────── */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 72.2% 50.6%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 72.2% 50.6%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ─────────────────────────────────────────
+   MACOFEL V2 BRAND SYSTEM
+───────────────────────────────────────── */
+:root {
+  /* Brand */
+  --macofel-red: #E31E24;
+  --macofel-red-dark: #b91518;
+  --macofel-dark: #0F172A;
+  --macofel-surface: #F8FAFC;
+
+  /* Shadows */
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04);
+}
+
+body {
+  background-color: #f9fafb;
+  color: var(--macofel-dark);
+}
+
+/* Hide hydration errors */
+[data-hydration-error] {
+  display: none !important;
+}
+
+/* ─────────────────────────────────────────
+   SMOOTH SCROLL & SCROLLBAR
+───────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #E31E24;
+}
+
+/* ─────────────────────────────────────────
+   ANIMATIONS
+───────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(227, 30, 36, 0.4); }
+  50%       { box-shadow: 0 0 0 12px rgba(227, 30, 36, 0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in     { animation: fade-in 0.5s ease-out both; }
+.animate-fade-up     { animation: fade-up 0.4s ease-out both; }
+.animate-slide-in    { animation: slide-in-left 0.5s ease-out both; }
+.animate-scale-in    { animation: scale-in 0.3s ease-out both; }
+.animate-float       { animation: float 3s ease-in-out infinite; }
+.animate-spin-slow   { animation: spin-slow 20s linear infinite; }
+.animate-shimmer     { animation: shimmer 2s linear infinite; }
+.animate-pulse-red   { animation: pulse-red 2s ease-in-out infinite; }
+
+/* Staggered children delays */
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 80ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 160ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 320ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 400ms; }
+
+/* ─────────────────────────────────────────
+   BRAND UTILITIES
+───────────────────────────────────────── */
+.macofel-red        { color: var(--macofel-red); }
+.bg-macofel-red     { background-color: var(--macofel-red); }
+.border-macofel-red { border-color: var(--macofel-red); }
+
+/* ─────────────────────────────────────────
+   V2 ANNOUNCEMENT BAR
+───────────────────────────────────────── */
+.v2-announcement-bar {
+  background: linear-gradient(90deg, #b91518 0%, #E31E24 50%, #b91518 100%);
+  background-size: 200% 100%;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ─────────────────────────────────────────
+   GLASS NAV (legacy)
+───────────────────────────────────────── */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ─────────────────────────────────────────
+   HERO GRADIENT V2
+───────────────────────────────────────── */
+.hero-v2-bg {
+  background: linear-gradient(135deg, #0F172A 0%, #1e293b 60%, #1a0a0a 100%);
+}
+
+.hero-v2-accent {
+  background: radial-gradient(circle at 70% 50%, rgba(227, 30, 36, 0.15) 0%, transparent 60%);
+}
+
+/* ─────────────────────────────────────────
+   PRODUCT CARD V2
+───────────────────────────────────────── */
+.product-card-v2 {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.product-card-v2:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ─────────────────────────────────────────
+   CATEGORY CARDS
+───────────────────────────────────────── */
+.category-card {
+  transition: all 0.25s ease;
+}
+
+.category-card:hover {
+  transform: translateY(-4px);
+}
+
+/* ─────────────────────────────────────────
+   SKELETON SHIMMER
+───────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────
+   SCROLLBAR HIDE (category nav)
+───────────────────────────────────────── */
+.category-scroll::-webkit-scrollbar { display: none; }
+.category-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─────────────────────────────────────────
+   PROMO BANNER (legacy)
+───────────────────────────────────────── */
+.promo-banner {
+  background: linear-gradient(90deg, #E31E24 0%, #9b1418 100%);
+}
+
+/* ─────────────────────────────────────────
+   BADGE PICKUP
+───────────────────────────────────────── */
+.badge-pickup {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+/* ─────────────────────────────────────────
+   RED GLOW
+───────────────────────────────────────── */
+.red-glow {
+  box-shadow: 0 0 30px rgba(227, 30, 36, 0.25);
+}
+
+/* ─────────────────────────────────────────
+   SECTION DIVIDER
+───────────────────────────────────────── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+}
+
+/* ─────────────────────────────────────────
+   STATS COUNTER
+───────────────────────────────────────── */
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ─────────────────────────────────────────
+   WHATSAPP
+───────────────────────────────────────── */
+.whatsapp-btn {
+  box-shadow: 0 8px 24px rgba(37, 211, 102, 0.4);
+}
+
+/* ─────────────────────────────────────────
+   RADIAL GRADIENT UTILITY
+───────────────────────────────────────── */
+.bg-gradient-radial {
+  background-image: radial-gradient(circle, var(--tw-gradient-stops));
+}

@@ -1,0 +1,455 @@
+import Link from 'next/link';
+import Image from 'next/image';
+import {
+  Truck,
+  ShieldCheck,
+  CreditCard,
+  MessageCircle,
+  ShoppingCart,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { getProducts } from '@/lib/mongodb-native';
+
+export const dynamic = 'force-dynamic';
+
+async function getFeaturedProducts() {
+  try {
+    const result = await getProducts({ featured: true, limit: 8 });
+    return result.products ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function getRecentProducts() {
+  try {
+    const result = await getProducts({ limit: 8 });
+    return result.products ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// Componentes no estilo Decar
+function TopBar() {
+  return (
+    <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">
+      <span>Compre com 10% OFF no PIX!</span>
+      <span className="mx-2">/</span>
+      <span>Enviamos para todo o Brasil</span>
+      <span className="mx-2">/</span>
+      <span>Envie sua lista de materiais</span>
+    </div>
+  );
+}
+
+function Header() {
+  return (
+    <header className="bg-white shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center justify-between gap-8">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <Image
+              src="/logo-macofel.png"
+              alt="MACOFEL"
+              width={60}
+              height={60}
+              className="h-14 w-auto object-contain"
+            />
+            <div className="flex flex-col">
+              <span className="text-2xl font-black text-gray-800 tracking-tight">
+                MACO<span className="text-red-600">FEL</span>
+              </span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+                Materiais para Construção
+              </span>
+            </div>
+          </Link>
+
+          {/* Busca */}
+          <div className="flex-1 max-w-2xl">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Faça uma pesquisa..."
+                className="w-full border-2 border-gray-200 rounded-lg py-3 px-4 pr-12 focus:border-red-500 focus:outline-none"
+              />
+              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Ações */}
+          <div className="flex items-center gap-6 shrink-0">
+            <Link href="/login" className="text-sm text-gray-600 hover:text-red-600">
+              <span className="font-bold">Entre</span> ou<br />
+              <span className="font-bold">Cadastre-se</span>
+            </Link>
+            <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-red-600">
+              <ShoppingCart className="w-6 h-6" />
+              <span className="font-bold">0</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Menu de Categorias */}
+      <nav className="border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4">
+          <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
+            <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
+            <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
+            <li><Link href="/catalogo?category=eletrica" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
+            <li><Link href="/catalogo?category=hidraulica" className="hover:text-red-600 transition-colors">Hidráulica</Link></li>
+            <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
+            <li><Link href="/catalogo?category=tintas" className="hover:text-red-600 transition-colors">Tintas</Link></li>
+            <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>
+          </ul>
+        </div>
+      </nav>
+    </header>
+  );
+}
+
+function HeroBanner() {
+  return (
+    <section className="bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-400 relative overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 py-16 relative z-10">
+        <div className="text-center">
+          <p className="text-xl font-bold text-gray-800 mb-2">RESGATE SEU CUPOM</p>
+          <h1 className="text-6xl md:text-7xl font-black text-blue-800 mb-4 tracking-tight">
+            PRIMEIRACOMPRA
+          </h1>
+          <p className="text-2xl font-bold text-gray-800 mb-8">E APROVEITE OFERTAS EM TODO O SITE</p>
+          <div className="flex items-center justify-center gap-3 text-xl font-bold text-gray-800">
+            <ShoppingCart className="w-8 h-8" />
+            ENTREGAS PARA TODO O BRASIL
+          </div>
+        </div>
+      </div>
+      {/* Decorações */}
+      <div className="absolute left-10 top-10 opacity-80">
+        <Image src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=200&h=200&fit=crop" alt="" width={200} height={200} className="rounded-lg shadow-xl" />
+      </div>
+      <div className="absolute right-10 top-10 opacity-80">
+        <Image src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=200&h=200&fit=crop" alt="" width={200} height={200} className="rounded-lg shadow-xl" />
+      </div>
+    </section>
+  );
+}
+
+function ServiceBadges() {
+  const services = [
+    { icon: <Truck className="w-5 h-5" />, text: 'Entrega rápida', color: 'text-red-600' },
+    { icon: <MessageCircle className="w-5 h-5" />, text: 'Envie sua lista de materiais', color: 'text-blue-600' },
+    { icon: <CreditCard className="w-5 h-5" />, text: 'Desconto no Pix', color: 'text-amber-600' },
+    { icon: <ShieldCheck className="w-5 h-5" />, text: 'Fale pelo WhatsApp', color: 'text-green-600' },
+  ];
+
+  return (
+    <div className="bg-white py-4 border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+          {services.map((s, i) => (
+            <div key={i} className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+              <span className={s.color}>{s.icon}</span>
+              <span className="text-sm font-semibold text-gray-700">{s.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductCard({ product, badgeText, badgeColor, index }: { product: any; badgeText?: string; badgeColor?: 'red' | 'green' | 'amber' | 'blue'; index?: number }) {
+  const pixPrice = (product.price * 0.9).toFixed(2).replace('.', ',');
+  const installment = (product.price / 12).toFixed(2).replace('.', ',');
+  const inStock = (product.stock ?? 0) > 0;
+
+  const badgeClasses = {
+    red: 'bg-red-600 text-white',
+    green: 'bg-emerald-600 text-white',
+    amber: 'bg-amber-500 text-white',
+    blue: 'bg-blue-600 text-white',
+  };
+
+  return (
+    <div 
+      className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-xl transition-all duration-300 group h-full flex flex-col animate-fade-in"
+      style={{ animationDelay: `${(index ?? 0) * 100}ms` }}
+    >
+      {/* Imagem */}
+      <div className="relative aspect-square mb-4 overflow-hidden rounded-lg bg-gray-50 flex-shrink-0">
+        {product.imageUrl ? (
+          <Image
+            src={product.imageUrl}
+            alt={product.name}
+            fill
+            className="object-contain p-4 group-hover:scale-110 transition-transform duration-500"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-300">
+            <span className="text-5xl">📦</span>
+          </div>
+        )}
+
+        {/* Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+          {badgeText && (
+            <span
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${badgeClasses[badgeColor || 'red']}`}
+            >
+              {badgeText}
+            </span>
+          )}
+          {product.featured && !badgeText && (
+            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
+              Destaque
+            </span>
+          )}
+        </div>
+
+        {/* Stock Badge */}
+        {inStock && (
+          <div className="absolute top-3 right-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[9px] font-bold text-emerald-600 uppercase">Em estoque</span>
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 flex flex-col">
+        <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 min-h-[40px] flex-shrink-0 group-hover:text-red-600 transition-colors">
+          {product.name}
+        </h3>
+
+        {/* Rating */}
+        <div className="flex items-center gap-1 mb-3 flex-shrink-0">
+          {[...Array(5)].map((_, i) => (
+            <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+          ))}
+          <span className="text-xs text-gray-500 ml-1">({product.stock || 0})</span>
+        </div>
+
+        {/* Preço */}
+        <div className="mb-4 flex-shrink-0">
+          <p className="text-xl font-black text-blue-600">
+            R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
+          </p>
+          <p className="text-xs text-gray-500">
+            12x de R$ {installment} no cartão s/ juros
+          </p>
+        </div>
+
+        {/* Botão Comprar */}
+        <Link
+          href={`/produto/${product.slug}`}
+          className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center font-bold py-3 rounded-lg transition-all duration-300 hover:scale-105 mt-auto"
+        >
+          Comprar
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+async function ProductSection({ title, products, badgeText, badgeColor }: { title: string; products: any[]; badgeText?: string; badgeColor?: 'red' | 'green' | 'amber' | 'blue' }) {
+  const badges = [
+    { text: 'Mais Vendido', color: 'red' as const },
+    { text: 'Destaque', color: 'amber' as const },
+    { text: 'Novo', color: 'green' as const },
+  ];
+
+  return (
+    <section className="py-10">
+      <div className="max-w-[1600px] mx-auto px-4 md:px-8">
+        <div className="mb-8">
+          {badgeText && (
+            <div className="inline-flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-4">
+              {badgeText}
+            </div>
+          )}
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-800 text-center">{title}</h2>
+        </div>
+        
+        {products.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            {products.slice(0, 8).map((product: any, index: number) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                badgeText={badgeText || (index < 3 ? badges[index]?.text : undefined)}
+                badgeColor={badgeColor || (index < 3 ? badges[index]?.color : undefined)}
+                index={index}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-5xl mb-4">📦</p>
+            <p>Nenhum produto encontrado</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CategoryCards() {
+  const categories = [
+    { name: 'Chuveiros Elétricos', slug: 'chuveiros', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
+    { name: 'Iluminação', slug: 'iluminacao', image: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?w=300&h=300&fit=crop' },
+    { name: 'Jardinagem', slug: 'jardim', image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=300&h=300&fit=crop' },
+    { name: 'Materiais Elétricos', slug: 'eletrica', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop' },
+    { name: 'Hidráulica', slug: 'hidraulica', image: 'https://macofel-novo.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87' },
+    { name: 'Torneiras Elétrica', slug: 'torneiras', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
+    { name: 'Ventiladores', slug: 'ventiladores', image: 'https://images.unsplash.com/photo-1600857544200-b2f666a9a2ec?w=300&h=300&fit=crop' },
+  ];
+
+  return (
+    <section className="py-10 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">Compre por Categorias</h2>
+        
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
+          {categories.map((cat) => (
+            <Link
+              key={cat.slug}
+              href={`/catalogo?category=${cat.slug}`}
+              className="flex flex-col items-center text-center group"
+            >
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden mb-3 border-2 border-transparent group-hover:border-red-500 transition-colors">
+                <Image
+                  src={cat.image}
+                  alt={cat.name}
+                  width={112}
+                  height={112}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="text-xs font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
+                {cat.name}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="bg-gray-900 text-white py-12">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          {/* Logo e Info */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl font-black">
+                MACO<span className="text-red-500">FEL</span>
+              </span>
+            </div>
+            <p className="text-gray-400 text-sm mb-4">
+              Materiais para Construção de qualidade em Parapuã e região.
+            </p>
+            <div className="text-sm text-gray-400 space-y-1">
+              <p>📍 Av. São Paulo, 699 - Centro</p>
+              <p>Parapuã - SP, 17730-000</p>
+              <p>📞 (18) 99814-5495</p>
+            </div>
+          </div>
+
+          {/* Links */}
+          <div>
+            <h4 className="font-bold mb-4">Institucional</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="#" className="hover:text-white">Sobre nós</Link></li>
+              <li><Link href="#" className="hover:text-white">Política de Privacidade</Link></li>
+              <li><Link href="#" className="hover:text-white">Termos de Uso</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold mb-4">Atendimento</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="#" className="hover:text-white">Fale Conosco</Link></li>
+              <li><Link href="#" className="hover:text-white">Trocas e Devoluções</Link></li>
+              <li><Link href="/meus-pedidos" className="hover:text-white">Meus Pedidos</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold mb-4">Formas de Pagamento</h4>
+            <div className="flex gap-2 flex-wrap">
+              <span className="bg-white/10 px-3 py-1 rounded text-xs">Visa</span>
+              <span className="bg-white/10 px-3 py-1 rounded text-xs">Master</span>
+              <span className="bg-green-600 px-3 py-1 rounded text-xs">Pix</span>
+              <span className="bg-white/10 px-3 py-1 rounded text-xs">Boleto</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
+          <p>© 2026 MACOFEL - Materiais para Construção. Todos os direitos reservados.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function WhatsAppFloating() {
+  return (
+    <a
+      href="https://wa.me/5518998145495?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20MACOFEL%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es."
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-lg transition-colors"
+    >
+      <MessageCircle className="w-5 h-5" />
+      <span className="font-bold text-sm">Fale conosco</span>
+    </a>
+  );
+}
+
+export default async function HomePageDecarStyle() {
+  const featuredProducts = await getFeaturedProducts();
+  const recentProducts = await getRecentProducts();
+
+  return (
+    <div className="min-h-screen bg-white">
+      <TopBar />
+      <Header />
+      <HeroBanner />
+      <ServiceBadges />
+      
+      <ProductSection 
+        title="Produtos Tigre para fazer bonito na obra com economia" 
+        products={featuredProducts}
+        badgeText="Mais Vendido"
+        badgeColor="red"
+      />
+      
+      <ProductSection 
+        title="Os melhores produtos com ofertas imperdíveis para construir ou reformar" 
+        products={recentProducts}
+        badgeText="Destaque"
+        badgeColor="amber"
+      />
+      
+      <CategoryCards />
+      
+      <Footer />
+      <WhatsAppFloating />
+    </div>
+  );
+}
