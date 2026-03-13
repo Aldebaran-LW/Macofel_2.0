@@ -1,0 +1,12 @@
+{
+  "projectId": "prj_gCwDJ9vcpA34GW5os9E4krIas9LL",
+  "orgId": "",
+  "settings": {
+    "framework": "nextjs",
+    "buildCommand": "npm run vercel-build",
+    "devCommand": "npm run dev",
+    "installCommand": "npm install --legacy-peer-deps",
+    "outputDirectory": ".next",
+    "rootDirectory": "nextjs_space"
+  }
+}

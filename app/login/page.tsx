@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn, getSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -32,25 +32,8 @@ export default function LoginPage() {
         toast.error('Email ou senha incorretos');
       } else {
         toast.success('Login realizado com sucesso!');
-        
-        // Aguardar um momento para a sessão ser atualizada e então buscar o role
-        setTimeout(async () => {
-          try {
-            const session = await getSession();
-            const userRole = (session?.user as any)?.role;
-            
-            // Redirecionar baseado no role
-            if (userRole === 'ADMIN') {
-              router.push('/admin/dashboard');
-            } else {
-              router.push('/');
-            }
-            router.refresh();
-          } catch {
-            router.push('/');
-            router.refresh();
-          }
-        }, 100);
+        router.push('/');
+        router.refresh();
       }
     } catch (error) {
       toast.error('Erro ao fazer login');

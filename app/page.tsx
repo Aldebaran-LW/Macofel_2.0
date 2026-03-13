@@ -106,7 +106,7 @@ function Header() {
             <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
             <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
             <li><Link href="/catalogo?category=eletrica" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
-            <li><Link href="/catalogo?category=hidraulica" className="hover:text-red-600 transition-colors">Hidráulica</Link></li>
+            <li><Link href="/catalogo?category=hidraulica" className="hover:text-red-600 transition-colors">Materiais Hidráulicos</Link></li>
             <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
             <li><Link href="/catalogo?category=tintas" className="hover:text-red-600 transition-colors">Tintas</Link></li>
             <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>
@@ -168,129 +168,73 @@ function ServiceBadges() {
   );
 }
 
-function ProductCard({ product, badgeText, badgeColor, index }: { product: any; badgeText?: string; badgeColor?: 'red' | 'green' | 'amber' | 'blue'; index?: number }) {
+function ProductCard({ product }: { product: any }) {
   const pixPrice = (product.price * 0.9).toFixed(2).replace('.', ',');
   const installment = (product.price / 12).toFixed(2).replace('.', ',');
-  const inStock = (product.stock ?? 0) > 0;
-
-  const badgeClasses = {
-    red: 'bg-red-600 text-white',
-    green: 'bg-emerald-600 text-white',
-    amber: 'bg-amber-500 text-white',
-    blue: 'bg-blue-600 text-white',
-  };
 
   return (
-    <div 
-      className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-xl transition-all duration-300 group h-full flex flex-col animate-fade-in"
-      style={{ animationDelay: `${(index ?? 0) * 100}ms` }}
-    >
+    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow group">
       {/* Imagem */}
-      <div className="relative aspect-square mb-4 overflow-hidden rounded-lg bg-gray-50 flex-shrink-0">
+      <div className="relative aspect-square mb-4 overflow-hidden rounded-lg bg-gray-50">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
             alt={product.name}
             fill
-            className="object-contain p-4 group-hover:scale-110 transition-transform duration-500"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-contain p-4 group-hover:scale-105 transition-transform"
+            sizes="(max-width: 768px) 50vw, 25vw"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
             <span className="text-5xl">📦</span>
           </div>
         )}
-
-        {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-          {badgeText && (
-            <span
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${badgeClasses[badgeColor || 'red']}`}
-            >
-              {badgeText}
-            </span>
-          )}
-          {product.featured && !badgeText && (
-            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
-              Destaque
-            </span>
-          )}
-        </div>
-
-        {/* Stock Badge */}
-        {inStock && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] font-bold text-emerald-600 uppercase">Em estoque</span>
-          </div>
-        )}
       </div>
 
       {/* Info */}
-      <div className="flex-1 flex flex-col">
-        <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 min-h-[40px] flex-shrink-0 group-hover:text-red-600 transition-colors">
-          {product.name}
-        </h3>
+      <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 min-h-[40px]">
+        {product.name}
+      </h3>
 
-        {/* Rating */}
-        <div className="flex items-center gap-1 mb-3 flex-shrink-0">
-          {[...Array(5)].map((_, i) => (
-            <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
-          ))}
-          <span className="text-xs text-gray-500 ml-1">({product.stock || 0})</span>
-        </div>
-
-        {/* Preço */}
-        <div className="mb-4 flex-shrink-0">
-          <p className="text-xl font-black text-blue-600">
-            R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
-          </p>
-          <p className="text-xs text-gray-500">
-            12x de R$ {installment} no cartão s/ juros
-          </p>
-        </div>
-
-        {/* Botão Comprar */}
-        <Link
-          href={`/produto/${product.slug}`}
-          className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center font-bold py-3 rounded-lg transition-all duration-300 hover:scale-105 mt-auto"
-        >
-          Comprar
-        </Link>
+      {/* Rating */}
+      <div className="flex items-center gap-1 mb-3">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+        ))}
+        <span className="text-xs text-gray-500 ml-1">(0)</span>
       </div>
+
+      {/* Preço */}
+      <div className="mb-4">
+        <p className="text-xl font-black text-blue-600">
+          R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
+        </p>
+        <p className="text-xs text-gray-500">
+          12x de R$ {installment} no cartão s/ juros
+        </p>
+      </div>
+
+      {/* Botão Comprar */}
+      <Link
+        href={`/produto/${product.slug}`}
+        className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center font-bold py-3 rounded-lg transition-colors"
+      >
+        Comprar
+      </Link>
     </div>
   );
 }
 
-async function ProductSection({ title, products, badgeText, badgeColor }: { title: string; products: any[]; badgeText?: string; badgeColor?: 'red' | 'green' | 'amber' | 'blue' }) {
-  const badges = [
-    { text: 'Mais Vendido', color: 'red' as const },
-    { text: 'Destaque', color: 'amber' as const },
-    { text: 'Novo', color: 'green' as const },
-  ];
-
+async function ProductSection({ title, products }: { title: string; products: any[] }) {
   return (
     <section className="py-10">
-      <div className="max-w-[1600px] mx-auto px-4 md:px-8">
-        <div className="mb-8">
-          {badgeText && (
-            <div className="inline-flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-4">
-              {badgeText}
-            </div>
-          )}
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800 text-center">{title}</h2>
-        </div>
+      <div className="max-w-7xl mx-auto px-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">{title}</h2>
         
         {products.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {products.slice(0, 8).map((product: any, index: number) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                badgeText={badgeText || (index < 3 ? badges[index]?.text : undefined)}
-                badgeColor={badgeColor || (index < 3 ? badges[index]?.color : undefined)}
-                index={index}
-              />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {products.slice(0, 4).map((product: any) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         ) : (
@@ -310,7 +254,7 @@ function CategoryCards() {
     { name: 'Iluminação', slug: 'iluminacao', image: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?w=300&h=300&fit=crop' },
     { name: 'Jardinagem', slug: 'jardim', image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=300&h=300&fit=crop' },
     { name: 'Materiais Elétricos', slug: 'eletrica', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop' },
-    { name: 'Hidráulica', slug: 'hidraulica', image: 'https://macofel-novo.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87' },
+    { name: 'Materiais Hidráulicos', slug: 'hidraulica', image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=300&h=300&fit=crop' },
     { name: 'Torneiras Elétrica', slug: 'torneiras', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
     { name: 'Ventiladores', slug: 'ventiladores', image: 'https://images.unsplash.com/photo-1600857544200-b2f666a9a2ec?w=300&h=300&fit=crop' },
   ];
@@ -434,16 +378,12 @@ export default async function HomePageDecarStyle() {
       
       <ProductSection 
         title="Produtos Tigre para fazer bonito na obra com economia" 
-        products={featuredProducts}
-        badgeText="Mais Vendido"
-        badgeColor="red"
+        products={featuredProducts} 
       />
       
       <ProductSection 
         title="Os melhores produtos com ofertas imperdíveis para construir ou reformar" 
-        products={recentProducts}
-        badgeText="Destaque"
-        badgeColor="amber"
+        products={recentProducts} 
       />
       
       <CategoryCards />

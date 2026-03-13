@@ -215,7 +215,7 @@ function CategoryShowcase() {
       name: 'Materiais Hidráulicos',
       slug: 'hidraulica',
       image:
-        'https://macofel-novo.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
+        'https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=80&w=600&auto=format&fit=crop',
       color: 'from-blue-900',
     },
     {

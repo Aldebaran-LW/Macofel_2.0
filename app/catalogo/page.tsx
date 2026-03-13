@@ -205,7 +205,7 @@ function CatalogoContent() {
               <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
               <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
               <li><Link href="/catalogo?category=material-eletrico" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
-              <li><Link href="/catalogo?category=material-hidraulico" className="hover:text-red-600 transition-colors">Hidráulica</Link></li>
+              <li><Link href="/catalogo?category=material-hidraulico" className="hover:text-red-600 transition-colors">Materiais Hidráulicos</Link></li>
               <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
               <li><Link href="/catalogo?category=tintas-acessorios" className="hover:text-red-600 transition-colors">Tintas</Link></li>
               <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>

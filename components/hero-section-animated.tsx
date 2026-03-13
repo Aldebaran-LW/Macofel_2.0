@@ -111,17 +111,17 @@ export default function HeroSectionAnimated() {
   const renderImage = (image: HeroImage, aspectRatio: string, className: string = '') => {
     const link = getImageLink(image);
     const imageElement = (
-      <div className={`relative overflow-hidden group border-0 ${className} ${aspectRatio || 'aspect-square'} bg-gradient-to-br from-slate-100 to-slate-200`}>
+      <div className={`relative rounded-2xl overflow-hidden group ${className}`}>
         <Image
           src={image.imageUrl}
           alt={image.alt}
           fill
-          className="object-contain p-2 group-hover:scale-105 transition-transform duration-700"
+          className="object-cover group-hover:scale-105 transition-transform duration-700"
           sizes="25vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
         {image.alt && (
-          <div className="absolute bottom-3 left-3 bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg tracking-wider z-10">
+          <div className="absolute bottom-3 left-3 bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg tracking-wider">
             {image.alt}
           </div>
         )}
@@ -246,10 +246,10 @@ export default function HeroSectionAnimated() {
                 style={{ animationDelay: '200ms' }}
               >
                 <div className="space-y-4">
-                  {gridImages.slice(0, 2).map((img, idx) => renderImage(img, 'aspect-square', ''))}
+                  {gridImages.slice(0, 2).map((img, idx) => renderImage(img, idx === 0 ? 'aspect-[4/3]' : 'aspect-square', ''))}
                 </div>
                 <div className="space-y-4 mt-8">
-                  {gridImages.slice(2, 4).map((img, idx) => renderImage(img, 'aspect-square', ''))}
+                  {gridImages.slice(2, 4).map((img, idx) => renderImage(img, idx === 0 ? 'aspect-square' : 'aspect-[4/3]', ''))}
                 </div>
               </div>
             )}
@@ -260,7 +260,7 @@ export default function HeroSectionAnimated() {
                 className="absolute inset-0 animate-fade-in"
                 key={largeImages[currentLargeIndex]?.id}
               >
-                {renderImage(largeImages[currentLargeIndex], 'aspect-square', 'h-full w-full')}
+                {renderImage(largeImages[currentLargeIndex], 'aspect-[4/3]', 'h-full')}
               </div>
             )}
           </div>

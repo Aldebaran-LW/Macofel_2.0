@@ -15,8 +15,7 @@
     "seed-hero-images": "tsx --require dotenv/config scripts/seed-hero-images.ts",
     "seed-users": "tsx --require dotenv/config scripts/seed-users-only.ts",
     "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts",
-    "test-all": "tsx --require dotenv/config scripts/test-all.ts",
-    "create-categoria-hidraulicos": "tsx --require dotenv/config scripts/create-categoria-hidraulicos.ts"
+    "test-all": "tsx --require dotenv/config scripts/test-all.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

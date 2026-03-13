@@ -275,7 +275,7 @@ async function CategoryShowcaseSection() {
     {
       name: 'Banheiro',
       slug: 'hidraulica',
-      image: 'https://macofel-novo.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
+      image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=80&w=600&auto=format&fit=crop',
       title: 'Seu banheiro merece essa novidade',
       description: 'Louças, metais e acessórios para transformar seu banheiro',
     },

@@ -5,12 +5,9 @@
 /.pnp
 .pnp.js
 .yarn/install-state.gz
-jspm_packages/
 
 # testing
 /coverage
-*.lcov
-.nyc_output
 
 # next.js
 /.next/
@@ -27,14 +24,10 @@ jspm_packages/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-logs
-*.log
 
 # local env files
 .env*.local
 .env
-.env.*
 
 # vercel
 .vercel
@@ -48,70 +41,10 @@ next-env.d.ts
 .prisma/
 
 # dotenv environment variable files
+.env
+.env.*
 !.env.example
-
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-
-# vuepress build output
-.vuepress/dist
-
-# vuepress v2.x temp and cache directory
-.temp
-
-# Sveltekit cache directory
-.svelte-kit/
-
-# vitepress build output
-**/.vitepress/dist
-
-# vitepress cache directory
-**/.vitepress/cache
-
-# Docusaurus cache and generated files
-.docusaurus
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# Firebase cache directory
-.firebase/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# yarn v3
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
-
-# Vite logs files
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
-
-# Emergent
-.emergent/
-
-# Git config (local configuration)
-.gitconfig
+-e 
+# Environment files
+*.env
+*.env.*

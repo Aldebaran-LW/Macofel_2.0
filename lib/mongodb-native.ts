@@ -211,37 +211,6 @@ export async function getCategories() {
   return categoriesWithCount;
 }
 
-export async function createCategory(data: {
-  name: string;
-  slug: string;
-  description?: string;
-}) {
-  const db = await connectToDatabase();
-  const categoriesCollection = db.collection('categories');
-
-  // Verificar se já existe categoria com mesmo nome ou slug
-  const existing = await categoriesCollection.findOne({
-    $or: [
-      { name: data.name },
-      { slug: data.slug },
-    ],
-  });
-
-  if (existing) {
-    throw new Error('Categoria com este nome ou slug já existe');
-  }
-
-  const result = await categoriesCollection.insertOne({
-    name: data.name,
-    slug: data.slug,
-    description: data.description || '',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return result.insertedId.toString();
-}
-
 export async function getHeroImages() {
   const db = await connectToDatabase();
   const heroImagesCollection = db.collection('hero_images');

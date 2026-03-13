@@ -75,7 +75,6 @@ export default function CadastroPage() {
         toast.error('Erro ao fazer login automático');
         router.push('/login');
       } else {
-        // Clientes sempre vão para a home após cadastro
         router.push('/');
         router.refresh();
       }

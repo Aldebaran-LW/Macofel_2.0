@@ -1,6 +1,3 @@
-
-
-
 'use client';
 
 import Link from 'next/link';
@@ -92,14 +89,11 @@ export default function Header() {
             <Link href="#categorias" className="hover:text-red-600 transition-colors">Categorias</Link>
             <Link href="#produtos" className="hover:text-red-600 transition-colors">Produtos</Link>
             <Link href="#orcamento" className="hover:text-red-600 transition-colors">Orçamentos</Link>
-            {session?.user && !isAdmin && (
+            {session?.user && (
               <Link href="/meus-pedidos" className="hover:text-red-600 transition-colors">Meus Pedidos</Link>
             )}
-            {session?.user && (
-              <Link href="/perfil" className="hover:text-red-600 transition-colors">Perfil</Link>
-            )}
             {isAdmin && (
-              <Link href="/admin/dashboard" className="hover:text-red-600 transition-colors">Painel Admin</Link>
+              <Link href="/admin" className="hover:text-red-600 transition-colors">Admin</Link>
             )}
           </div>
 
@@ -182,7 +176,7 @@ export default function Header() {
             >
               Orçamentos
             </Link>
-            {session?.user && !isAdmin && (
+            {session?.user && (
               <Link
                 href="/meus-pedidos"
                 className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
@@ -191,22 +185,13 @@ export default function Header() {
                 Meus Pedidos
               </Link>
             )}
-            {session?.user && (
-              <Link
-                href="/perfil"
-                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Meu Perfil
-              </Link>
-            )}
             {isAdmin && (
               <Link
-                href="/admin/dashboard"
+                href="/admin"
                 className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Painel Admin
+                Admin
               </Link>
             )}
             {!session?.user && (
