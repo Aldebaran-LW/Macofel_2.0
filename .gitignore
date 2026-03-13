@@ -48,3 +48,9 @@ next-env.d.ts
 # Environment files
 *.env
 *.env.*
+
+# Emergent
+.emergent/
+
+# Git config (local configuration)
+.gitconfig
