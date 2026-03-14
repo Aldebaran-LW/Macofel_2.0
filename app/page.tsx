@@ -37,40 +37,76 @@ async function getRecentProducts() {
   }
 }
 
+const FEATURED_SECONDARY_IMAGE_BY_CATEGORY: Record<string, string> = {
+  'cimento e argamassa':
+    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1000&auto=format&fit=crop',
+  'tijolos e blocos':
+    'https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?q=80&w=1000&auto=format&fit=crop',
+  'tintas e acessorios':
+    'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=80&w=1000&auto=format&fit=crop',
+  ferramentas:
+    'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=1000&auto=format&fit=crop',
+  'material hidraulico':
+    'https://macofel-tres.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
+  'material eletrico':
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop',
+  hidraulica: 'https://macofel-tres.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
+  eletrica: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop',
+};
+
+function normalizeCategoryName(value?: string | null) {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function getFeaturedSecondaryImage(categoryName?: string | null) {
+  return FEATURED_SECONDARY_IMAGE_BY_CATEGORY[normalizeCategoryName(categoryName)] ?? null;
+}
+
 async function ProductsByCategory() {
-  const categories = [
-    {
-      name: 'Cimento & Argamassa',
-      slug: 'cimento',
-    },
-    {
-      name: 'Ferramentas',
-      slug: 'ferramentas',
-    },
-    {
-      name: 'Elétrica',
-      slug: 'eletrica',
-    },
-    {
-      name: 'Hidráulica',
-      slug: 'hidraulica',
-    },
-    {
-      name: 'Acabamentos',
-      slug: 'acabamentos',
-    },
-    {
-      name: 'Tintas & Vernizes',
-      slug: 'tintas',
-    },
-  ];
+  // Buscar categorias reais do banco de dados
+  const db = await import('@/lib/mongodb-native').then(m => m.connectToDatabase());
+  const categoriesCollection = db.collection('categories');
+  const allCategories = await categoriesCollection.find({}).toArray();
+  
+  // Mapear categorias desejadas com slugs do banco
+  const categoryMapping: Record<string, string[]> = {
+    'Cimento & Argamassa': ['cimento-argamassa', 'cimento'],
+    'Ferramentas': ['ferramentas'],
+    'Elétrica': ['material-eletrico', 'eletrica', 'material eletrico'],
+    'Hidráulica': ['material-hidraulico', 'hidraulica', 'material hidraulico'],
+    'Tintas & Vernizes': ['tintas-acessorios', 'tintas'],
+  };
 
   // Buscar produtos por categoria
   const categoriesWithProducts = await Promise.all(
-    categories.map(async (cat) => {
+    Object.entries(categoryMapping).map(async ([categoryName, possibleSlugs]) => {
       try {
-        const result = await getProducts({ categorySlug: cat.slug, limit: 8 });
-        const products = (result.products ?? []).map((product: any) => ({
+        let products: any[] = [];
+        
+        // Tentar cada slug possível até encontrar produtos
+        for (const slug of possibleSlugs) {
+          const result = await getProducts({ categorySlug: slug, limit: 8 });
+          if (result.products && result.products.length > 0) {
+            products = result.products;
+            break;
+          }
+        }
+        
+        // Se não encontrou por slug, buscar por nome da categoria nos produtos
+        if (products.length === 0) {
+          const allProducts = await getProducts({ limit: 50 });
+          const categoryNameLower = categoryName.toLowerCase();
+          products = (allProducts.products ?? []).filter((p: any) => {
+            const productCategoryName = p.category?.name?.toLowerCase() || '';
+            return productCategoryName.includes(categoryNameLower.split('&')[0].trim()) ||
+                   productCategoryName.includes(categoryNameLower.split('e')[0].trim());
+          }).slice(0, 8);
+        }
+        
+        const mappedProducts = products.map((product: any) => ({
           id: product.id,
           name: product.name,
           slug: product.slug,
@@ -80,15 +116,19 @@ async function ProductsByCategory() {
           featured: product.featured,
           originalPrice: product.originalPrice,
           category: product.category ? { name: product.category.name } : null,
+          secondaryImageUrl: getFeaturedSecondaryImage(product.category?.name),
         }));
         
         return {
-          ...cat,
-          products,
+          name: categoryName,
+          slug: possibleSlugs[0],
+          products: mappedProducts,
         };
       } catch (error) {
+        console.error(`Erro ao buscar produtos para ${categoryName}:`, error);
         return {
-          ...cat,
+          name: categoryName,
+          slug: possibleSlugs[0],
           products: [],
         };
       }
@@ -476,6 +516,11 @@ async function FeaturedProducts() {
 
   if (products.length === 0) return null;
 
+  const productsWithSecondary = products.map((product: any) => ({
+    ...product,
+    secondaryImageUrl: getFeaturedSecondaryImage(product.category?.name),
+  }));
+
   return (
     <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
       <div className="flex items-end justify-between mb-10">
@@ -497,8 +542,8 @@ async function FeaturedProducts() {
         </Link>
       </div>
 
-      {products.length > 0 ? (
-        <CategoryProductsCarousel products={products} />
+      {productsWithSecondary.length > 0 ? (
+        <CategoryProductsCarousel products={productsWithSecondary} />
       ) : (
         <div className="col-span-4 text-center py-20 text-slate-400">
           <div className="text-5xl mb-4">📦</div>

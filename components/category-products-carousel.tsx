@@ -18,7 +18,7 @@ interface Product {
 }
 
 interface CategoryProductsCarouselProps {
-  products: Product[];
+  products: (Product & { secondaryImageUrl?: string | null })[];
 }
 
 export default function CategoryProductsCarousel({
@@ -77,6 +77,7 @@ export default function CategoryProductsCarousel({
             <ProductCardV2
               product={product}
               priority={index < 4}
+              secondaryImageUrl={product.secondaryImageUrl}
             />
           </div>
         ))}
