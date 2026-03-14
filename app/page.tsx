@@ -14,6 +14,7 @@ import {
 import ProductSectionCarousel from '@/components/product-section-carousel';
 import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
 import CategoryProductsCarousel from '@/components/category-products-carousel';
+import HeroCarousel from '@/components/hero-carousel';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -221,30 +222,38 @@ function Header() {
 }
 
 function HeroBanner() {
-  return (
-    <section className="bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-400 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 py-16 relative z-10">
-        <div className="text-center">
-          <p className="text-xl font-bold text-gray-800 mb-2">RESGATE SEU CUPOM</p>
-          <h1 className="text-6xl md:text-7xl font-black text-emerald-800 mb-4 tracking-tight">
-            PRIMEIRACOMPRA
-          </h1>
-          <p className="text-2xl font-bold text-gray-800 mb-8">E APROVEITE OFERTAS EM TODO O SITE</p>
-          <div className="flex items-center justify-center gap-3 text-xl font-bold text-gray-800">
-            <ShoppingCart className="w-8 h-8" />
-            ENTREGAS PARA TODO O BRASIL
-          </div>
-        </div>
-      </div>
-      {/* Decorações */}
-      <div className="absolute left-10 top-10 opacity-80">
-        <Image src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=200&h=200&fit=crop" alt="" width={200} height={200} className="rounded-lg shadow-xl" />
-      </div>
-      <div className="absolute right-10 top-10 opacity-80">
-        <Image src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=200&h=200&fit=crop" alt="" width={200} height={200} className="rounded-lg shadow-xl" />
-      </div>
-    </section>
-  );
+  const slides = [
+    {
+      id: '1',
+      image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1920&auto=format&fit=crop',
+      subtitle: 'RESGATE SEU CUPOM',
+      title: 'PRIMEIRACOMPRA',
+      text: 'E APROVEITE OFERTAS EM TODO O SITE • ENTREGAS PARA TODO O BRASIL',
+    },
+    {
+      id: '2',
+      image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=1920&auto=format&fit=crop',
+      subtitle: 'FERRAMENTAS DE QUALIDADE',
+      title: 'CONSTRUA COM CONFIANÇA',
+      text: 'As melhores ferramentas para sua obra • Até 12x sem juros',
+    },
+    {
+      id: '3',
+      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1920&auto=format&fit=crop',
+      subtitle: 'MATERIAIS ELÉTRICOS',
+      title: 'INSTALAÇÃO COMPLETA',
+      text: 'Tudo para sua instalação elétrica • Entrega rápida e segura',
+    },
+    {
+      id: '4',
+      image: 'https://macofel-tres.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
+      subtitle: 'MATERIAIS HIDRÁULICOS',
+      title: 'QUALIDADE GARANTIDA',
+      text: 'Produtos certificados • Melhor preço da região',
+    },
+  ];
+
+  return <HeroCarousel slides={slides} autoPlayInterval={5000} />;
 }
 
 function ServiceBadges() {

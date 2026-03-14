@@ -68,11 +68,11 @@ export default function CategoryProductsCarousel({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <motion.div ref={trackRef} style={{ x }} className="flex w-max gap-4 md:gap-6 py-2">
+      <motion.div ref={trackRef} style={{ x }} className="flex w-max gap-3 sm:gap-4 md:gap-6 py-2">
         {duplicatedProducts.map((product, index) => (
           <div
             key={`${product.id}-${index}`}
-            className="w-[188px] sm:w-[210px] lg:w-[233px] xl:w-[240px] shrink-0"
+            className="w-[160px] xs:w-[180px] sm:w-[200px] md:w-[210px] lg:w-[233px] xl:w-[240px] shrink-0"
           >
             <ProductCardV2
               product={product}

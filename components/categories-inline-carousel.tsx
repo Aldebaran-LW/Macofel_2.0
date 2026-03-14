@@ -23,22 +23,22 @@ export default function CategoriesInlineCarousel({ categories }: CategoriesInlin
         <Link
           key={category.slug}
           href={`/catalogo?category=${category.slug}`}
-          className="group relative w-[240px] md:w-[280px] shrink-0 overflow-hidden rounded-[1.75rem] aspect-[16/10] shadow-[0_22px_55px_-38px_rgba(15,23,42,0.45)]"
+          className="group relative w-[200px] sm:w-[220px] md:w-[240px] lg:w-[280px] shrink-0 overflow-hidden rounded-xl sm:rounded-2xl aspect-[16/10] shadow-[0_22px_55px_-38px_rgba(15,23,42,0.45)]"
         >
           <Image
             src={category.image}
             alt={category.name}
             fill
             className="object-cover transition-transform duration-700 group-hover:scale-105"
-            sizes="(max-width: 768px) 70vw, 280px"
+            sizes="(max-width: 640px) 200px, (max-width: 768px) 220px, (max-width: 1024px) 240px, 280px"
           />
           <div
             className={`absolute inset-0 bg-gradient-to-t ${category.color} via-black/25 to-transparent opacity-90 group-hover:opacity-80 transition-opacity`}
           />
-          <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-            <p className="text-base font-black tracking-tight leading-tight">{category.name}</p>
-            <div className="mt-2 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/75 group-hover:text-white transition-colors">
-              Ver categoria <ArrowRight className="w-3.5 h-3.5" />
+          <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 md:p-5 text-white">
+            <p className="text-sm sm:text-base font-black tracking-tight leading-tight line-clamp-2">{category.name}</p>
+            <div className="mt-1 sm:mt-2 inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-white/75 group-hover:text-white transition-colors">
+              Ver categoria <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </div>
           </div>
         </Link>
