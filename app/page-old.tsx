@@ -19,6 +19,8 @@ import {
 import LayoutWrapperV2 from '@/components/layout-wrapper-v2';
 import ProductCardV2 from '@/components/product-card-v2';
 import HeroSectionAnimated from '@/components/hero-section-animated';
+import ScrollAnimate from '@/components/scroll-animate';
+import ProductsCarousel from '@/components/products-carousel';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -366,54 +368,52 @@ async function FeaturedProducts() {
   ];
 
   return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
-            Selecionados para Você
-          </p>
-          <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
-            Produtos em
-            <br />
-            <span className="text-red-600">Destaque</span>
-          </h2>
+    <ScrollAnimate animation="fade-up">
+      <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.3em] text-red-600 mb-3">
+              Selecionados para Você
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
+              Produtos em
+              <br />
+              <span className="text-red-600">Destaque</span>
+            </h2>
+          </div>
+          <Link
+            href="/catalogo"
+            className="hidden md:flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-6 py-3 rounded-xl transition-all"
+          >
+            Ver Todos <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
-        <Link
-          href="/catalogo"
-          className="hidden md:flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-6 py-3 rounded-xl transition-all"
-        >
-          Ver Todos <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
 
-      {products.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {products.map((product: any, index: number) => (
-            <ProductCardV2
-              key={product.id}
-              product={product}
-              badgeText={index < 3 ? badges[index]?.text : undefined}
-              badgeColor={index < 3 ? badges[index]?.color : undefined}
-              priority={index < 4}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="col-span-4 text-center py-20 text-slate-400">
-          <div className="text-5xl mb-4">📦</div>
-          <p className="font-bold">Nenhum produto em destaque encontrado.</p>
-        </div>
-      )}
+        {products.length > 0 ? (
+          <ProductsCarousel
+            products={products}
+            speed={65}
+            gap={24}
+            badgeText={badges.map(b => b.text)}
+            badgeColor={badges.map(b => b.color)}
+          />
+        ) : (
+          <div className="text-center py-20 text-slate-400">
+            <div className="text-5xl mb-4">📦</div>
+            <p className="font-bold">Nenhum produto em destaque encontrado.</p>
+          </div>
+        )}
 
-      <div className="flex justify-center mt-10 md:hidden">
-        <Link
-          href="/catalogo"
-          className="flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 px-8 py-3 rounded-xl"
-        >
-          Ver Todos os Produtos
-        </Link>
-      </div>
-    </section>
+        <div className="flex justify-center mt-10 md:hidden">
+          <Link
+            href="/catalogo"
+            className="flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 px-8 py-3 rounded-xl"
+          >
+            Ver Todos os Produtos
+          </Link>
+        </div>
+      </section>
+    </ScrollAnimate>
   );
 }
 

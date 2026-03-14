@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import ProductSectionCarousel from '@/components/product-section-carousel';
+import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +37,7 @@ async function getRecentProducts() {
 // Componentes no estilo Decar
 function TopBar() {
   return (
-    <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">
+    <div className="bg-emerald-600 text-white text-center py-2 text-sm font-medium">
       <span>Compre com 10% OFF no PIX!</span>
       <span className="mx-2">/</span>
       <span>Enviamos para todo o Brasil</span>
@@ -123,7 +125,7 @@ function HeroBanner() {
       <div className="max-w-7xl mx-auto px-4 py-16 relative z-10">
         <div className="text-center">
           <p className="text-xl font-bold text-gray-800 mb-2">RESGATE SEU CUPOM</p>
-          <h1 className="text-6xl md:text-7xl font-black text-blue-800 mb-4 tracking-tight">
+          <h1 className="text-6xl md:text-7xl font-black text-emerald-800 mb-4 tracking-tight">
             PRIMEIRACOMPRA
           </h1>
           <p className="text-2xl font-bold text-gray-800 mb-8">E APROVEITE OFERTAS EM TODO O SITE</p>
@@ -147,7 +149,7 @@ function HeroBanner() {
 function ServiceBadges() {
   const services = [
     { icon: <Truck className="w-5 h-5" />, text: 'Entrega rápida', color: 'text-red-600' },
-    { icon: <MessageCircle className="w-5 h-5" />, text: 'Envie sua lista de materiais', color: 'text-blue-600' },
+    { icon: <MessageCircle className="w-5 h-5" />, text: 'Envie sua lista de materiais', color: 'text-emerald-600' },
     { icon: <CreditCard className="w-5 h-5" />, text: 'Desconto no Pix', color: 'text-amber-600' },
     { icon: <ShieldCheck className="w-5 h-5" />, text: 'Fale pelo WhatsApp', color: 'text-green-600' },
   ];
@@ -206,7 +208,7 @@ function ProductCard({ product }: { product: any }) {
 
       {/* Preço */}
       <div className="mb-4">
-        <p className="text-xl font-black text-blue-600">
+        <p className="text-xl font-black text-emerald-600">
           R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
         </p>
         <p className="text-xs text-gray-500">
@@ -217,7 +219,7 @@ function ProductCard({ product }: { product: any }) {
       {/* Botão Comprar */}
       <Link
         href={`/produto/${product.slug}`}
-        className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center font-bold py-3 rounded-lg transition-colors"
+        className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white text-center font-bold py-3 rounded-lg transition-colors"
       >
         Comprar
       </Link>
@@ -225,68 +227,62 @@ function ProductCard({ product }: { product: any }) {
   );
 }
 
-async function ProductSection({ title, products }: { title: string; products: any[] }) {
-  return (
-    <section className="py-10">
-      <div className="max-w-7xl mx-auto px-4">
-        <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">{title}</h2>
-        
-        {products.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {products.slice(0, 4).map((product: any) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12 text-gray-400">
-            <p className="text-5xl mb-4">📦</p>
-            <p>Nenhum produto encontrado</p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
 
 function CategoryCards() {
   const categories = [
-    { name: 'Chuveiros Elétricos', slug: 'chuveiros', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
-    { name: 'Iluminação', slug: 'iluminacao', image: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?w=300&h=300&fit=crop' },
-    { name: 'Jardinagem', slug: 'jardim', image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=300&h=300&fit=crop' },
-    { name: 'Materiais Elétricos', slug: 'eletrica', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop' },
-    { name: 'Materiais Hidráulicos', slug: 'hidraulica', image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=300&h=300&fit=crop' },
-    { name: 'Torneiras Elétrica', slug: 'torneiras', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&h=300&fit=crop' },
-    { name: 'Ventiladores', slug: 'ventiladores', image: 'https://images.unsplash.com/photo-1600857544200-b2f666a9a2ec?w=300&h=300&fit=crop' },
+    {
+      name: 'Cimento & Argamassa',
+      slug: 'cimento',
+      image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop',
+      color: 'from-slate-800',
+    },
+    {
+      name: 'Ferramentas',
+      slug: 'ferramentas',
+      image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=600&auto=format&fit=crop',
+      color: 'from-red-900',
+    },
+    {
+      name: 'Elétrica',
+      slug: 'eletrica',
+      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=600&auto=format&fit=crop',
+      color: 'from-amber-900',
+    },
+    {
+      name: 'Hidráulica',
+      slug: 'hidraulica',
+      image: 'https://macofel-tres.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
+      color: 'from-blue-900',
+    },
+    {
+      name: 'Acabamentos',
+      slug: 'acabamentos',
+      image: 'https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?q=80&w=600&auto=format&fit=crop',
+      color: 'from-emerald-900',
+    },
+    {
+      name: 'Tintas & Vernizes',
+      slug: 'tintas',
+      image: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=80&w=600&auto=format&fit=crop',
+      color: 'from-purple-900',
+    },
+    {
+      name: 'Iluminação',
+      slug: 'iluminacao',
+      image: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?q=80&w=600&auto=format&fit=crop',
+      color: 'from-yellow-900',
+    },
+    {
+      name: 'Jardinagem',
+      slug: 'jardim',
+      image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?q=80&w=600&auto=format&fit=crop',
+      color: 'from-green-900',
+    },
   ];
 
   return (
-    <section className="py-10 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4">
-        <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">Compre por Categorias</h2>
-        
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
-          {categories.map((cat) => (
-            <Link
-              key={cat.slug}
-              href={`/catalogo?category=${cat.slug}`}
-              className="flex flex-col items-center text-center group"
-            >
-              <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden mb-3 border-2 border-transparent group-hover:border-red-500 transition-colors">
-                <Image
-                  src={cat.image}
-                  alt={cat.name}
-                  width={112}
-                  height={112}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <span className="text-xs font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
-                {cat.name}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
+    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
+      <CategoriesInlineCarousel categories={categories} />
     </section>
   );
 }
@@ -375,18 +371,17 @@ export default async function HomePageDecarStyle() {
       <Header />
       <HeroBanner />
       <ServiceBadges />
+      <CategoryCards />
       
-      <ProductSection 
+      <ProductSectionCarousel 
         title="Produtos Tigre para fazer bonito na obra com economia" 
         products={featuredProducts} 
       />
       
-      <ProductSection 
+      <ProductSectionCarousel 
         title="Os melhores produtos com ofertas imperdíveis para construir ou reformar" 
         products={recentProducts} 
       />
-      
-      <CategoryCards />
       
       <Footer />
       <WhatsAppFloating />
