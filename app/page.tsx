@@ -9,9 +9,11 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
 } from 'lucide-react';
 import ProductSectionCarousel from '@/components/product-section-carousel';
 import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
+import CategoryProductsCarousel from '@/components/category-products-carousel';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +34,105 @@ async function getRecentProducts() {
   } catch {
     return [];
   }
+}
+
+async function ProductsByCategory() {
+  const categories = [
+    {
+      name: 'Cimento & Argamassa',
+      slug: 'cimento',
+    },
+    {
+      name: 'Ferramentas',
+      slug: 'ferramentas',
+    },
+    {
+      name: 'Elétrica',
+      slug: 'eletrica',
+    },
+    {
+      name: 'Hidráulica',
+      slug: 'hidraulica',
+    },
+    {
+      name: 'Acabamentos',
+      slug: 'acabamentos',
+    },
+    {
+      name: 'Tintas & Vernizes',
+      slug: 'tintas',
+    },
+  ];
+
+  // Buscar produtos por categoria
+  const categoriesWithProducts = await Promise.all(
+    categories.map(async (cat) => {
+      try {
+        const result = await getProducts({ categorySlug: cat.slug, limit: 8 });
+        const products = (result.products ?? []).map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.price,
+          stock: product.stock,
+          imageUrl: product.imageUrl,
+          featured: product.featured,
+          originalPrice: product.originalPrice,
+          category: product.category ? { name: product.category.name } : null,
+        }));
+        
+        return {
+          ...cat,
+          products,
+        };
+      } catch (error) {
+        return {
+          ...cat,
+          products: [],
+        };
+      }
+    })
+  );
+
+  // Filtrar apenas categorias que têm produtos
+  const categoriesWithProductsFiltered = categoriesWithProducts.filter(
+    (cat) => cat.products.length > 0
+  );
+
+  if (categoriesWithProductsFiltered.length === 0) return null;
+
+  return (
+    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
+      {categoriesWithProductsFiltered.map((category) => (
+        <div key={category.slug} className="mb-16 last:mb-0">
+          {/* Título da Categoria */}
+          <div className="mb-8">
+            <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter text-slate-900">
+              {category.name}
+            </h2>
+            <div className="h-1 w-16 bg-emerald-600 mt-2" />
+          </div>
+
+          {/* Carousel de Produtos */}
+          {category.products && category.products.length > 0 && (
+            <CategoryProductsCarousel
+              products={category.products}
+            />
+          )}
+
+          {/* Link para ver mais */}
+          <div className="flex justify-center mt-8">
+            <Link
+              href={`/catalogo?category=${category.slug}`}
+              className="flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-6 py-3 rounded-xl transition-all"
+            >
+              Ver todos de {category.name} <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
 }
 
 // Componentes no estilo Decar
@@ -361,10 +462,54 @@ function WhatsAppFloating() {
   );
 }
 
-export default async function HomePageDecarStyle() {
-  const featuredProducts = await getFeaturedProducts();
-  const recentProducts = await getRecentProducts();
+async function FeaturedProducts() {
+  const products = await getFeaturedProducts();
 
+  if (products.length === 0) return null;
+
+  return (
+    <section className="max-w-[1600px] mx-auto px-4 md:px-8 mb-24">
+      <div className="flex items-end justify-between mb-10">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-emerald-600 mb-3">
+            Selecionados para Você
+          </p>
+          <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-slate-900">
+            Produtos em
+            <br />
+            <span className="text-emerald-600">Destaque</span>
+          </h2>
+        </div>
+        <Link
+          href="/catalogo"
+          className="hidden md:flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-6 py-3 rounded-xl transition-all"
+        >
+          Ver Todos <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+
+      {products.length > 0 ? (
+        <CategoryProductsCarousel products={products} />
+      ) : (
+        <div className="col-span-4 text-center py-20 text-slate-400">
+          <div className="text-5xl mb-4">📦</div>
+          <p className="font-bold">Nenhum produto em destaque encontrado.</p>
+        </div>
+      )}
+
+      <div className="flex justify-center mt-10 md:hidden">
+        <Link
+          href="/catalogo"
+          className="flex items-center gap-2 text-sm font-bold border-2 border-slate-900 text-slate-900 px-8 py-3 rounded-xl"
+        >
+          Ver Todos os Produtos
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+export default async function HomePageDecarStyle() {
   return (
     <div className="min-h-screen bg-white">
       <TopBar />
@@ -372,17 +517,8 @@ export default async function HomePageDecarStyle() {
       <HeroBanner />
       <ServiceBadges />
       <CategoryCards />
-      
-      <ProductSectionCarousel 
-        title="Produtos Tigre para fazer bonito na obra com economia" 
-        products={featuredProducts} 
-      />
-      
-      <ProductSectionCarousel 
-        title="Os melhores produtos com ofertas imperdíveis para construir ou reformar" 
-        products={recentProducts} 
-      />
-      
+      <FeaturedProducts />
+      <ProductsByCategory />
       <Footer />
       <WhatsAppFloating />
     </div>
