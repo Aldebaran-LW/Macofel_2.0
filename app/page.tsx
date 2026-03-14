@@ -10,11 +10,14 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  Menu,
+  X,
 } from 'lucide-react';
 import ProductSectionCarousel from '@/components/product-section-carousel';
 import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
 import CategoryProductsCarousel from '@/components/category-products-carousel';
 import HeroCarousel from '@/components/hero-carousel';
+import HeaderMobile from '@/components/header-mobile';
 import { getProducts } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -190,75 +193,7 @@ function TopBar() {
 }
 
 function Header() {
-  return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between gap-8">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <Image
-              src="/logo-macofel.png"
-              alt="MACOFEL"
-              width={60}
-              height={60}
-              className="h-14 w-auto object-contain"
-            />
-            <div className="flex flex-col">
-              <span className="text-2xl font-black text-gray-800 tracking-tight">
-                MACO<span className="text-red-600">FEL</span>
-              </span>
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider">
-                Materiais para Construção
-              </span>
-            </div>
-          </Link>
-
-          {/* Busca */}
-          <div className="flex-1 max-w-2xl">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Faça uma pesquisa..."
-                className="w-full border-2 border-gray-200 rounded-lg py-3 px-4 pr-12 focus:border-red-500 focus:outline-none"
-              />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Ações */}
-          <div className="flex items-center gap-6 shrink-0">
-            <Link href="/login" className="text-sm text-gray-600 hover:text-red-600">
-              <span className="font-bold">Entre</span> ou<br />
-              <span className="font-bold">Cadastre-se</span>
-            </Link>
-            <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-red-600">
-              <ShoppingCart className="w-6 h-6" />
-              <span className="font-bold">0</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Menu de Categorias */}
-      <nav className="border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-4">
-          <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
-            <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
-            <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
-            <li><Link href="/catalogo?category=eletrica" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
-            <li><Link href="/catalogo?category=hidraulica" className="hover:text-red-600 transition-colors">Materiais Hidráulicos</Link></li>
-            <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
-            <li><Link href="/catalogo?category=tintas" className="hover:text-red-600 transition-colors">Tintas</Link></li>
-            <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>
-          </ul>
-        </div>
-      </nav>
-    </header>
-  );
+  return <HeaderMobile />;
 }
 
 function HeroBanner() {
