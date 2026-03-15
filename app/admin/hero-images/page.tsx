@@ -152,17 +152,17 @@ export default function AdminHeroImagesPage() {
 
     try {
       setUploadingImage(true);
-      const formData = new FormData();
-      formData.append('file', file);
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
 
       const res = await fetch('/api/admin/hero-images/upload', {
         method: 'POST',
-        body: formData,
+        body: uploadFormData,
       });
 
       if (res.ok) {
         const data = await res.json();
-        setFormData({ ...formData, imageUrl: data.url });
+        setFormData((prev) => ({ ...prev, imageUrl: data.url }));
         toast.success('Imagem enviada com sucesso!');
       } else {
         const error = await res.json();
