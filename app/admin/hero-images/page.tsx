@@ -287,7 +287,7 @@ export default function AdminHeroImagesPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Imagens Hero</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Imagens Hero</h1>
         <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
           <Plus className="h-4 w-4 mr-2" />
           Adicionar Imagem
@@ -306,9 +306,11 @@ export default function AdminHeroImagesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {images.map((image) => (
+          {images
+            .sort((a, b) => a.order - b.order)
+            .map((image) => (
             <div key={image.id} className="bg-white rounded-lg shadow p-6">
-              <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
+              <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4 border border-gray-200">
                 {image.imageUrl ? (
                   <Image
                     src={image.imageUrl}
@@ -324,47 +326,71 @@ export default function AdminHeroImagesPage() {
                     <ImageIcon className="h-12 w-12 text-gray-300" />
                   </div>
                 )}
-                {image.active ? (
-                  <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                    Ativa
-                  </div>
-                ) : (
-                  <div className="absolute top-2 left-2 bg-gray-600 text-white text-xs px-2 py-1 rounded">
-                    Inativa
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="font-semibold text-lg">{image.alt}</h3>
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>Ordem: {image.order}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs ${
-                    image.displayType === 'grid' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                <div className="absolute top-2 right-2 flex gap-2">
+                  {image.active ? (
+                    <span className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">
+                      Ativa
+                    </span>
+                  ) : (
+                    <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded font-medium">
+                      Inativa
+                    </span>
+                  )}
+                  <span className={`text-xs px-2 py-1 rounded font-medium ${
+                    image.displayType === 'grid' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
                   }`}>
                     {image.displayType === 'grid' ? 'Grid' : 'Large'}
                   </span>
                 </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg text-gray-900 mb-1">{image.alt}</h3>
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium">Ordem:</span>
+                        <span>{image.order}</span>
+                      </span>
+                      {image.animationOrder > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="font-medium">Animação:</span>
+                          <span>{image.animationOrder}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {image.linkType && (
-                  <p className="text-xs text-gray-500">
-                    Link: {
-                      image.linkType === 'product' && image.productId
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs font-medium text-gray-700 mb-1">Link configurado:</p>
+                    <p className="text-xs text-gray-600 truncate">
+                      {image.linkType === 'product' && image.productId
                         ? `Produto: ${products.find(p => p.id === image.productId)?.name || image.productId}`
                         : image.linkType === 'category' && image.categorySlug
                         ? `Categoria: ${categories.find(c => c.slug === image.categorySlug)?.name || image.categorySlug}`
                         : image.linkType === 'url' && image.linkUrl
                         ? image.linkUrl
-                        : 'Nenhum'
-                    }
-                  </p>
+                        : 'Nenhum'}
+                    </p>
+                  </div>
+                )}
+
+                {!image.linkType && (
+                  <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                    <p className="text-xs text-yellow-700">Sem link configurado</p>
+                  </div>
                 )}
               </div>
 
-              <div className="flex gap-2 mt-4 pt-4 border-t">
+              <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleOpenDialog(image)}
+                  className="flex-1"
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Editar
@@ -375,8 +401,7 @@ export default function AdminHeroImagesPage() {
                   onClick={() => handleDelete(image.id)}
                   className="text-red-600 hover:text-red-700 hover:border-red-300"
                 >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Excluir
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -409,18 +434,31 @@ export default function AdminHeroImagesPage() {
             <div>
               <label className="block text-sm font-medium mb-1">Upload de Imagem</label>
               <div className="relative">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  className="cursor-pointer"
-                />
-                {uploadingImage && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600" />
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {uploadingImage ? (
+                      <>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></div>
+                        <p className="text-sm text-gray-500">Enviando...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                        <p className="mb-2 text-sm text-gray-500">
+                          <span className="font-semibold">Clique para fazer upload</span> ou arraste e solte
+                        </p>
+                        <p className="text-xs text-gray-500">PNG, JPG, WEBP (máx. 10MB)</p>
+                      </>
+                    )}
                   </div>
-                )}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
+                </label>
               </div>
             </div>
 
