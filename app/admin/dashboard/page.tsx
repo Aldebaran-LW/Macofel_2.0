@@ -29,7 +29,14 @@ export default function DashboardPage() {
       const res = await fetch('/api/admin/stats');
       if (res.ok) {
         const data = await res.json();
-        setStats(data ?? {});
+        setStats({
+          totalProducts: data?.totalProducts ?? 0,
+          totalOrders: data?.totalOrders ?? 0,
+          totalCustomers: data?.totalCustomers ?? 0,
+          totalRevenue: data?.totalRevenue ?? 0,
+        });
+      } else {
+        toast.error('Erro ao carregar estatísticas');
       }
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -60,7 +67,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Receita Total',
-      value: `R$ ${stats.totalRevenue.toFixed(2)}`,
+      value: `R$ ${(stats.totalRevenue || 0).toFixed(2)}`,
       icon: DollarSign,
       color: 'bg-red-500',
     },

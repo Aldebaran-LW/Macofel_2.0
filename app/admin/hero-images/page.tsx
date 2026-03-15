@@ -1,7 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Image as ImageIcon, Plus, Trash2, Edit2, Save, X, Eye, ExternalLink, Upload } from 'lucide-react';
+import { Image as ImageIcon, Plus, Edit, Trash2, Save, X, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import Image from 'next/image';
 
@@ -35,14 +51,16 @@ interface Category {
 
 export default function AdminHeroImagesPage() {
   const [images, setImages] = useState<HeroImage[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<HeroImage>>({});
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newImage, setNewImage] = useState({ 
-    imageUrl: '', 
-    alt: 'Imagem do Hero', 
-    order: 0, 
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingImage, setEditingImage] = useState<HeroImage | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [formData, setFormData] = useState({
+    imageUrl: '',
+    alt: 'Imagem do Hero',
+    order: 0,
     active: true,
     linkType: null as 'product' | 'category' | 'url' | null,
     productId: null as string | null,
@@ -51,18 +69,12 @@ export default function AdminHeroImagesPage() {
     displayType: 'grid' as 'grid' | 'large',
     animationOrder: 0,
   });
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    fetchImages(true); // true = fazer seed automático se não houver imagens
+    fetchImages(true);
     fetchProducts();
     fetchCategories();
   }, []);
-
 
   const fetchProducts = async () => {
     try {
@@ -95,7 +107,7 @@ export default function AdminHeroImagesPage() {
       
       if (res.status === 401) {
         toast.error('Sessão expirada. Faça login novamente.');
-        window.location.href = '/login';
+        window.location.href = '/admin/login';
         return;
       }
       
@@ -109,56 +121,37 @@ export default function AdminHeroImagesPage() {
         const imageList = Array.isArray(data) ? data : [];
         setImages(imageList);
 
-        // Se não há imagens, fazer seed automático das imagens padrão (apenas na primeira vez)
         if (imageList.length === 0 && autoSeed) {
           const seedRes = await fetch('/api/admin/hero-images/seed', { method: 'POST' });
           if (seedRes.ok) {
-            const seedData = await seedRes.json();
-            if (seedData.success) {
-              toast.success('Imagens padrão carregadas com sucesso!');
-              // Buscar as imagens novamente após o seed
-              const refetchRes = await fetch('/api/admin/hero-images');
-              if (refetchRes.ok) {
-                const refetchData = await refetchRes.json();
-                setImages(Array.isArray(refetchData) ? refetchData : []);
-              }
+            toast.success('Imagens padrão carregadas!');
+            const refetchRes = await fetch('/api/admin/hero-images');
+            if (refetchRes.ok) {
+              const refetchData = await refetchRes.json();
+              setImages(Array.isArray(refetchData) ? refetchData : []);
             }
           }
         }
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        toast.error(errorData.error || 'Erro ao carregar imagens');
       }
     } catch (error) {
       console.error('Erro ao buscar imagens:', error);
-      toast.error('Erro de conexão ao carregar imagens');
+      toast.error('Erro ao carregar imagens');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement> | File) => {
-    const file = e instanceof File ? e : (e.target as HTMLInputElement).files?.[0];
-    
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de arquivo
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Tipo de arquivo não permitido. Use JPEG, PNG ou WebP');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 10MB.');
       return;
     }
-
-    // Validar tamanho (máximo 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.error('Arquivo muito grande. Tamanho máximo: 10MB');
-      return;
-    }
-
-    setUploadingImage(true);
 
     try {
+      setUploadingImage(true);
       const formData = new FormData();
       formData.append('file', file);
 
@@ -169,12 +162,11 @@ export default function AdminHeroImagesPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setNewImage({ ...newImage, imageUrl: data.imageUrl });
-        setImagePreview(data.imageUrl);
+        setFormData({ ...formData, imageUrl: data.url });
         toast.success('Imagem enviada com sucesso!');
       } else {
         const error = await res.json();
-        toast.error(error.error || 'Erro ao fazer upload da imagem');
+        toast.error(error.error || 'Erro ao fazer upload');
       }
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
@@ -184,70 +176,84 @@ export default function AdminHeroImagesPage() {
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
+  const resetForm = () => {
+    setFormData({
+      imageUrl: '',
+      alt: 'Imagem do Hero',
+      order: 0,
+      active: true,
+      linkType: null,
+      productId: null,
+      categorySlug: null,
+      linkUrl: null,
+      displayType: 'grid',
+      animationOrder: 0,
+    });
+    setEditingImage(null);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      handleImageUpload(file);
+  const handleOpenDialog = (image?: HeroImage) => {
+    if (image) {
+      setEditingImage(image);
+      setFormData({
+        imageUrl: image.imageUrl,
+        alt: image.alt,
+        order: image.order,
+        active: image.active,
+        linkType: image.linkType || null,
+        productId: image.productId || null,
+        categorySlug: image.categorySlug || null,
+        linkUrl: image.linkUrl || null,
+        displayType: image.displayType || 'grid',
+        animationOrder: image.animationOrder ?? 0,
+      });
+    } else {
+      resetForm();
     }
+    setIsDialogOpen(true);
   };
 
-  const handleAddImage = async () => {
-    if (!newImage.imageUrl.trim()) {
-      toast.error('URL da imagem é obrigatória ou faça upload de um arquivo');
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.imageUrl.trim()) {
+      toast.error('URL da imagem é obrigatória');
       return;
     }
 
     try {
-      const res = await fetch('/api/admin/hero-images', {
-        method: 'POST',
+      const url = '/api/admin/hero-images';
+      const method = editingImage ? 'PUT' : 'POST';
+      const body = editingImage 
+        ? { id: editingImage.id, ...formData }
+        : formData;
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newImage),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        toast.success('Imagem adicionada com sucesso');
-        setNewImage({ 
-          imageUrl: '', 
-          alt: 'Imagem do Hero', 
-          order: 0, 
-          active: true,
-          linkType: null,
-          productId: null,
-          categorySlug: null,
-          linkUrl: null,
-          displayType: 'grid',
-          animationOrder: 0,
-        });
-        setImagePreview(null);
-        setShowAddForm(false);
+        toast.success(editingImage ? 'Imagem atualizada!' : 'Imagem adicionada!');
+        handleCloseDialog();
         fetchImages();
       } else {
         const error = await res.json();
-        toast.error(error.error || 'Erro ao adicionar imagem');
+        toast.error(error.error || 'Erro ao salvar imagem');
       }
     } catch (error) {
-      console.error('Erro ao adicionar imagem:', error);
-      toast.error('Erro ao adicionar imagem');
+      console.error('Erro ao salvar imagem:', error);
+      toast.error('Erro ao salvar imagem');
     }
   };
 
-  const handleDeleteImage = async (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja deletar esta imagem?')) {
       return;
     }
@@ -258,7 +264,7 @@ export default function AdminHeroImagesPage() {
       });
 
       if (res.ok) {
-        toast.success('Imagem deletada com sucesso');
+        toast.success('Imagem deletada!');
         fetchImages();
       } else {
         const error = await res.json();
@@ -270,83 +276,125 @@ export default function AdminHeroImagesPage() {
     }
   };
 
-  const handleStartEdit = (image: HeroImage) => {
-    setEditingId(image.id);
-    setEditForm({
-      imageUrl: image.imageUrl,
-      alt: image.alt,
-      order: image.order,
-      active: image.active,
-      linkType: image.linkType || null,
-      productId: image.productId || null,
-      categorySlug: image.categorySlug || null,
-      linkUrl: image.linkUrl || null,
-      displayType: image.displayType || 'grid',
-      animationOrder: image.animationOrder ?? 0,
-    });
-  };
-
-  const handleSaveEdit = async (id: string) => {
-    try {
-      const res = await fetch('/api/admin/hero-images', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, ...editForm }),
-      });
-
-      if (res.ok) {
-        toast.success('Imagem atualizada com sucesso');
-        setEditingId(null);
-        setEditForm({});
-        fetchImages();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || 'Erro ao atualizar imagem');
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar imagem:', error);
-      toast.error('Erro ao atualizar imagem');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600" />
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Imagens do Hero</h1>
-          <p className="text-gray-600 mt-2">Gerencie as imagens exibidas no hero da página inicial</p>
-        </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-bold"
-        >
-          <Plus className="w-5 h-5" />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Imagens Hero</h1>
+        <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
+          <Plus className="h-4 w-4 mr-2" />
           Adicionar Imagem
-        </button>
+        </Button>
       </div>
 
-      {showAddForm && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Adicionar Nova Imagem</h2>
-          <div className="space-y-4">
+      {images.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <ImageIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma imagem cadastrada</h3>
+          <p className="text-gray-600 mb-6">Adicione imagens para o hero da página inicial</p>
+          <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Primeira Imagem
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {images.map((image) => (
+            <div key={image.id} className="bg-white rounded-lg shadow p-6">
+              <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
+                {image.imageUrl ? (
+                  <Image
+                    src={image.imageUrl}
+                    alt={image.alt}
+                    fill
+                    className="object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <ImageIcon className="h-12 w-12 text-gray-300" />
+                  </div>
+                )}
+                {image.active ? (
+                  <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                    Ativa
+                  </div>
+                ) : (
+                  <div className="absolute top-2 left-2 bg-gray-600 text-white text-xs px-2 py-1 rounded">
+                    Inativa
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">{image.alt}</h3>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Ordem: {image.order}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    image.displayType === 'grid' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {image.displayType === 'grid' ? 'Grid' : 'Large'}
+                  </span>
+                </div>
+                {image.linkType && (
+                  <p className="text-xs text-gray-500">
+                    Link: {
+                      image.linkType === 'product' && image.productId
+                        ? `Produto: ${products.find(p => p.id === image.productId)?.name || image.productId}`
+                        : image.linkType === 'category' && image.categorySlug
+                        ? `Categoria: ${categories.find(c => c.slug === image.categorySlug)?.name || image.categorySlug}`
+                        : image.linkType === 'url' && image.linkUrl
+                        ? image.linkUrl
+                        : 'Nenhum'
+                    }
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-4 pt-4 border-t">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenDialog(image)}
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDelete(image.id)}
+                  className="text-red-600 hover:text-red-700 hover:border-red-300"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Excluir
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingImage ? 'Editar Imagem Hero' : 'Adicionar Nova Imagem Hero'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Preview da imagem */}
-            {(imagePreview || newImage.imageUrl) && (
+            {formData.imageUrl && (
               <div className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
                 <Image
-                  src={imagePreview || newImage.imageUrl}
+                  src={formData.imageUrl}
                   alt="Preview"
                   fill
                   className="object-cover"
@@ -357,605 +405,195 @@ export default function AdminHeroImagesPage() {
               </div>
             )}
 
-            {/* Upload de arquivo com drag and drop */}
+            {/* Upload de arquivo */}
             <div>
-              <label
-                className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                  isDragging
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  {uploadingImage ? (
-                    <>
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></div>
-                      <p className="text-sm text-gray-500">Enviando...</p>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Clique para fazer upload</span> ou arraste e solte
-                      </p>
-                      <p className="text-xs text-gray-500">PNG, JPG, WEBP (máx. 10MB)</p>
-                    </>
-                  )}
-                </div>
-                <input
+              <label className="block text-sm font-medium mb-1">Upload de Imagem</label>
+              <div className="relative">
+                <Input
                   type="file"
-                  className="hidden"
                   accept="image/*"
                   onChange={handleImageUpload}
                   disabled={uploadingImage}
+                  className="cursor-pointer"
                 />
-              </label>
-            </div>
-
-            {/* Ou URL alternativa */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">ou</span>
+                {uploadingImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600" />
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* URL da imagem */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                URL da Imagem
-              </label>
-              <input
-                type="text"
-                value={newImage.imageUrl}
-                onChange={(e) => {
-                  setNewImage({ ...newImage, imageUrl: e.target.value });
-                  setImagePreview(e.target.value || null);
-                }}
+              <label className="block text-sm font-medium mb-1">URL da Imagem <span className="text-red-500">*</span></label>
+              <Input
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                 placeholder="https://exemplo.com/imagem.jpg"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Cole a URL da imagem (pode ser de um serviço de hospedagem como Imgur, Cloudinary, etc.)
-              </p>
             </div>
+
+            {/* Texto alternativo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Texto Alternativo
-              </label>
-              <input
-                type="text"
-                value={newImage.alt}
-                onChange={(e) => setNewImage({ ...newImage, alt: e.target.value })}
+              <label className="block text-sm font-medium mb-1">Texto Alternativo</label>
+              <Input
+                value={formData.alt}
+                onChange={(e) => setFormData({ ...formData, alt: e.target.value })}
                 placeholder="Descrição da imagem"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
               />
             </div>
-            {/* Link da Imagem */}
+
+            {/* Tipo de link */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Link
-              </label>
-              <select
-                value={newImage.linkType || ''}
-                onChange={(e) => {
-                  const linkType = e.target.value as 'product' | 'category' | 'url' | '';
-                  const newData: any = { 
-                    ...newImage, 
+              <label className="block text-sm font-medium mb-1">Tipo de Link</label>
+              <Select
+                value={formData.linkType || ''}
+                onValueChange={(value) => {
+                  const linkType = value as 'product' | 'category' | 'url' | '';
+                  setFormData({
+                    ...formData,
                     linkType: linkType || null,
-                  };
-                  // Limpar campos que não são do tipo selecionado
-                  if (linkType !== 'product') newData.productId = null;
-                  if (linkType !== 'category') newData.categorySlug = null;
-                  if (linkType !== 'url') newData.linkUrl = null;
-                  setNewImage(newData);
+                    productId: linkType !== 'product' ? null : formData.productId,
+                    categorySlug: linkType !== 'category' ? null : formData.categorySlug,
+                    linkUrl: linkType !== 'url' ? null : formData.linkUrl,
+                  });
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
               >
-                <option value="">Nenhum link</option>
-                <option value="product">Link para Produto</option>
-                <option value="category">Link para Categoria</option>
-                <option value="url">URL Personalizada</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo de link" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum link</SelectItem>
+                  <SelectItem value="product">Link para Produto</SelectItem>
+                  <SelectItem value="category">Link para Categoria</SelectItem>
+                  <SelectItem value="url">URL Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {newImage.linkType === 'product' && (
+            {/* Produto */}
+            {formData.linkType === 'product' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Selecionar Produto
-                </label>
-                <select
-                  value={newImage.productId || ''}
-                  onChange={(e) => setNewImage({ ...newImage, productId: e.target.value || null })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                <label className="block text-sm font-medium mb-1">Selecionar Produto</label>
+                <Select
+                  value={formData.productId || ''}
+                  onValueChange={(value) => setFormData({ ...formData, productId: value || null })}
                 >
-                  <option value="">Selecione um produto</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um produto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
-            {newImage.linkType === 'category' && (
+            {/* Categoria */}
+            {formData.linkType === 'category' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Selecionar Categoria
-                </label>
-                <select
-                  value={newImage.categorySlug || ''}
-                  onChange={(e) => setNewImage({ ...newImage, categorySlug: e.target.value || null })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                <label className="block text-sm font-medium mb-1">Selecionar Categoria</label>
+                <Select
+                  value={formData.categorySlug || ''}
+                  onValueChange={(value) => setFormData({ ...formData, categorySlug: value || null })}
                 >
-                  <option value="">Selecione uma categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.slug}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
-            {newImage.linkType === 'url' && (
+            {/* URL personalizada */}
+            {formData.linkType === 'url' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  URL Personalizada
-                </label>
-                <input
-                  type="text"
-                  value={newImage.linkUrl || ''}
-                  onChange={(e) => setNewImage({ ...newImage, linkUrl: e.target.value || null })}
+                <label className="block text-sm font-medium mb-1">URL Personalizada</label>
+                <Input
+                  value={formData.linkUrl || ''}
+                  onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value || null })}
                   placeholder="https://exemplo.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>
             )}
 
-            {/* Tipo de Exibição e Ordem de Animação */}
+            {/* Tipo de exibição e ordem */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Exibição
-                </label>
-                <select
-                  value={newImage.displayType}
-                  onChange={(e) => setNewImage({ ...newImage, displayType: e.target.value as 'grid' | 'large' })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                <label className="block text-sm font-medium mb-1">Tipo de Exibição</label>
+                <Select
+                  value={formData.displayType}
+                  onValueChange={(value) => setFormData({ ...formData, displayType: value as 'grid' | 'large' })}
                 >
-                  <option value="grid">Grid (4 quadrados)</option>
-                  <option value="large">Imagem Grande</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Grid: aparece primeiro na animação | Large: aparece depois
-                </p>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="grid">Grid (4 quadrados)</SelectItem>
+                    <SelectItem value="large">Imagem Grande</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ordem na Animação
-                </label>
-                <input
+                <label className="block text-sm font-medium mb-1">Ordem</label>
+                <Input
                   type="number"
-                  value={newImage.animationOrder}
-                  onChange={(e) => setNewImage({ ...newImage, animationOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                  value={formData.order}
+                  onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
                   min="0"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Ordem de exibição dentro do mesmo tipo
-                </p>
               </div>
             </div>
 
+            {/* Ordem de animação e ativo */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ordem Geral
-                </label>
-                <input
+                <label className="block text-sm font-medium mb-1">Ordem na Animação</label>
+                <Input
                   type="number"
-                  value={newImage.order}
-                  onChange={(e) => setNewImage({ ...newImage, order: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                  value={formData.animationOrder}
+                  onChange={(e) => setFormData({ ...formData, animationOrder: parseInt(e.target.value) || 0 })}
+                  min="0"
                 />
               </div>
-              <div className="flex items-center gap-2 mt-8">
-                <input
-                  type="checkbox"
-                  id="newActive"
-                  checked={newImage.active}
-                  onChange={(e) => setNewImage({ ...newImage, active: e.target.checked })}
-                  className="w-4 h-4 text-red-600 focus:ring-red-600"
-                />
-                <label htmlFor="newActive" className="text-sm font-medium text-gray-700">
-                  Ativa
+              <div className="flex items-end">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.active}
+                    onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                  <span className="text-sm font-medium">Imagem Ativa</span>
                 </label>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddImage}
-                className="flex items-center gap-2 bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                Salvar
-              </button>
-              <button
-                onClick={() => {
-                  setShowAddForm(false);
-                  setNewImage({ 
-                    imageUrl: '', 
-                    alt: 'Imagem do Hero', 
-                    order: 0, 
-                    active: true,
-                    linkType: null,
-                    productId: null,
-                    categorySlug: null,
-                    linkUrl: null,
-                    displayType: 'grid',
-                    animationOrder: 0,
-                  });
-                  setImagePreview(null);
-                }}
-                className="flex items-center gap-2 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                <X className="w-4 h-4" />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                <X className="h-4 w-4 mr-2" />
                 Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {images.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600">
-          Total de imagens: <span className="font-bold text-gray-900">{images.length}</span>
-          {' • '}
-          Ativas: <span className="font-bold text-green-600">{images.filter(img => img.active).length}</span>
-          {' • '}
-          Inativas: <span className="font-bold text-gray-500">{images.filter(img => !img.active).length}</span>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {images.length === 0 ? (
-          <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-            <ImageIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 font-medium mb-2">Nenhuma imagem cadastrada</p>
-            <p className="text-sm text-gray-500 mb-4">Adicione uma imagem para começar a gerenciar o hero da página inicial</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center gap-2 bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Adicionar Primeira Imagem
-            </button>
-          </div>
-        ) : (
-          images.map((image) => (
-            <div
-              key={image.id}
-              className="bg-white rounded-lg shadow overflow-hidden"
-            >
-              <div className="relative aspect-video bg-gray-100">
-                {editingId === image.id ? (
-                  <div className="p-4 space-y-4 h-full overflow-y-auto">
-                    {/* Preview da imagem */}
-                    {editForm.imageUrl && (
-                      <div className="relative w-full h-32 mb-4 rounded-lg overflow-hidden border border-gray-200">
-                        <Image
-                          src={editForm.imageUrl}
-                          alt="Preview"
-                          fill
-                          className="object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        URL da Imagem
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.imageUrl || ''}
-                        onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                        placeholder="https://exemplo.com/imagem.jpg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Texto Alternativo
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.alt || ''}
-                        onChange={(e) => setEditForm({ ...editForm, alt: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                      />
-                    </div>
-                    {/* Link da Imagem */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tipo de Link
-                      </label>
-                      <select
-                        value={editForm.linkType || ''}
-                        onChange={(e) => {
-                          const linkType = e.target.value as 'product' | 'category' | 'url' | '';
-                          const newForm: any = { ...editForm, linkType: linkType || null };
-                          // Limpar campos que não são do tipo selecionado
-                          if (linkType !== 'product') newForm.productId = null;
-                          if (linkType !== 'category') newForm.categorySlug = null;
-                          if (linkType !== 'url') newForm.linkUrl = null;
-                          setEditForm(newForm);
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                      >
-                        <option value="">Nenhum link</option>
-                        <option value="product">Link para Produto</option>
-                        <option value="category">Link para Categoria</option>
-                        <option value="url">URL Personalizada</option>
-                      </select>
-                    </div>
-
-                    {editForm.linkType === 'product' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Selecionar Produto
-                        </label>
-                        <select
-                          value={editForm.productId || ''}
-                          onChange={(e) => setEditForm({ ...editForm, productId: e.target.value || null })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                        >
-                          <option value="">Selecione um produto</option>
-                          {products.map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {editForm.linkType === 'category' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Selecionar Categoria
-                        </label>
-                        <select
-                          value={editForm.categorySlug || ''}
-                          onChange={(e) => setEditForm({ ...editForm, categorySlug: e.target.value || null })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                        >
-                          <option value="">Selecione uma categoria</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.slug}>
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {editForm.linkType === 'url' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          URL Personalizada
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.linkUrl || ''}
-                          onChange={(e) => setEditForm({ ...editForm, linkUrl: e.target.value || null })}
-                          placeholder="https://exemplo.com"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                        />
-                      </div>
-                    )}
-
-                    {/* Tipo de Exibição e Ordem de Animação */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Tipo de Exibição
-                        </label>
-                        <select
-                          value={editForm.displayType || 'grid'}
-                          onChange={(e) => setEditForm({ ...editForm, displayType: e.target.value as 'grid' | 'large' })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                        >
-                          <option value="grid">Grid (4 quadrados)</option>
-                          <option value="large">Imagem Grande</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Ordem na Animação
-                        </label>
-                        <input
-                          type="number"
-                          value={editForm.animationOrder ?? 0}
-                          onChange={(e) => setEditForm({ ...editForm, animationOrder: parseInt(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Ordem Geral
-                        </label>
-                        <input
-                          type="number"
-                          value={editForm.order ?? 0}
-                          onChange={(e) => setEditForm({ ...editForm, order: parseInt(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 pt-6">
-                        <input
-                          type="checkbox"
-                          checked={editForm.active ?? true}
-                          onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
-                          className="w-4 h-4 text-red-600 focus:ring-red-600"
-                        />
-                        <label className="text-sm font-medium text-gray-700">Ativa</label>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {image.imageUrl ? (
-                      <Image
-                        src={image.imageUrl}
-                        alt={image.alt}
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.innerHTML = `
-                              <div class="flex items-center justify-center h-full text-gray-400">
-                                <div class="text-center">
-                                  <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                  </svg>
-                                  <p class="text-xs">Erro ao carregar imagem</p>
-                                </div>
-                              </div>
-                            `;
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-400">
-                        <ImageIcon className="w-12 h-12" />
-                      </div>
-                    )}
-                    {!image.active && (
-                      <div className="absolute top-2 right-2 bg-gray-800 text-white text-xs px-2 py-1 rounded font-bold">
-                        Inativa
-                      </div>
-                    )}
-                    {image.active && (
-                      <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded font-bold">
-                        Ativa
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="p-4">
-                {editingId === image.id ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSaveEdit(image.id)}
-                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
-                    >
-                      <Save className="w-4 h-4" />
-                      Salvar
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-2">
-                      <p className="text-sm font-medium text-gray-900 mb-1 truncate" title={image.alt}>
-                        {image.alt}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                        <span>Ordem: {image.order}</span>
-                        <span className={`px-2 py-0.5 rounded ${image.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                          {image.active ? 'Ativa' : 'Inativa'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className={`px-2 py-0.5 rounded ${image.displayType === 'grid' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                          {image.displayType === 'grid' ? 'Grid' : 'Large'}
-                        </span>
-                        <span>Anim: {image.animationOrder ?? 0}</span>
-                      </div>
-                    {image.imageUrl && (
-                      <a
-                        href={image.imageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1"
-                        title={image.imageUrl}
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        Abrir imagem
-                      </a>
-                    )}
-                    {image.linkType && (
-                      <div className="mt-2 text-xs">
-                        <span className="font-semibold text-gray-700">Link: </span>
-                        {image.linkType === 'product' && image.productId && (
-                          <span className="text-blue-600">
-                            Produto: {products.find(p => p.id === image.productId)?.name || image.productId}
-                          </span>
-                        )}
-                        {image.linkType === 'category' && image.categorySlug && (
-                          <span className="text-blue-600">
-                            Categoria: {categories.find(c => c.slug === image.categorySlug)?.name || image.categorySlug}
-                          </span>
-                        )}
-                        {image.linkType === 'url' && image.linkUrl && (
-                          <a
-                            href={image.linkUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            {image.linkUrl}
-                          </a>
-                        )}
-                      </div>
-                    )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleStartEdit(image)}
-                        className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDeleteImage(image.id)}
-                        className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                        title="Deletar imagem"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+              </Button>
+              <Button type="submit" className="bg-red-600 hover:bg-red-700">
+                <Save className="h-4 w-4 mr-2" />
+                {editingImage ? 'Salvar Alterações' : 'Adicionar Imagem'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

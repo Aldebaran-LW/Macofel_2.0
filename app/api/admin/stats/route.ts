@@ -18,21 +18,43 @@ export async function GET() {
     await connectToDatabase();
 
     // Buscar produtos do MongoDB e estatísticas do PostgreSQL
-    const [productsResult, totalOrders, totalCustomers, orders] = await Promise.all([
+    const [productsResult, totalOrders, totalCustomers, orders, recentOrders] = await Promise.all([
       getProducts({}), // Buscar todos os produtos para contar
       prisma.order.count(),
       prisma.user.count({ where: { role: 'CLIENT' } }),
-      prisma.order.findMany({ select: { total: true } }),
+      prisma.order.findMany({ select: { total: true, status: true } }),
+      prisma.order.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          status: true,
+          total: true,
+          createdAt: true,
+          customerName: true,
+        },
+      }),
     ]);
 
     const totalProducts = productsResult.total;
     const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order?.total ?? 0), 0);
+    const pendingOrders = orders.filter((o: any) => o.status === 'PENDING').length;
+    const completedOrders = orders.filter((o: any) => o.status === 'COMPLETED').length;
 
     return NextResponse.json({
       totalProducts,
       totalOrders,
       totalCustomers,
       totalRevenue,
+      pendingOrders,
+      completedOrders,
+      recentOrders: recentOrders.map((order: any) => ({
+        id: order.id,
+        customerName: order.customerName,
+        total: order.total,
+        status: order.status,
+        createdAt: order.createdAt.toISOString(),
+      })),
     });
   } catch (error: any) {
     console.error('Erro ao buscar estatísticas:', error);

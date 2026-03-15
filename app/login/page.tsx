@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +33,8 @@ export default function LoginPage() {
         toast.error('Email ou senha incorretos');
       } else {
         toast.success('Login realizado com sucesso!');
-        router.push('/');
+        // Redirecionar sempre para área do cliente
+        router.push('/minha-conta');
         router.refresh();
       }
     } catch (error) {
@@ -41,6 +43,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
@@ -123,13 +126,23 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-3 text-center">
             <p className="text-sm text-gray-600">
               Não tem uma conta?{' '}
               <Link href="/cadastro" className="text-red-600 hover:text-red-700 font-medium">
                 Cadastre-se
               </Link>
             </p>
+            <div className="pt-3 border-t border-gray-200">
+              <Link
+                href="/admin/login"
+                className="text-sm text-gray-600 hover:text-red-600 transition-colors flex items-center justify-center gap-2 mx-auto font-medium"
+              >
+                <Shield className="h-4 w-4" />
+                Acesso Administrativo
+                <span>→</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

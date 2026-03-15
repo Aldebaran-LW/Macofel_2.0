@@ -90,10 +90,13 @@ export default function Header() {
             <Link href="#produtos" className="hover:text-red-600 transition-colors">Produtos</Link>
             <Link href="#orcamento" className="hover:text-red-600 transition-colors">Orçamentos</Link>
             {session?.user && (
-              <Link href="/meus-pedidos" className="hover:text-red-600 transition-colors">Meus Pedidos</Link>
+              <>
+                <Link href="/minha-conta" className="hover:text-red-600 transition-colors">Minha Conta</Link>
+                <Link href="/minha-conta/pedidos" className="hover:text-red-600 transition-colors">Meus Pedidos</Link>
+              </>
             )}
             {isAdmin && (
-              <Link href="/admin" className="hover:text-red-600 transition-colors">Admin</Link>
+              <Link href="/admin/dashboard" className="hover:text-red-600 transition-colors">Admin</Link>
             )}
           </div>
 
@@ -117,7 +120,7 @@ export default function Header() {
                     )}
                   </Link>
                 )}
-                <Link href="/perfil" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                <Link href="/minha-conta" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                   <User className="w-5 h-5" />
                 </Link>
                 <Button 
@@ -133,6 +136,9 @@ export default function Header() {
               <>
                 <Link href="/login" className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all active:scale-95">
                   Falar com Consultor
+                </Link>
+                <Link href="/admin/login" className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg">
+                  🔐 Admin Login
                 </Link>
                 <button 
                   className="lg:hidden p-2"
@@ -177,13 +183,22 @@ export default function Header() {
               Orçamentos
             </Link>
             {session?.user && (
-              <Link
-                href="/meus-pedidos"
-                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Meus Pedidos
-              </Link>
+              <>
+                <Link
+                  href="/minha-conta"
+                  className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Minha Conta
+                </Link>
+                <Link
+                  href="/minha-conta/pedidos"
+                  className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Meus Pedidos
+                </Link>
+              </>
             )}
             {isAdmin && (
               <Link

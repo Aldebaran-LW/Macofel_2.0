@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Home, Image as ImageIcon } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Home, Image as ImageIcon, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { signOut, useSession } from 'next-auth/react';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -16,6 +19,25 @@ const menuItems = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    // Verificar se o usuário é admin
+    if (session && (session.user as any)?.role !== 'ADMIN') {
+      router.push('/admin/login');
+    }
+  }, [session, router]);
+
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      toast.success('Logout realizado com sucesso');
+      router.push('/');
+    } catch (error) {
+      toast.error('Erro ao fazer logout');
+    }
+  };
 
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen p-4 flex flex-col">
@@ -47,13 +69,22 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      <Link
-        href="/"
-        className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
-      >
-        <Home className="h-5 w-5" />
-        <span>Voltar ao Site</span>
-      </Link>
+      <div className="space-y-2 border-t border-gray-700 pt-4">
+        <Link
+          href="/"
+          className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+        >
+          <Home className="h-5 w-5" />
+          <span>Voltar ao Site</span>
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+        >
+          <LogOut className="h-5 w-5" />
+          <span>Sair</span>
+        </button>
+      </div>
     </aside>
   );
 }

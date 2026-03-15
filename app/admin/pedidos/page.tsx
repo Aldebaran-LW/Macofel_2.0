@@ -75,59 +75,67 @@ export default function AdminPedidosPage() {
       <h1 className="text-3xl font-bold mb-8">Gerenciar Pedidos</h1>
 
       <div className="space-y-4">
-        {orders?.map?.((order) => {
-          const statusInfo = statusConfig[order?.status ?? 'PENDING'];
-          const StatusIcon = statusInfo?.icon;
+        {orders.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhum pedido encontrado</h3>
+            <p className="text-gray-600">Os pedidos aparecerão aqui quando os clientes fizerem compras</p>
+          </div>
+        ) : (
+          orders.map((order) => {
+            const statusInfo = statusConfig[order.status ?? 'PENDING'];
+            const StatusIcon = statusInfo?.icon;
 
-          return (
-            <div key={order?.id} className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="font-semibold text-lg">Pedido #{order?.id?.substring?.(0, 8)}</p>
-                  <p className="text-sm text-gray-600">
-                    {order?.user?.firstName} {order?.user?.lastName} ({order?.user?.email})
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(order?.createdAt ?? '').toLocaleString('pt-BR')}
-                  </p>
+            return (
+              <div key={order.id} className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <p className="font-semibold text-lg">Pedido #{order.id.substring(0, 8)}</p>
+                    <p className="text-sm text-gray-600">
+                      {order.user.firstName} {order.user.lastName} ({order.user.email})
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(order.createdAt).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                  <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo?.color}`}>
+                    {StatusIcon && <StatusIcon className="h-4 w-4 mr-1" />}
+                    {statusInfo?.label}
+                  </div>
                 </div>
-                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo?.color}`}>
-                  {StatusIcon && <StatusIcon className="h-4 w-4 mr-1" />}
-                  {statusInfo?.label}
+
+                <div className="border-t pt-4 mb-4">
+                  <h4 className="font-medium mb-2">Itens:</h4>
+                  {order.items.map((item) => (
+                    <p key={item.id} className="text-sm text-gray-600">
+                      {item.quantity}x {item.product.name} - R$ {((item.price ?? 0) * (item.quantity ?? 0)).toFixed(2)}
+                    </p>
+                  ))}
+                  <p className="font-bold mt-2">Total: R$ {order.total.toFixed(2)}</p>
+                </div>
+
+                <div className="border-t pt-4 mb-4">
+                  <p className="text-sm"><strong>Endereço:</strong> {order.deliveryAddress}</p>
+                  <p className="text-sm"><strong>Email:</strong> {order.customerEmail}</p>
+                </div>
+
+                <div className="flex gap-2">
+                  {['PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map((status) => (
+                    <Button
+                      key={status}
+                      size="sm"
+                      variant={order.status === status ? 'default' : 'outline'}
+                      onClick={() => updateStatus(order.id, status)}
+                      className={order.status === status ? 'bg-red-600' : ''}
+                    >
+                      {statusConfig[status]?.label}
+                    </Button>
+                  ))}
                 </div>
               </div>
-
-              <div className="border-t pt-4 mb-4">
-                <h4 className="font-medium mb-2">Itens:</h4>
-                {order?.items?.map?.((item) => (
-                  <p key={item?.id} className="text-sm text-gray-600">
-                    {item?.quantity}x {item?.product?.name} - R$ {((item?.price ?? 0) * (item?.quantity ?? 0)).toFixed(2)}
-                  </p>
-                ))}
-                <p className="font-bold mt-2">Total: R$ {order?.total?.toFixed?.(2)}</p>
-              </div>
-
-              <div className="border-t pt-4 mb-4">
-                <p className="text-sm"><strong>Endereço:</strong> {order?.deliveryAddress}</p>
-                <p className="text-sm"><strong>Telefone:</strong> {order?.customerEmail}</p>
-              </div>
-
-              <div className="flex gap-2">
-                {['PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map((status) => (
-                  <Button
-                    key={status}
-                    size="sm"
-                    variant={order?.status === status ? 'default' : 'outline'}
-                    onClick={() => updateStatus(order?.id ?? '', status)}
-                    className={order?.status === status ? 'bg-red-600' : ''}
-                  >
-                    {statusConfig[status]?.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

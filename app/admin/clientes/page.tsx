@@ -43,36 +43,44 @@ export default function AdminClientesPage() {
     <div>
       <h1 className="text-3xl font-bold mb-8">Clientes Cadastrados</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {clients?.map?.((client) => (
-          <div key={client?.id} className="bg-white rounded-lg shadow p-6">
-            <h3 className="font-semibold text-lg mb-2">
-              {client?.firstName} {client?.lastName}
-            </h3>
-            <div className="space-y-2 text-sm text-gray-600">
-              <div className="flex items-center">
-                <Mail className="h-4 w-4 mr-2" />
-                {client?.email}
-              </div>
-              {client?.phone && (
+      {clients.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <Mail className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhum cliente cadastrado</h3>
+          <p className="text-gray-600">Os clientes aparecerão aqui quando se cadastrarem</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {clients.map((client) => (
+            <div key={client.id} className="bg-white rounded-lg shadow p-6">
+              <h3 className="font-semibold text-lg mb-2">
+                {client.firstName} {client.lastName}
+              </h3>
+              <div className="space-y-2 text-sm text-gray-600">
                 <div className="flex items-center">
-                  <Phone className="h-4 w-4 mr-2" />
-                  {client.phone}
+                  <Mail className="h-4 w-4 mr-2" />
+                  {client.email}
                 </div>
-              )}
-              {client?.address && (
-                <div className="flex items-start">
-                  <MapPin className="h-4 w-4 mr-2 mt-0.5" />
-                  {client.address}
-                </div>
-              )}
-              <p className="text-xs text-gray-500 mt-3">
-                Cadastrado em: {new Date(client?.createdAt ?? '').toLocaleDateString('pt-BR')}
-              </p>
+                {client.phone && (
+                  <div className="flex items-center">
+                    <Phone className="h-4 w-4 mr-2" />
+                    {client.phone}
+                  </div>
+                )}
+                {client.address && (
+                  <div className="flex items-start">
+                    <MapPin className="h-4 w-4 mr-2 mt-0.5" />
+                    {client.address}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-3">
+                  Cadastrado em: {new Date(client.createdAt).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
