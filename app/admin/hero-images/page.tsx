@@ -353,10 +353,10 @@ export default function AdminHeroImagesPage() {
                         <span className="font-medium">Ordem:</span>
                         <span>{image.order}</span>
                       </span>
-                      {image.animationOrder > 0 && (
+                      {(image.animationOrder ?? 0) > 0 && (
                         <span className="flex items-center gap-1">
                           <span className="font-medium">Animação:</span>
-                          <span>{image.animationOrder}</span>
+                          <span>{image.animationOrder ?? 0}</span>
                         </span>
                       )}
                     </div>
