@@ -119,7 +119,20 @@ export default function AdminHeroImagesPage() {
       if (res.ok) {
         const data = await res.json();
         const imageList = Array.isArray(data) ? data : [];
-        setImages(imageList);
+        // Garantir que todas as imagens têm campos obrigatórios
+        const normalizedImages = imageList.map((img: any) => ({
+          ...img,
+          order: img.order ?? 0,
+          active: img.active ?? true,
+          alt: img.alt || 'Imagem do Hero',
+          displayType: img.displayType || 'grid',
+          animationOrder: img.animationOrder ?? 0,
+          linkType: img.linkType || null,
+          productId: img.productId || null,
+          categorySlug: img.categorySlug || null,
+          linkUrl: img.linkUrl || null,
+        }));
+        setImages(normalizedImages);
 
         if (imageList.length === 0 && autoSeed) {
           const seedRes = await fetch('/api/admin/hero-images/seed', { method: 'POST' });
@@ -284,6 +297,9 @@ export default function AdminHeroImagesPage() {
     );
   }
 
+  // Garantir que images é sempre um array
+  const safeImages = Array.isArray(images) ? images : [];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -294,7 +310,7 @@ export default function AdminHeroImagesPage() {
         </Button>
       </div>
 
-      {images.length === 0 ? (
+      {safeImages.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <ImageIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma imagem cadastrada</h3>
@@ -306,19 +322,29 @@ export default function AdminHeroImagesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {images
-            .sort((a, b) => a.order - b.order)
+          {safeImages
+            .filter((image) => image && image.id) // Filtrar imagens inválidas
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
             .map((image) => (
             <div key={image.id} className="bg-white rounded-lg shadow p-6">
               <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4 border border-gray-200">
-                {image.imageUrl ? (
+                {image.imageUrl && image.imageUrl.trim() ? (
                   <Image
                     src={image.imageUrl}
-                    alt={image.alt}
+                    alt={image.alt || 'Imagem do Hero'}
                     fill
                     className="object-cover"
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
+                      try {
+                        const target = e.target as HTMLImageElement;
+                        if (target && target.parentElement) {
+                          target.style.display = 'none';
+                        }
+                      } catch (error) {
+                        console.error('Erro ao tratar erro de imagem:', error);
+                      }
                     }}
                   />
                 ) : (
@@ -337,9 +363,9 @@ export default function AdminHeroImagesPage() {
                     </span>
                   )}
                   <span className={`text-xs px-2 py-1 rounded font-medium ${
-                    image.displayType === 'grid' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                    (image.displayType || 'grid') === 'grid' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
                   }`}>
-                    {image.displayType === 'grid' ? 'Grid' : 'Large'}
+                    {(image.displayType || 'grid') === 'grid' ? 'Grid' : 'Large'}
                   </span>
                 </div>
               </div>
@@ -347,11 +373,11 @@ export default function AdminHeroImagesPage() {
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-900 mb-1">{image.alt}</h3>
+                    <h3 className="font-semibold text-lg text-gray-900 mb-1">{image.alt || 'Imagem do Hero'}</h3>
                     <div className="flex items-center gap-3 text-sm text-gray-600">
                       <span className="flex items-center gap-1">
                         <span className="font-medium">Ordem:</span>
-                        <span>{image.order}</span>
+                        <span>{image.order ?? 0}</span>
                       </span>
                       {(image.animationOrder ?? 0) > 0 && (
                         <span className="flex items-center gap-1">
@@ -363,7 +389,7 @@ export default function AdminHeroImagesPage() {
                   </div>
                 </div>
 
-                {image.linkType && (
+                {image.linkType ? (
                   <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                     <p className="text-xs font-medium text-gray-700 mb-1">Link configurado:</p>
                     <p className="text-xs text-gray-600 truncate">
@@ -376,9 +402,7 @@ export default function AdminHeroImagesPage() {
                         : 'Nenhum'}
                     </p>
                   </div>
-                )}
-
-                {!image.linkType && (
+                ) : (
                   <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
                     <p className="text-xs text-yellow-700">Sem link configurado</p>
                   </div>
