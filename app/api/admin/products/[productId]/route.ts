@@ -18,7 +18,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, description, price, stock, imageUrl, categoryId, featured } = body;
+    const { name, description, price, stock, weight, imageUrl, categoryId, featured } = body;
 
     const updateData: any = {};
 
@@ -35,6 +35,7 @@ export async function PATCH(
     if (description !== undefined) updateData.description = description;
     if (price !== undefined) updateData.price = parseFloat(price);
     if (stock !== undefined) updateData.stock = parseInt(stock);
+    if (weight !== undefined) updateData.weight = weight ? parseFloat(weight) : null;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';

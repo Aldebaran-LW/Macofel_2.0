@@ -29,6 +29,7 @@ interface Product {
   description: string;
   price: number;
   stock: number;
+  weight?: number | null;
   imageUrl?: string | null;
   categoryId: string;
   featured: boolean;
@@ -51,6 +52,7 @@ export default function AdminProdutosPage() {
     description: '',
     price: '',
     stock: '',
+    weight: '',
     imageUrl: '',
     categoryId: '',
     featured: false,
@@ -97,6 +99,7 @@ export default function AdminProdutosPage() {
       description: '',
       price: '',
       stock: '',
+      weight: '',
       imageUrl: '',
       categoryId: '',
       featured: false,
@@ -157,6 +160,7 @@ export default function AdminProdutosPage() {
         description: product.description,
         price: product.price.toString(),
         stock: product.stock.toString(),
+        weight: product.weight?.toString() || '',
         imageUrl: product.imageUrl || '',
         categoryId: product.categoryId,
         featured: product.featured,
@@ -196,6 +200,7 @@ export default function AdminProdutosPage() {
           description: formData.description,
           price: formData.price,
           stock: formData.stock || '0',
+          weight: formData.weight || null,
           imageUrl: formData.imageUrl || null,
           categoryId: formData.categoryId,
           featured: formData.featured,
@@ -404,7 +409,7 @@ export default function AdminProdutosPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Preço (R$) <span className="text-red-500">*</span>
@@ -428,6 +433,18 @@ export default function AdminProdutosPage() {
                   value={formData.stock}
                   onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                   placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Peso (kg)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.weight}
+                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  placeholder="0.00"
                 />
               </div>
             </div>

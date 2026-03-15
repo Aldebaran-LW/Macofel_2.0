@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Home, Image as ImageIcon, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Home, Image as ImageIcon, LogOut, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ const menuItems = [
   { href: '/admin/categorias', label: 'Categorias', icon: FolderTree },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
+  { href: '/admin/orcamento', label: 'Orçamento', icon: FileText },
   { href: '/admin/hero-images', label: 'Imagens Hero', icon: ImageIcon },
 ];
 

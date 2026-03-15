@@ -29,6 +29,7 @@ model Product {
   description String
   price       Float
   stock       Int      @default(0)
+  weight      Float?   // Peso em kg
   imageUrl    String?
   categoryId  String   @db.ObjectId
   featured    Boolean  @default(false)
