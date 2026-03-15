@@ -161,6 +161,14 @@ export async function PUT(req: NextRequest) {
 
     // Buscar categoria atualizada
     const updatedCategory = await categoriesCollection.findOne({ _id: new ObjectId(id) });
+    
+    if (!updatedCategory) {
+      return NextResponse.json(
+        { error: 'Categoria não encontrada após atualização' },
+        { status: 404 }
+      );
+    }
+
     const productsCollection = db.collection('products');
     const productCount = await productsCollection.countDocuments({
       categoryId: new ObjectId(id),
