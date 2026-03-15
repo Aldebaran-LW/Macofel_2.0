@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, ErrorInfo, Component } from 'react';
 import { Image as ImageIcon, Plus, Edit, Trash2, Save, X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,46 @@ interface Category {
   slug: string;
 }
 
+// Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Erro capturado pelo Error Boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <div className="text-red-600 text-xl font-semibold">Erro ao carregar página</div>
+          <Button
+            onClick={() => {
+              this.setState({ hasError: false });
+              window.location.reload();
+            }}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Recarregar Página
+          </Button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function AdminHeroImagesPage() {
   const [images, setImages] = useState<HeroImage[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -81,10 +121,20 @@ export default function AdminHeroImagesPage() {
       const res = await fetch('/api/products?limit=1000');
       if (res.ok) {
         const data = await res.json();
-        setProducts(data?.products ?? []);
+        const productList = Array.isArray(data?.products) ? data.products : [];
+        // Garantir que todos os produtos têm campos obrigatórios
+        const safeProducts = productList
+          .filter((p: any) => p && p.id && p.name && p.slug)
+          .map((p: any) => ({
+            id: String(p.id),
+            name: String(p.name),
+            slug: String(p.slug),
+          }));
+        setProducts(safeProducts);
       }
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
+      setProducts([]);
     }
   };
 
@@ -93,10 +143,20 @@ export default function AdminHeroImagesPage() {
       const res = await fetch('/api/categories');
       if (res.ok) {
         const data = await res.json();
-        setCategories(data ?? []);
+        const categoryList = Array.isArray(data) ? data : [];
+        // Garantir que todas as categorias têm campos obrigatórios
+        const safeCategories = categoryList
+          .filter((c: any) => c && c.id && c.name && c.slug)
+          .map((c: any) => ({
+            id: String(c.id),
+            name: String(c.name),
+            slug: String(c.slug),
+          }));
+        setCategories(safeCategories);
       }
     } catch (error) {
       console.error('Erro ao buscar categorias:', error);
+      setCategories([]);
     }
   };
 
@@ -297,11 +357,14 @@ export default function AdminHeroImagesPage() {
     );
   }
 
-  // Garantir que images é sempre um array
-  const safeImages = Array.isArray(images) ? images : [];
+  // Garantir que images é sempre um array válido
+  const safeImages = Array.isArray(images) 
+    ? images.filter((img) => img && img.id && typeof img.id === 'string')
+    : [];
 
   return (
-    <div className="space-y-6">
+    <ErrorBoundary>
+      <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Imagens Hero</h1>
         <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
@@ -393,13 +456,29 @@ export default function AdminHeroImagesPage() {
                   <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                     <p className="text-xs font-medium text-gray-700 mb-1">Link configurado:</p>
                     <p className="text-xs text-gray-600 truncate">
-                      {image.linkType === 'product' && image.productId
-                        ? `Produto: ${products.find(p => p.id === image.productId)?.name || image.productId}`
-                        : image.linkType === 'category' && image.categorySlug
-                        ? `Categoria: ${categories.find(c => c.slug === image.categorySlug)?.name || image.categorySlug}`
-                        : image.linkType === 'url' && image.linkUrl
-                        ? image.linkUrl
-                        : 'Nenhum'}
+                      {(() => {
+                        try {
+                          if (image.linkType === 'product' && image.productId) {
+                            const product = Array.isArray(products) 
+                              ? products.find(p => p && p.id === image.productId)
+                              : null;
+                            return `Produto: ${product?.name || image.productId || 'N/A'}`;
+                          }
+                          if (image.linkType === 'category' && image.categorySlug) {
+                            const category = Array.isArray(categories)
+                              ? categories.find(c => c && c.slug === image.categorySlug)
+                              : null;
+                            return `Categoria: ${category?.name || image.categorySlug || 'N/A'}`;
+                          }
+                          if (image.linkType === 'url' && image.linkUrl) {
+                            return String(image.linkUrl);
+                          }
+                          return 'Nenhum';
+                        } catch (error) {
+                          console.error('Erro ao renderizar link:', error);
+                          return 'Erro ao carregar link';
+                        }
+                      })()}
                     </p>
                   </div>
                 ) : (
@@ -547,11 +626,17 @@ export default function AdminHeroImagesPage() {
                     <SelectValue placeholder="Selecione um produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
+                    {Array.isArray(products) && products.length > 0 ? (
+                      products.map((product) => (
+                        product && product.id && product.name ? (
+                          <SelectItem key={String(product.id)} value={String(product.id)}>
+                            {String(product.name)}
+                          </SelectItem>
+                        ) : null
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>Nenhum produto disponível</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -569,11 +654,17 @@ export default function AdminHeroImagesPage() {
                     <SelectValue placeholder="Selecione uma categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.slug}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
+                    {Array.isArray(categories) && categories.length > 0 ? (
+                      categories.map((category) => (
+                        category && category.id && category.name && category.slug ? (
+                          <SelectItem key={String(category.id)} value={String(category.slug)}>
+                            {String(category.name)}
+                          </SelectItem>
+                        ) : null
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>Nenhuma categoria disponível</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -656,6 +747,7 @@ export default function AdminHeroImagesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
