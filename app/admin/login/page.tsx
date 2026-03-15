@@ -111,6 +111,7 @@ export default function AdminLoginPage() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
+                  autoComplete="email"
                   className="pl-10 bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-red-500"
                 />
               </div>
@@ -127,6 +128,7 @@ export default function AdminLoginPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
+                  autoComplete="current-password"
                   className="pl-10 pr-10 bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-red-500"
                 />
                 <button

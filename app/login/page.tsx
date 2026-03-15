@@ -32,9 +32,21 @@ export default function LoginPage() {
       if (result?.error) {
         toast.error('Email ou senha incorretos');
       } else {
-        toast.success('Login realizado com sucesso!');
-        // Redirecionar sempre para área do cliente
-        router.push('/minha-conta');
+        // Aguardar um pouco para a sessão ser atualizada
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verificar se é admin e redirecionar adequadamente
+        const res = await fetch('/api/auth/session', { cache: 'no-store' });
+        const sessionData = await res.json();
+        const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
+
+        if (userRole === 'ADMIN') {
+          toast.success('Login realizado com sucesso! Redirecionando para área administrativa...');
+          router.push('/admin/dashboard');
+        } else {
+          toast.success('Login realizado com sucesso!');
+          router.push('/minha-conta');
+        }
         router.refresh();
       }
     } catch (error) {
@@ -87,15 +99,16 @@ export default function LoginPage() {
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  className="pl-10 pr-10"
-                />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required
+                      autoComplete="current-password"
+                      className="pl-10 pr-10"
+                    />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
