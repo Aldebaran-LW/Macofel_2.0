@@ -414,3 +414,113 @@ export async function updateHeroImage(id: string, data: {
 
   return result.modifiedCount > 0;
 }
+
+// ----------------------------
+// HERO SLIDES (HeroCarousel)
+// ----------------------------
+
+export type HeroSlideDoc = {
+  imageUrl: string;
+  subtitle?: string | null;
+  title?: string | null;
+  text?: string | null;
+  href?: string | null;
+  order?: number;
+  active?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+function normalizeHeroSlide(doc: any) {
+  return {
+    id: doc._id?.toString?.() ?? String(doc.id),
+    imageUrl: String(doc.imageUrl || ''),
+    subtitle: doc.subtitle ?? null,
+    title: doc.title ?? null,
+    text: doc.text ?? null,
+    href: doc.href ?? null,
+    order: typeof doc.order === 'number' ? doc.order : 0,
+    active: typeof doc.active === 'boolean' ? doc.active : true,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+}
+
+export async function getHeroSlides() {
+  const db = await connectToDatabase();
+  const heroSlidesCollection = db.collection('hero_slides');
+
+  const slides = await heroSlidesCollection
+    .find({ active: true })
+    .sort({ order: 1, updatedAt: -1 })
+    .toArray();
+
+  return slides.map(normalizeHeroSlide);
+}
+
+export async function getAllHeroSlides() {
+  const db = await connectToDatabase();
+  const heroSlidesCollection = db.collection('hero_slides');
+
+  const slides = await heroSlidesCollection
+    .find({})
+    .sort({ order: 1, updatedAt: -1 })
+    .toArray();
+
+  return slides.map(normalizeHeroSlide);
+}
+
+export async function createHeroSlide(data: HeroSlideDoc) {
+  const db = await connectToDatabase();
+  const heroSlidesCollection = db.collection('hero_slides');
+
+  const now = new Date();
+  const result = await heroSlidesCollection.insertOne({
+    imageUrl: data.imageUrl,
+    subtitle: data.subtitle ?? null,
+    title: data.title ?? null,
+    text: data.text ?? null,
+    href: data.href ?? null,
+    order: data.order ?? 0,
+    active: data.active ?? true,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return result.insertedId.toString();
+}
+
+export async function updateHeroSlide(id: string, data: Partial<HeroSlideDoc>) {
+  const db = await connectToDatabase();
+  const heroSlidesCollection = db.collection('hero_slides');
+
+  const updateData: any = {
+    updatedAt: new Date(),
+  };
+
+  if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
+  if (data.subtitle !== undefined) updateData.subtitle = data.subtitle ?? null;
+  if (data.title !== undefined) updateData.title = data.title ?? null;
+  if (data.text !== undefined) updateData.text = data.text ?? null;
+  if (data.href !== undefined) updateData.href = data.href ?? null;
+  if (data.order !== undefined) updateData.order = data.order ?? 0;
+  if (data.active !== undefined) updateData.active = data.active ?? true;
+
+  const result = await heroSlidesCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updateData }
+  );
+
+  return result.modifiedCount > 0;
+}
+
+export async function deleteHeroSlide(id: string) {
+  const db = await connectToDatabase();
+  const heroSlidesCollection = db.collection('hero_slides');
+
+  const result = await heroSlidesCollection.deleteOne({
+    _id: new ObjectId(id),
+  });
+
+  return result.deletedCount > 0;
+}

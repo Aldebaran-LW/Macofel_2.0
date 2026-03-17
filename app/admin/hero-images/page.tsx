@@ -1,55 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, ErrorInfo, Component } from 'react';
-import { Image as ImageIcon, Plus, Edit, Trash2, Save, X, Upload } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toast } from 'sonner';
+import React, { useEffect, useState, ErrorInfo } from 'react';
+import { Edit, Image as ImageIcon, Link2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import Image from 'next/image';
+import { toast } from 'sonner';
 
-interface HeroImage {
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+interface HeroSlide {
   id: string;
   imageUrl: string;
-  alt: string;
+  subtitle?: string | null;
+  title?: string | null;
+  text?: string | null;
+  href?: string | null;
   order: number;
   active: boolean;
-  linkType?: 'product' | 'category' | 'url' | null;
-  productId?: string | null;
-  categorySlug?: string | null;
-  linkUrl?: string | null;
-  displayType?: 'grid' | 'large';
-  animationOrder?: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-// Error Boundary Component
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error?: Error }
@@ -90,125 +63,68 @@ class ErrorBoundary extends React.Component<
 }
 
 export default function AdminHeroImagesPage() {
-  const [images, setImages] = useState<HeroImage[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingImage, setEditingImage] = useState<HeroImage | null>(null);
+  const [editingSlide, setEditingSlide] = useState<HeroSlide | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     imageUrl: '',
-    alt: 'Imagem do Hero',
+    subtitle: '',
+    title: '',
+    text: '',
+    href: '',
     order: 0,
     active: true,
-    linkType: null as 'product' | 'category' | 'url' | null,
-    productId: null as string | null,
-    categorySlug: null as string | null,
-    linkUrl: null as string | null,
-    displayType: 'grid' as 'grid' | 'large',
-    animationOrder: 0,
   });
 
   useEffect(() => {
-    fetchImages(true);
-    fetchProducts();
-    fetchCategories();
+    fetchSlides();
   }, []);
 
-  const fetchProducts = async () => {
-    try {
-      const res = await fetch('/api/products?limit=1000');
-      if (res.ok) {
-        const data = await res.json();
-        const productList = Array.isArray(data?.products) ? data.products : [];
-        // Garantir que todos os produtos têm campos obrigatórios
-        const safeProducts = productList
-          .filter((p: any) => p && p.id && p.name && p.slug)
-          .map((p: any) => ({
-            id: String(p.id),
-            name: String(p.name),
-            slug: String(p.slug),
-          }));
-        setProducts(safeProducts);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar produtos:', error);
-      setProducts([]);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const res = await fetch('/api/categories');
-      if (res.ok) {
-        const data = await res.json();
-        const categoryList = Array.isArray(data) ? data : [];
-        // Garantir que todas as categorias têm campos obrigatórios
-        const safeCategories = categoryList
-          .filter((c: any) => c && c.id && c.name && c.slug)
-          .map((c: any) => ({
-            id: String(c.id),
-            name: String(c.name),
-            slug: String(c.slug),
-          }));
-        setCategories(safeCategories);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar categorias:', error);
-      setCategories([]);
-    }
-  };
-
-  const fetchImages = async (autoSeed = false) => {
+  const fetchSlides = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/hero-images');
-      
+      const res = await fetch('/api/admin/hero-slides');
+
       if (res.status === 401) {
         toast.error('Sessão expirada. Faça login novamente.');
         window.location.href = '/admin/login';
         return;
       }
-      
+
       if (res.status === 403) {
         toast.error('Acesso negado. Você precisa ser administrador.');
         return;
       }
-      
-      if (res.ok) {
-        const data = await res.json();
-        const imageList = Array.isArray(data) ? data : [];
-        // Garantir que todas as imagens têm campos obrigatórios
-        const normalizedImages = imageList.map((img: any) => ({
-          ...img,
-          order: img.order ?? 0,
-          active: img.active ?? true,
-          alt: img.alt || 'Imagem do Hero',
-          displayType: img.displayType || 'grid',
-          animationOrder: img.animationOrder ?? 0,
-          linkType: img.linkType || null,
-          productId: img.productId || null,
-          categorySlug: img.categorySlug || null,
-          linkUrl: img.linkUrl || null,
-        }));
-        setImages(normalizedImages);
 
-        if (imageList.length === 0 && autoSeed) {
-          const seedRes = await fetch('/api/admin/hero-images/seed', { method: 'POST' });
-          if (seedRes.ok) {
-            toast.success('Imagens padrão carregadas!');
-            const refetchRes = await fetch('/api/admin/hero-images');
-            if (refetchRes.ok) {
-              const refetchData = await refetchRes.json();
-              setImages(Array.isArray(refetchData) ? refetchData : []);
-            }
-          }
-        }
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        toast.error(error.error || 'Erro ao carregar slides');
+        return;
       }
+
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      const normalized: HeroSlide[] = list
+        .filter((s: any) => s && s.id)
+        .map((s: any) => ({
+          id: String(s.id),
+          imageUrl: String(s.imageUrl || ''),
+          subtitle: s.subtitle ?? null,
+          title: s.title ?? null,
+          text: s.text ?? null,
+          href: s.href ?? null,
+          order: typeof s.order === 'number' ? s.order : 0,
+          active: typeof s.active === 'boolean' ? s.active : true,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        }));
+
+      setSlides(normalized);
     } catch (error) {
-      console.error('Erro ao buscar imagens:', error);
-      toast.error('Erro ao carregar imagens');
+      console.error('Erro ao buscar slides:', error);
+      toast.error('Erro ao carregar slides');
     } finally {
       setLoading(false);
     }
@@ -235,10 +151,10 @@ export default function AdminHeroImagesPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setFormData((prev) => ({ ...prev, imageUrl: data.url }));
+        setFormData((prev) => ({ ...prev, imageUrl: String(data.imageUrl || '') }));
         toast.success('Imagem enviada com sucesso!');
       } else {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         toast.error(error.error || 'Erro ao fazer upload');
       }
     } catch (error) {
@@ -252,33 +168,27 @@ export default function AdminHeroImagesPage() {
   const resetForm = () => {
     setFormData({
       imageUrl: '',
-      alt: 'Imagem do Hero',
+      subtitle: '',
+      title: '',
+      text: '',
+      href: '',
       order: 0,
       active: true,
-      linkType: null,
-      productId: null,
-      categorySlug: null,
-      linkUrl: null,
-      displayType: 'grid',
-      animationOrder: 0,
     });
-    setEditingImage(null);
+    setEditingSlide(null);
   };
 
-  const handleOpenDialog = (image?: HeroImage) => {
-    if (image) {
-      setEditingImage(image);
+  const handleOpenDialog = (slide?: HeroSlide) => {
+    if (slide) {
+      setEditingSlide(slide);
       setFormData({
-        imageUrl: image.imageUrl,
-        alt: image.alt,
-        order: image.order,
-        active: image.active,
-        linkType: image.linkType || null,
-        productId: image.productId || null,
-        categorySlug: image.categorySlug || null,
-        linkUrl: image.linkUrl || null,
-        displayType: image.displayType || 'grid',
-        animationOrder: image.animationOrder ?? 0,
+        imageUrl: slide.imageUrl,
+        subtitle: slide.subtitle ?? '',
+        title: slide.title ?? '',
+        text: slide.text ?? '',
+        href: slide.href ?? '',
+        order: slide.order ?? 0,
+        active: slide.active ?? true,
       });
     } else {
       resetForm();
@@ -293,59 +203,60 @@ export default function AdminHeroImagesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.imageUrl.trim()) {
       toast.error('URL da imagem é obrigatória');
       return;
     }
 
     try {
-      const url = '/api/admin/hero-images';
-      const method = editingImage ? 'PUT' : 'POST';
-      const body = editingImage 
-        ? { id: editingImage.id, ...formData }
-        : formData;
+      const method = editingSlide ? 'PUT' : 'POST';
+      const payload = {
+        ...(editingSlide ? { id: editingSlide.id } : {}),
+        imageUrl: formData.imageUrl.trim(),
+        subtitle: formData.subtitle.trim() || null,
+        title: formData.title.trim() || null,
+        text: formData.text.trim() || null,
+        href: formData.href.trim() || null,
+        order: Number.isFinite(formData.order) ? formData.order : 0,
+        active: !!formData.active,
+      };
 
-      const res = await fetch(url, {
+      const res = await fetch('/api/admin/hero-slides', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        toast.success(editingImage ? 'Imagem atualizada!' : 'Imagem adicionada!');
+        toast.success(editingSlide ? 'Slide atualizado!' : 'Slide adicionado!');
         handleCloseDialog();
-        fetchImages();
+        fetchSlides();
       } else {
-        const error = await res.json();
-        toast.error(error.error || 'Erro ao salvar imagem');
+        const error = await res.json().catch(() => ({}));
+        toast.error(error.error || 'Erro ao salvar slide');
       }
     } catch (error) {
-      console.error('Erro ao salvar imagem:', error);
-      toast.error('Erro ao salvar imagem');
+      console.error('Erro ao salvar slide:', error);
+      toast.error('Erro ao salvar slide');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja deletar esta imagem?')) {
-      return;
-    }
+    if (!confirm('Tem certeza que deseja deletar este slide?')) return;
 
     try {
-      const res = await fetch(`/api/admin/hero-images?id=${id}`, {
-        method: 'DELETE',
-      });
-
+      const res = await fetch(`/api/admin/hero-slides?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Imagem deletada!');
-        fetchImages();
+        toast.success('Slide deletado!');
+        fetchSlides();
       } else {
-        const error = await res.json();
-        toast.error(error.error || 'Erro ao deletar imagem');
+        const error = await res.json().catch(() => ({}));
+        toast.error(error.error || 'Erro ao deletar slide');
       }
     } catch (error) {
-      console.error('Erro ao deletar imagem:', error);
-      toast.error('Erro ao deletar imagem');
+      console.error('Erro ao deletar slide:', error);
+      toast.error('Erro ao deletar slide');
     }
   };
 
@@ -357,191 +268,145 @@ export default function AdminHeroImagesPage() {
     );
   }
 
-  // Garantir que images é sempre um array válido
-  const safeImages = Array.isArray(images) 
-    ? images.filter((img) => img && img.id && typeof img.id === 'string')
+  const safeSlides = Array.isArray(slides)
+    ? slides.filter((s) => s && s.id && typeof s.id === 'string')
     : [];
 
   return (
     <ErrorBoundary>
       <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Imagens Hero</h1>
-        <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Imagem
-        </Button>
-      </div>
-
-      {safeImages.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <ImageIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma imagem cadastrada</h3>
-          <p className="text-gray-600 mb-6">Adicione imagens para o hero da página inicial</p>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">Slides do Hero</h1>
           <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
             <Plus className="h-4 w-4 mr-2" />
-            Adicionar Primeira Imagem
+            Adicionar Slide
           </Button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {safeImages
-            .filter((image) => image && image.id) // Filtrar imagens inválidas
-            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-            .map((image) => (
-            <div key={image.id} className="bg-white rounded-lg shadow p-6">
-              <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4 border border-gray-200">
-                {image.imageUrl && image.imageUrl.trim() ? (
-                  <Image
-                    src={image.imageUrl}
-                    alt={image.alt || 'Imagem do Hero'}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    onError={(e) => {
-                      try {
-                        const target = e.target as HTMLImageElement;
-                        if (target && target.parentElement) {
-                          target.style.display = 'none';
-                        }
-                      } catch (error) {
-                        console.error('Erro ao tratar erro de imagem:', error);
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <ImageIcon className="h-12 w-12 text-gray-300" />
-                  </div>
-                )}
-                <div className="absolute top-2 right-2 flex gap-2">
-                  {image.active ? (
-                    <span className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">
-                      Ativa
-                    </span>
-                  ) : (
-                    <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded font-medium">
-                      Inativa
-                    </span>
-                  )}
-                  <span className={`text-xs px-2 py-1 rounded font-medium ${
-                    (image.displayType || 'grid') === 'grid' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                  }`}>
-                    {(image.displayType || 'grid') === 'grid' ? 'Grid' : 'Large'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-900 mb-1">{image.alt || 'Imagem do Hero'}</h3>
-                    <div className="flex items-center gap-3 text-sm text-gray-600">
-                      <span className="flex items-center gap-1">
-                        <span className="font-medium">Ordem:</span>
-                        <span>{image.order ?? 0}</span>
-                      </span>
-                      {(image.animationOrder ?? 0) > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="font-medium">Animação:</span>
-                          <span>{image.animationOrder ?? 0}</span>
-                        </span>
+
+        {safeSlides.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <ImageIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhum slide cadastrado</h3>
+            <p className="text-gray-600 mb-6">Adicione slides para o carousel do hero da página inicial</p>
+            <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Primeiro Slide
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {safeSlides
+              .slice()
+              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+              .map((slide) => (
+                <div key={slide.id} className="bg-white rounded-lg shadow p-6">
+                  <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4 border border-gray-200">
+                    {slide.imageUrl?.trim() ? (
+                      <Image
+                        src={slide.imageUrl}
+                        alt={slide.title || slide.subtitle || 'Slide do Hero'}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <ImageIcon className="h-12 w-12 text-gray-300" />
+                      </div>
+                    )}
+
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      {slide.active ? (
+                        <span className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">Ativo</span>
+                      ) : (
+                        <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded font-medium">Inativo</span>
                       )}
                     </div>
                   </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                        {slide.title || slide.subtitle || 'Slide'}
+                      </h3>
+                      <div className="flex items-center gap-3 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <span className="font-medium">Ordem:</span>
+                          <span>{slide.order ?? 0}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {slide.href ? (
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-700 mb-1 flex items-center gap-1">
+                          <Link2 className="h-3 w-3" />
+                          Link
+                        </p>
+                        <p className="text-xs text-gray-600 truncate">{String(slide.href)}</p>
+                      </div>
+                    ) : (
+                      <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                        <p className="text-xs text-yellow-700">Sem link configurado</p>
+                      </div>
+                    )}
+
+                    {(slide.subtitle || slide.text) && (
+                      <div className="space-y-1">
+                        {slide.subtitle && (
+                          <p className="text-xs text-gray-600 truncate">
+                            <span className="font-medium">Subtitle:</span> {String(slide.subtitle)}
+                          </p>
+                        )}
+                        {slide.text && (
+                          <p className="text-xs text-gray-600 line-clamp-2">
+                            <span className="font-medium">Texto:</span> {String(slide.text)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+                    <Button size="sm" variant="outline" onClick={() => handleOpenDialog(slide)} className="flex-1">
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDelete(slide.id)}
+                      className="text-red-600 hover:text-red-700 hover:border-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+              ))}
+          </div>
+        )}
 
-                {image.linkType ? (
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <p className="text-xs font-medium text-gray-700 mb-1">Link configurado:</p>
-                    <p className="text-xs text-gray-600 truncate">
-                      {(() => {
-                        try {
-                          if (image.linkType === 'product' && image.productId) {
-                            const product = Array.isArray(products) 
-                              ? products.find(p => p && p.id === image.productId)
-                              : null;
-                            return `Produto: ${product?.name || image.productId || 'N/A'}`;
-                          }
-                          if (image.linkType === 'category' && image.categorySlug) {
-                            const category = Array.isArray(categories)
-                              ? categories.find(c => c && c.slug === image.categorySlug)
-                              : null;
-                            return `Categoria: ${category?.name || image.categorySlug || 'N/A'}`;
-                          }
-                          if (image.linkType === 'url' && image.linkUrl) {
-                            return String(image.linkUrl);
-                          }
-                          return 'Nenhum';
-                        } catch (error) {
-                          console.error('Erro ao renderizar link:', error);
-                          return 'Erro ao carregar link';
-                        }
-                      })()}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
-                    <p className="text-xs text-yellow-700">Sem link configurado</p>
-                  </div>
-                )}
-              </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingSlide ? 'Editar Slide do Hero' : 'Adicionar Novo Slide do Hero'}</DialogTitle>
+            </DialogHeader>
 
-              <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleOpenDialog(image)}
-                  className="flex-1"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Editar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDelete(image.id)}
-                  className="text-red-600 hover:text-red-700 hover:border-red-300"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {formData.imageUrl && (
+                <div className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                  <Image src={formData.imageUrl} alt="Preview" fill className="object-cover" unoptimized />
+                </div>
+              )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingImage ? 'Editar Imagem Hero' : 'Adicionar Nova Imagem Hero'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Preview da imagem */}
-            {formData.imageUrl && (
-              <div className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
-                <Image
-                  src={formData.imageUrl}
-                  alt="Preview"
-                  fill
-                  className="object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Upload de arquivo */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Upload de Imagem</label>
-              <div className="relative">
+              <div>
+                <label className="block text-sm font-medium mb-1">Upload de Imagem</label>
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     {uploadingImage ? (
                       <>
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2" />
                         <p className="text-sm text-gray-500">Enviando...</p>
                       </>
                     ) : (
@@ -563,164 +428,66 @@ export default function AdminHeroImagesPage() {
                   />
                 </label>
               </div>
-            </div>
 
-            {/* URL da imagem */}
-            <div>
-              <label className="block text-sm font-medium mb-1">URL da Imagem <span className="text-red-500">*</span></label>
-              <Input
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://exemplo.com/imagem.jpg"
-                required
-              />
-            </div>
-
-            {/* Texto alternativo */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Texto Alternativo</label>
-              <Input
-                value={formData.alt}
-                onChange={(e) => setFormData({ ...formData, alt: e.target.value })}
-                placeholder="Descrição da imagem"
-              />
-            </div>
-
-            {/* Tipo de link */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Tipo de Link</label>
-              <Select
-                value={formData.linkType || ''}
-                onValueChange={(value) => {
-                  const linkType = value as 'product' | 'category' | 'url' | '';
-                  setFormData({
-                    ...formData,
-                    linkType: linkType || null,
-                    productId: linkType !== 'product' ? null : formData.productId,
-                    categorySlug: linkType !== 'category' ? null : formData.categorySlug,
-                    linkUrl: linkType !== 'url' ? null : formData.linkUrl,
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo de link" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Nenhum link</SelectItem>
-                  <SelectItem value="product">Link para Produto</SelectItem>
-                  <SelectItem value="category">Link para Categoria</SelectItem>
-                  <SelectItem value="url">URL Personalizada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Produto */}
-            {formData.linkType === 'product' && (
               <div>
-                <label className="block text-sm font-medium mb-1">Selecionar Produto</label>
-                <Select
-                  value={formData.productId || ''}
-                  onValueChange={(value) => setFormData({ ...formData, productId: value || null })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um produto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.isArray(products) && products.length > 0 ? (
-                      products.map((product) => (
-                        product && product.id && product.name ? (
-                          <SelectItem key={String(product.id)} value={String(product.id)}>
-                            {String(product.name)}
-                          </SelectItem>
-                        ) : null
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>Nenhum produto disponível</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Categoria */}
-            {formData.linkType === 'category' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Selecionar Categoria</label>
-                <Select
-                  value={formData.categorySlug || ''}
-                  onValueChange={(value) => setFormData({ ...formData, categorySlug: value || null })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.isArray(categories) && categories.length > 0 ? (
-                      categories.map((category) => (
-                        category && category.id && category.name && category.slug ? (
-                          <SelectItem key={String(category.id)} value={String(category.slug)}>
-                            {String(category.name)}
-                          </SelectItem>
-                        ) : null
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>Nenhuma categoria disponível</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* URL personalizada */}
-            {formData.linkType === 'url' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">URL Personalizada</label>
+                <label className="block text-sm font-medium mb-1">
+                  URL da Imagem <span className="text-red-500">*</span>
+                </label>
                 <Input
-                  value={formData.linkUrl || ''}
-                  onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value || null })}
-                  placeholder="https://exemplo.com"
+                  value={formData.imageUrl}
+                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  placeholder="https://exemplo.com/imagem.jpg"
+                  required
                 />
               </div>
-            )}
 
-            {/* Tipo de exibição e ordem */}
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Tipo de Exibição</label>
-                <Select
-                  value={formData.displayType}
-                  onValueChange={(value) => setFormData({ ...formData, displayType: value as 'grid' | 'large' })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="grid">Grid (4 quadrados)</SelectItem>
-                    <SelectItem value="large">Imagem Grande</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Ordem</label>
+                <label className="block text-sm font-medium mb-1">Subtitle</label>
                 <Input
-                  type="number"
-                  value={formData.order}
-                  onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
-                  min="0"
+                  value={formData.subtitle}
+                  onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                  placeholder="Ex.: Promoção da Semana"
                 />
               </div>
-            </div>
 
-            {/* Ordem de animação e ativo */}
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Ordem na Animação</label>
+                <label className="block text-sm font-medium mb-1">Título</label>
                 <Input
-                  type="number"
-                  value={formData.animationOrder}
-                  onChange={(e) => setFormData({ ...formData, animationOrder: parseInt(e.target.value) || 0 })}
-                  min="0"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Ex.: Tudo para sua obra"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Texto</label>
+                <Textarea
+                  value={formData.text}
+                  onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+                  placeholder="Ex.: Materiais de qualidade com os melhores preços"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Link (href)</label>
+                  <Input
+                    value={formData.href}
+                    onChange={(e) => setFormData({ ...formData, href: e.target.value })}
+                    placeholder="Ex.: /catalogo?category=ferramentas"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ordem</label>
+                  <Input
+                    type="number"
+                    value={formData.order}
+                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                    min="0"
+                  />
+                </div>
+              </div>
+
               <div className="flex items-end">
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
@@ -729,24 +496,23 @@ export default function AdminHeroImagesPage() {
                     onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
                     className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                   />
-                  <span className="text-sm font-medium">Imagem Ativa</span>
+                  <span className="text-sm font-medium">Slide Ativo</span>
                 </label>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                <X className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-              <Button type="submit" className="bg-red-600 hover:bg-red-700">
-                <Save className="h-4 w-4 mr-2" />
-                {editingImage ? 'Salvar Alterações' : 'Adicionar Imagem'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+                <Button type="submit" className="bg-red-600 hover:bg-red-700">
+                  <Save className="h-4 w-4 mr-2" />
+                  {editingSlide ? 'Salvar Alterações' : 'Adicionar Slide'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </ErrorBoundary>
   );
