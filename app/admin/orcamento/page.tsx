@@ -20,6 +20,8 @@ export default function AdminOrcamentoPage() {
   const [clienteEmail, setClienteEmail] = useState('');
   const [clienteTelefone, setClienteTelefone] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [frete, setFrete] = useState('');
+  const [desconto, setDesconto] = useState('');
   const [produtoAtual, setProdutoAtual] = useState({ nome: '', quantidade: '1', preco: '' });
 
   const adicionarItem = () => {
@@ -49,8 +51,16 @@ export default function AdminOrcamentoPage() {
     setItems(items.filter(item => item.id !== id));
   };
 
+  const subtotalItens = () => items.reduce((total, item) => total + item.subtotal, 0);
+
+  const valorFrete = () => parseFloat(frete.replace(',', '.')) || 0;
+  const valorDesconto = () => parseFloat(desconto.replace(',', '.')) || 0;
+
   const calcularTotal = () => {
-    return items.reduce((total, item) => total + item.subtotal, 0);
+    const sub = subtotalItens();
+    const f = valorFrete();
+    const d = valorDesconto();
+    return Math.max(0, sub + f - d);
   };
 
   const gerarPDF = () => {
@@ -131,6 +141,17 @@ export default function AdminOrcamentoPage() {
               color: #dc2626;
               font-size: 24px;
             }
+            .totals {
+              text-align: right;
+              margin-top: 20px;
+            }
+            .total-line {
+              display: flex;
+              justify-content: flex-end;
+              gap: 24px;
+              margin-bottom: 6px;
+              font-size: 14px;
+            }
             .observacoes {
               margin-top: 30px;
               padding: 15px;
@@ -185,8 +206,13 @@ export default function AdminOrcamentoPage() {
                 `).join('')}
               </tbody>
             </table>
-            <div class="total">
-              <span>Total: <span class="total-value">R$ ${calcularTotal().toFixed(2)}</span></span>
+            <div class="totals">
+              <div class="total-line"><span>Subtotal:</span><span>R$ ${subtotalItens().toFixed(2)}</span></div>
+              ${valorFrete() > 0 ? `<div class="total-line"><span>Frete:</span><span>R$ ${valorFrete().toFixed(2)}</span></div>` : ''}
+              ${valorDesconto() > 0 ? `<div class="total-line"><span>Desconto:</span><span>- R$ ${valorDesconto().toFixed(2)}</span></div>` : ''}
+              <div class="total">
+                <span>Total: <span class="total-value">R$ ${calcularTotal().toFixed(2)}</span></span>
+              </div>
             </div>
           </div>
 
@@ -323,6 +349,33 @@ export default function AdminOrcamentoPage() {
             </div>
           </div>
 
+          {/* Frete e Descontos */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Frete e Descontos</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Frete (R$)</label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={frete}
+                  onChange={(e) => setFrete(e.target.value.replace(/[^0-9,.-]/g, ''))}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Desconto (R$)</label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={desconto}
+                  onChange={(e) => setDesconto(e.target.value.replace(/[^0-9,.-]/g, ''))}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Observações */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Observações</h2>
@@ -379,8 +432,28 @@ export default function AdminOrcamentoPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="border-t pt-4 mt-4">
-                <div className="flex justify-between items-center">
+              <div className="border-t pt-4 mt-4 space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Subtotal:</span>
+                  <span>R$ {subtotalItens().toFixed(2)}</span>
+                </div>
+                {(valorFrete() > 0 || valorDesconto() > 0) && (
+                  <>
+                    {valorFrete() > 0 && (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Frete:</span>
+                        <span>R$ {valorFrete().toFixed(2)}</span>
+                      </div>
+                    )}
+                    {valorDesconto() > 0 && (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Desconto:</span>
+                        <span>- R$ {valorDesconto().toFixed(2)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t">
                   <span className="text-lg font-semibold">Total:</span>
                   <span className="text-2xl font-bold text-red-600">
                     R$ {calcularTotal().toFixed(2)}

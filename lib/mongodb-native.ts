@@ -46,6 +46,7 @@ export async function getProducts(filters?: {
   featured?: boolean;
   page?: number;
   limit?: number;
+  sort?: 'price_asc' | 'price_desc' | 'name' | 'relevance';
 }) {
   const db = await connectToDatabase();
   const productsCollection = db.collection('products');
@@ -86,12 +87,20 @@ export async function getProducts(filters?: {
   const limit = filters?.limit || 12;
   const skip = (page - 1) * limit;
 
+  // Ordenação
+  const sortOption = filters?.sort || 'relevance';
+  const sortSpec: [string, 1 | -1][] =
+    sortOption === 'price_asc' ? [['price', 1]] :
+    sortOption === 'price_desc' ? [['price', -1]] :
+    sortOption === 'name' ? [['name', 1]] :
+    [['createdAt', -1]];
+
   // Buscar produtos
   const products = await productsCollection
     .find(query)
+    .sort(sortSpec)
     .skip(skip)
     .limit(limit)
-    .sort({ createdAt: -1 })
     .toArray();
 
   // Buscar categorias para cada produto

@@ -19,7 +19,7 @@ import {
   CreditCard,
   ShieldCheck,
 } from 'lucide-react';
-import WhatsAppButton from '@/components/whatsapp-button';
+import HeaderMobile from '@/components/header-mobile';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -55,7 +55,7 @@ function CatalogoContent() {
   const [selectedCategory, setSelectedCategory] = useState(searchParams?.get('category') ?? '');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(parseInt(searchParams?.get('page') ?? '1') || 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
@@ -65,6 +65,15 @@ function CatalogoContent() {
   const [wishedIds, setWishedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { fetchCategories(); }, []);
+
+  // Sincronizar estado com a URL quando navegar pelos links do header (ex.: clicar em "Ferramentas")
+  const categoryFromUrl = searchParams?.get('category') ?? '';
+  const pageFromUrl = parseInt(searchParams?.get('page') ?? '1') || 1;
+  useEffect(() => {
+    setSelectedCategory(categoryFromUrl);
+    setPage(pageFromUrl);
+  }, [categoryFromUrl, pageFromUrl]);
+
   useEffect(() => { fetchProducts(); }, [page, selectedCategory, sortBy]);
 
   const fetchCategories = async () => {
@@ -82,6 +91,7 @@ function CatalogoContent() {
       if (selectedCategory) params.append('category', selectedCategory);
       if (minPrice) params.append('minPrice', minPrice);
       if (maxPrice) params.append('maxPrice', maxPrice);
+      if (sortBy) params.append('sort', sortBy);
 
       const res = await fetch(`/api/products?${params}`);
       const data = await res.json();
@@ -157,77 +167,36 @@ function CatalogoContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Top Bar Azul */}
-      <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">
+      {/* Top Bar – igual à página principal */}
+      <div className="bg-emerald-600 text-white text-center py-2 text-sm font-medium">
         <span>Compre com 10% OFF no PIX!</span>
         <span className="mx-2">/</span>
         <span>Enviamos para todo o Brasil</span>
+        <span className="mx-2">/</span>
+        <span>Envie sua lista de materiais</span>
       </div>
 
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-8">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
-              <Image src="/logo-macofel.png" alt="MACOFEL" width={60} height={60} className="h-14 w-auto object-contain" />
-              <div className="flex flex-col">
-                <span className="text-2xl font-black text-gray-800 tracking-tight">MACO<span className="text-red-600">FEL</span></span>
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Materiais para Construção</span>
-              </div>
-            </Link>
-            <div className="flex-1 max-w-2xl">
-              <form onSubmit={handleSearch} className="relative">
-                <input
-                  type="text"
-                  placeholder="Faça uma pesquisa..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full border-2 border-gray-200 rounded-lg py-3 px-4 pr-12 focus:border-red-500 focus:outline-none"
-                />
-                <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600">
-                  <Search className="w-5 h-5" />
-                </button>
-              </form>
-            </div>
-            <div className="flex items-center gap-6 shrink-0">
-              <Link href="/login" className="text-sm text-gray-600 hover:text-red-600">
-                <span className="font-bold">Entre</span> ou<br /><span className="font-bold">Cadastre-se</span>
-              </Link>
-              <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-red-600">
-                <ShoppingCart className="w-6 h-6" /><span className="font-bold">0</span>
-              </Link>
-            </div>
-          </div>
-        </div>
-        <nav className="border-t border-gray-100">
-          <div className="max-w-7xl mx-auto px-4">
-            <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
-              <li><Link href="/catalogo?category=banheiro" className="hover:text-red-600 transition-colors">Banheiro</Link></li>
-              <li><Link href="/catalogo?category=cozinha" className="hover:text-red-600 transition-colors">Cozinha</Link></li>
-              <li><Link href="/catalogo?category=material-eletrico" className="hover:text-red-600 transition-colors">Materiais Elétricos</Link></li>
-              <li><Link href="/catalogo?category=material-hidraulico" className="hover:text-red-600 transition-colors">Materiais Hidráulicos</Link></li>
-              <li><Link href="/catalogo?category=ferramentas" className="hover:text-red-600 transition-colors">Ferramentas</Link></li>
-              <li><Link href="/catalogo?category=tintas-acessorios" className="hover:text-red-600 transition-colors">Tintas</Link></li>
-              <li><Link href="/catalogo" className="text-red-600 font-bold">+ Categorias</Link></li>
-            </ul>
-          </div>
-        </nav>
-      </header>
+      {/* Header – mesmo componente da página principal */}
+      <HeaderMobile />
 
-      {/* Service Badges */}
+      {/* Service Badges – igual à página principal */}
       <div className="bg-white py-4 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
             <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
               <Truck className="w-5 h-5 text-red-600" />
               <span className="text-sm font-semibold text-gray-700">Entrega rápida</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+              <MessageCircle className="w-5 h-5 text-emerald-600" />
+              <span className="text-sm font-semibold text-gray-700">Envie sua lista de materiais</span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
               <CreditCard className="w-5 h-5 text-amber-600" />
               <span className="text-sm font-semibold text-gray-700">Desconto no Pix</span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
-              <MessageCircle className="w-5 h-5 text-green-600" />
+              <ShieldCheck className="w-5 h-5 text-green-600" />
               <span className="text-sm font-semibold text-gray-700">Fale pelo WhatsApp</span>
             </div>
           </div>

@@ -1,21 +1,47 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ShoppingCart, Menu, X } from 'lucide-react';
+
+interface NavCategory {
+  name: string;
+  slug: string;
+  href: string;
+  isActive: boolean;
+}
 
 export default function HeaderMobile() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [rawCategories, setRawCategories] = useState<Array<{ name: string; slug: string }>>([]);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentCategory = pathname === '/catalogo' ? (searchParams?.get('category') ?? '') : '';
 
-  const categories = [
-    { name: 'Banheiro', href: '/catalogo?category=banheiro' },
-    { name: 'Cozinha', href: '/catalogo?category=cozinha' },
-    { name: 'Materiais Elétricos', href: '/catalogo?category=eletrica' },
-    { name: 'Materiais Hidráulicos', href: '/catalogo?category=hidraulica' },
-    { name: 'Ferramentas', href: '/catalogo?category=ferramentas' },
-    { name: 'Tintas', href: '/catalogo?category=tintas' },
-    { name: '+ Categorias', href: '/catalogo', className: 'text-emerald-600 font-bold' },
+  // Buscar categorias da mesma API do catálogo (uma vez) para slugs sincronizados
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/categories')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: Array<{ id: string; name: string; slug: string }>) => {
+        if (cancelled || !Array.isArray(list)) return;
+        setRawCategories(list.map((c) => ({ name: c.name, slug: c.slug })));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Derivar links e estado ativo a partir da URL
+  const categories: NavCategory[] = [
+    ...rawCategories.map((c) => ({
+      name: c.name,
+      slug: c.slug,
+      href: `/catalogo?category=${encodeURIComponent(c.slug)}`,
+      isActive: currentCategory === c.slug,
+    })),
+    { name: '+ Categorias', slug: '', href: '/catalogo', isActive: !currentCategory },
   ];
 
   return (
@@ -86,15 +112,19 @@ export default function HeaderMobile() {
         </div>
       </div>
 
-      {/* Menu de Categorias - Desktop */}
+      {/* Menu de Categorias - Desktop (sincronizado com URL e API) */}
       <nav className="hidden md:block border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-4">
           <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
             {categories.map((cat) => (
-              <li key={cat.name}>
+              <li key={cat.slug || 'all'}>
                 <Link
                   href={cat.href}
-                  className={cat.className || 'hover:text-emerald-600 transition-colors'}
+                  className={
+                    cat.isActive
+                      ? 'text-emerald-600 font-bold'
+                      : 'hover:text-emerald-600 transition-colors'
+                  }
                 >
                   {cat.name}
                 </Link>
@@ -166,17 +196,19 @@ export default function HeaderMobile() {
               </div>
             </div>
 
-            {/* Categorias */}
+            {/* Categorias (sincronizado com API e URL) */}
             <div className="p-4">
               <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Categorias</h3>
               <ul className="space-y-2">
                 {categories.map((cat) => (
-                  <li key={cat.name}>
+                  <li key={cat.slug || 'all'}>
                     <Link
                       href={cat.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`block py-2.5 px-3 rounded-lg hover:bg-emerald-50 transition-colors ${
-                        cat.className || 'text-gray-700 hover:text-emerald-600'
+                      className={`block py-2.5 px-3 rounded-lg transition-colors ${
+                        cat.isActive
+                          ? 'bg-emerald-100 text-emerald-700 font-bold'
+                          : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-600'
                       }`}
                     >
                       {cat.name}

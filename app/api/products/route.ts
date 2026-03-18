@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const minPrice = parseFloat(searchParams.get('minPrice') ?? '0');
     const maxPrice = parseFloat(searchParams.get('maxPrice') ?? '999999');
     const featured = searchParams.get('featured') === 'true';
+    const sort = searchParams.get('sort') as 'price_asc' | 'price_desc' | 'name' | 'relevance' | null;
 
     const result = await getProducts({
       search: search || undefined,
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
       featured: featured || undefined,
       page,
       limit,
+      sort: sort && ['price_asc', 'price_desc', 'name', 'relevance'].includes(sort) ? sort : undefined,
     });
 
     return NextResponse.json({
