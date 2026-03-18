@@ -15,6 +15,7 @@ const menuItems = [
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
   { href: '/admin/orcamento', label: 'Orçamento', icon: FileText },
+  { href: '/admin/orcamentos', label: 'Orçamentos salvos', icon: FileText },
   { href: '/admin/hero-images', label: 'Imagens Hero', icon: ImageIcon },
 ];
 

@@ -533,3 +533,110 @@ export async function deleteHeroSlide(id: string) {
 
   return result.deletedCount > 0;
 }
+
+// ----------------------------
+// ORCAMENTOS (MongoDB nativo)
+// ----------------------------
+
+export type OrcamentoItemDoc = {
+  produto: string;
+  quantidade: number;
+  precoUnitario: number;
+  subtotal: number;
+};
+
+export type OrcamentoDoc = {
+  clienteNome: string;
+  clienteEmail?: string | null;
+  clienteTelefone?: string | null;
+  observacoes?: string | null;
+
+  itens: OrcamentoItemDoc[];
+
+  // Valores calculados no momento do salvamento
+  subtotal: number;
+  freteValor: number;
+  descontoTipo: 'reais' | 'percentual';
+  descontoRaw: number; // R$ (se descontoTipo=reais) ou % (se percentual)
+  descontoValor: number; // valor em R$ do desconto (após conversão/clamp)
+  total: number;
+};
+
+function normalizeOrcamento(doc: any) {
+  return {
+    id: doc._id.toString(),
+    clienteNome: String(doc.clienteNome ?? ''),
+    clienteEmail: doc.clienteEmail ?? null,
+    clienteTelefone: doc.clienteTelefone ?? null,
+    observacoes: doc.observacoes ?? null,
+    itens: Array.isArray(doc.itens) ? doc.itens : [],
+    subtotal: typeof doc.subtotal === 'number' ? doc.subtotal : 0,
+    freteValor: typeof doc.freteValor === 'number' ? doc.freteValor : 0,
+    descontoTipo: doc.descontoTipo === 'percentual' ? 'percentual' : 'reais',
+    descontoRaw: typeof doc.descontoRaw === 'number' ? doc.descontoRaw : 0,
+    descontoValor: typeof doc.descontoValor === 'number' ? doc.descontoValor : 0,
+    total: typeof doc.total === 'number' ? doc.total : 0,
+    createdAt: doc.createdAt ?? null,
+    updatedAt: doc.updatedAt ?? null,
+  };
+}
+
+export async function createOrcamento(data: OrcamentoDoc) {
+  const db = await connectToDatabase();
+  const orcamentosCollection = db.collection('orcamentos');
+
+  const now = new Date();
+  const result = await orcamentosCollection.insertOne({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return result.insertedId.toString();
+}
+
+export async function getOrcamentos(filters?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const db = await connectToDatabase();
+  const orcamentosCollection = db.collection('orcamentos');
+
+  const page = filters?.page ?? 1;
+  const limit = filters?.limit ?? 20;
+  const skip = (page - 1) * limit;
+
+  const query: any = {};
+  if (filters?.search?.trim()) {
+    query.clienteNome = { $regex: filters.search.trim(), $options: 'i' };
+  }
+
+  const total = await orcamentosCollection.countDocuments(query);
+  const docs = await orcamentosCollection
+    .find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+
+  return {
+    orcamentos: docs.map(normalizeOrcamento),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  };
+}
+
+export async function getOrcamentoById(id: string) {
+  const db = await connectToDatabase();
+  const orcamentosCollection = db.collection('orcamentos');
+
+  const doc = await orcamentosCollection.findOne({ _id: new ObjectId(id) });
+  if (!doc) return null;
+
+  return normalizeOrcamento(doc);
+}

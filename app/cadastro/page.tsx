@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { UserPlus, Mail, Lock, User, Phone, MapPin, Eye, EyeOff } from 'lucide-react';
+import { formatCpf, isValidCpf, normalizeCpf } from '@/lib/cpf';
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function CadastroPage() {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    cpf: '',
     phone: '',
     address: '',
   });
@@ -28,6 +30,16 @@ export default function CadastroPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const cpfClean = normalizeCpf(formData.cpf);
+    if (!cpfClean) {
+      toast.error('CPF é obrigatório');
+      return;
+    }
+    if (!isValidCpf(cpfClean)) {
+      toast.error('CPF inválido');
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       toast.error('As senhas não coincidem');
@@ -50,6 +62,7 @@ export default function CadastroPage() {
           password: formData.password,
           firstName: formData.firstName,
           lastName: formData.lastName,
+          cpf: cpfClean,
           phone: formData.phone,
           address: formData.address,
         }),
@@ -91,14 +104,16 @@ export default function CadastroPage() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <div className="relative h-14 w-44">
-              <Image
-                src="/logo-macofel.png"
-                alt="MACOFEL"
-                fill
-                className="object-contain"
-              />
-            </div>
+            <Link href="/" aria-label="Voltar para a página inicial" className="block">
+              <div className="relative h-14 w-44">
+                <Image
+                  src="/logo-macofel.png"
+                  alt="MACOFEL"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </Link>
           </div>
 
           <div className="text-center mb-8">
@@ -167,6 +182,21 @@ export default function CadastroPage() {
                   className="pl-10"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cpf">
+                CPF <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="cpf"
+                placeholder="000.000.000-00"
+                value={formData.cpf}
+                onChange={(e) => setFormData({ ...formData, cpf: formatCpf(e.target.value) })}
+                required
+                inputMode="numeric"
+                autoComplete="off"
+              />
             </div>
 
             <div className="space-y-2">

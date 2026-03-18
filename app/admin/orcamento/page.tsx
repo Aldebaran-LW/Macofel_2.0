@@ -1,9 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FileText, Download, Plus, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { FileText, Download, Plus, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 interface OrcamentoItem {
@@ -14,6 +22,15 @@ interface OrcamentoItem {
   subtotal: number;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  slug?: string;
+  price: number;
+  stock: number;
+  imageUrl?: string | null;
+}
+
 export default function AdminOrcamentoPage() {
   const [items, setItems] = useState<OrcamentoItem[]>([]);
   const [clienteNome, setClienteNome] = useState('');
@@ -22,29 +39,97 @@ export default function AdminOrcamentoPage() {
   const [observacoes, setObservacoes] = useState('');
   const [frete, setFrete] = useState('');
   const [desconto, setDesconto] = useState('');
+  const [descontoTipo, setDescontoTipo] = useState<'reais' | 'percentual'>('reais');
   const [produtoAtual, setProdutoAtual] = useState({ nome: '', quantidade: '1', preco: '' });
 
-  const adicionarItem = () => {
-    if (!produtoAtual.nome || !produtoAtual.preco) {
-      toast.error('Preencha nome e preço do produto');
+  const router = useRouter();
+  const [savingOrcamento, setSavingOrcamento] = useState(false);
+  const [savedOrcamentoId, setSavedOrcamentoId] = useState<string | null>(null);
+
+  // Modal para selecionar produto e quantidade
+  const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productsLoaded, setProductsLoaded] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [modalQuantidade, setModalQuantidade] = useState('1');
+
+  const adicionarItem = (produtoNome: string, quantidade: number, precoUnitario: number) => {
+    if (!produtoNome) {
+      toast.error('Selecione um produto');
       return;
     }
 
-    const quantidade = parseFloat(produtoAtual.quantidade) || 1;
-    const precoUnitario = parseFloat(produtoAtual.preco) || 0;
-    const subtotal = quantidade * precoUnitario;
+    if (!Number.isFinite(precoUnitario) || precoUnitario < 0) {
+      toast.error('Preço unitário inválido');
+      return;
+    }
+
+    const safeQuantidade = Math.max(1, quantidade || 1);
+    const safePrecoUnitario = precoUnitario || 0;
+    const subtotal = safeQuantidade * safePrecoUnitario;
 
     const novoItem: OrcamentoItem = {
       id: Date.now().toString(),
-      produto: produtoAtual.nome,
-      quantidade,
-      precoUnitario,
+      produto: produtoNome,
+      quantidade: safeQuantidade,
+      precoUnitario: safePrecoUnitario,
       subtotal,
     };
 
-    setItems([...items, novoItem]);
+    setItems((prev) => [...prev, novoItem]);
     setProdutoAtual({ nome: '', quantidade: '1', preco: '' });
     toast.success('Item adicionado');
+  };
+
+  const resetModalState = () => {
+    setSelectedProduct(null);
+    setProductSearch('');
+    setModalQuantidade('1');
+    setProdutoAtual({ nome: '', quantidade: '1', preco: '' });
+  };
+
+  const fetchProductsForModal = async () => {
+    try {
+      setLoadingProducts(true);
+      const res = await fetch('/api/products?limit=100');
+      if (!res.ok) throw new Error('Falha ao carregar produtos');
+      const data = await res.json();
+      setProducts(data?.products ?? []);
+      setProductsLoaded(true);
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao carregar produtos para seleção');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const openAddItemDialog = () => {
+    resetModalState();
+    setIsAddItemDialogOpen(true);
+    if (!productsLoaded && !loadingProducts) {
+      void fetchProductsForModal();
+    }
+  };
+
+  const handleConfirmAddItem = () => {
+    if (!selectedProduct) {
+      toast.error('Selecione um produto');
+      return;
+    }
+
+    const quantidade = parseFloat(modalQuantidade) || 1;
+
+    if (selectedProduct.stock > 0 && quantidade > selectedProduct.stock) {
+      toast.error(`Quantidade excede o estoque (estoque: ${selectedProduct.stock})`);
+      return;
+    }
+
+    adicionarItem(selectedProduct.name, quantidade, selectedProduct.price);
+    setIsAddItemDialogOpen(false);
+    resetModalState();
   };
 
   const removerItem = (id: string) => {
@@ -54,13 +139,85 @@ export default function AdminOrcamentoPage() {
   const subtotalItens = () => items.reduce((total, item) => total + item.subtotal, 0);
 
   const valorFrete = () => parseFloat(frete.replace(',', '.')) || 0;
-  const valorDesconto = () => parseFloat(desconto.replace(',', '.')) || 0;
+  const valorDesconto = () => {
+    const sub = subtotalItens();
+    const raw = parseFloat(desconto.replace(',', '.')) || 0;
+
+    if (descontoTipo === 'percentual') {
+      const pct = Math.max(0, raw);
+      const descontoValor = (pct / 100) * sub;
+      return Math.min(sub, descontoValor);
+    }
+
+    const descontoValor = Math.max(0, raw);
+    return Math.min(sub, descontoValor);
+  };
 
   const calcularTotal = () => {
     const sub = subtotalItens();
     const f = valorFrete();
     const d = valorDesconto();
     return Math.max(0, sub + f - d);
+  };
+
+  const salvarOrcamento = async () => {
+    if (items.length === 0) {
+      toast.error('Adicione pelo menos um item ao orçamento');
+      return;
+    }
+
+    if (!clienteNome) {
+      toast.error('Informe o nome do cliente');
+      return;
+    }
+
+    try {
+      setSavingOrcamento(true);
+
+      const freteValor = valorFrete();
+      const descontoValor = valorDesconto();
+      const subtotal = subtotalItens();
+      const total = calcularTotal();
+      const descontoRaw = parseFloat(desconto.replace(',', '.')) || 0;
+
+      const res = await fetch('/api/orcamentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clienteNome,
+          clienteEmail: clienteEmail || null,
+          clienteTelefone: clienteTelefone || null,
+          observacoes: observacoes || null,
+          itens: items,
+          subtotal,
+          freteValor,
+          descontoTipo,
+          descontoRaw,
+          descontoValor,
+          total,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? 'Erro ao salvar orçamento');
+      }
+
+      const data = await res.json();
+      const id = data?.id as string | undefined;
+
+      if (!id) {
+        throw new Error('Resposta inválida do servidor');
+      }
+
+      setSavedOrcamentoId(id);
+      toast.success('Orçamento salvo com sucesso');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.message ?? 'Erro ao salvar orçamento');
+    } finally {
+      setSavingOrcamento(false);
+    }
   };
 
   const gerarPDF = () => {
@@ -75,6 +232,7 @@ export default function AdminOrcamentoPage() {
     }
 
     // Criar conteúdo HTML do PDF
+    const descontoRawValue = parseFloat(desconto.replace(',', '.')) || 0;
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -209,7 +367,7 @@ export default function AdminOrcamentoPage() {
             <div class="totals">
               <div class="total-line"><span>Subtotal:</span><span>R$ ${subtotalItens().toFixed(2)}</span></div>
               ${valorFrete() > 0 ? `<div class="total-line"><span>Frete:</span><span>R$ ${valorFrete().toFixed(2)}</span></div>` : ''}
-              ${valorDesconto() > 0 ? `<div class="total-line"><span>Desconto:</span><span>- R$ ${valorDesconto().toFixed(2)}</span></div>` : ''}
+              ${valorDesconto() > 0 ? `<div class="total-line"><span>Desconto: ${descontoTipo === 'percentual' ? (descontoRawValue + '%') : ('R$ ' + descontoRawValue.toFixed(2))}</span><span>- R$ ${valorDesconto().toFixed(2)}</span></div>` : ''}
               <div class="total">
                 <span>Total: <span class="total-value">R$ ${calcularTotal().toFixed(2)}</span></span>
               </div>
@@ -248,14 +406,33 @@ export default function AdminOrcamentoPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Orçamento</h1>
-        <Button
-          onClick={gerarPDF}
-          className="bg-red-600 hover:bg-red-700"
-          disabled={items.length === 0}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Exportar PDF
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={salvarOrcamento}
+            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={savingOrcamento || items.length === 0}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            {savingOrcamento ? 'Salvando...' : 'Salvar Orçamento'}
+          </Button>
+          <Button
+            onClick={gerarPDF}
+            className="bg-red-600 hover:bg-red-700"
+            disabled={items.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar PDF
+          </Button>
+          {savedOrcamentoId && (
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/admin/orcamentos/${savedOrcamentoId}`)}
+              className="border-gray-200"
+            >
+              Consultar/Exportar depois
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -298,7 +475,15 @@ export default function AdminOrcamentoPage() {
           </div>
 
           {/* Adicionar Item */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div
+            className="bg-white rounded-lg shadow p-6 cursor-pointer"
+            onClick={openAddItemDialog}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') openAddItemDialog();
+            }}
+          >
             <h2 className="text-xl font-semibold mb-4">Adicionar Item</h2>
             <div className="space-y-4">
               <div>
@@ -307,8 +492,13 @@ export default function AdminOrcamentoPage() {
                 </label>
                 <Input
                   value={produtoAtual.nome}
-                  onChange={(e) => setProdutoAtual({ ...produtoAtual, nome: e.target.value })}
-                  placeholder="Nome do produto"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openAddItemDialog();
+                  }}
+                  readOnly
+                  placeholder="Clique para selecionar um produto"
+                  className="cursor-pointer"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -321,8 +511,7 @@ export default function AdminOrcamentoPage() {
                     min="1"
                     step="1"
                     value={produtoAtual.quantidade}
-                    onChange={(e) => setProdutoAtual({ ...produtoAtual, quantidade: e.target.value })}
-                    placeholder="1"
+                    disabled
                   />
                 </div>
                 <div>
@@ -334,13 +523,15 @@ export default function AdminOrcamentoPage() {
                     step="0.01"
                     min="0"
                     value={produtoAtual.preco}
-                    onChange={(e) => setProdutoAtual({ ...produtoAtual, preco: e.target.value })}
-                    placeholder="0.00"
+                    disabled
                   />
                 </div>
               </div>
               <Button
-                onClick={adicionarItem}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openAddItemDialog();
+                }}
                 className="w-full bg-red-600 hover:bg-red-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -348,6 +539,169 @@ export default function AdminOrcamentoPage() {
               </Button>
             </div>
           </div>
+
+          {/* Modal de seleção do produto */}
+          <Dialog
+            open={isAddItemDialogOpen}
+            onOpenChange={(open) => {
+              setIsAddItemDialogOpen(open);
+              if (!open) resetModalState();
+            }}
+          >
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Selecionar Produto</DialogTitle>
+              </DialogHeader>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Buscar por nome..."
+                      className="pl-9"
+                    />
+                  </div>
+
+                  <div className="max-h-[320px] overflow-y-auto rounded-lg border border-gray-100">
+                    {loadingProducts ? (
+                      <div className="p-4 text-sm text-gray-500">Carregando produtos...</div>
+                    ) : products.length === 0 ? (
+                      <div className="p-4 text-sm text-gray-500">Nenhum produto encontrado.</div>
+                    ) : (
+                      <div className="divide-y divide-gray-100">
+                        {products
+                          .filter((p) =>
+                            p.name.toLowerCase().includes(productSearch.trim().toLowerCase())
+                          )
+                          .map((p) => {
+                            const isSelected = selectedProduct?.id === p.id;
+                            const disabled = p.stock <= 0;
+
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  if (disabled) {
+                                    toast.error('Produto sem estoque');
+                                    return;
+                                  }
+                                  setSelectedProduct(p);
+                                  setProdutoAtual({ nome: p.name, quantidade: '1', preco: String(p.price) });
+                                  setModalQuantidade('1');
+                                }}
+                                className={[
+                                  'w-full text-left px-4 py-3 transition-colors',
+                                  isSelected ? 'bg-red-50' : 'bg-white hover:bg-gray-50',
+                                  disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                                ].join(' ')}
+                              >
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-sm text-gray-900 truncate">
+                                      {p.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      Estoque: {p.stock}
+                                    </div>
+                                  </div>
+                                  <div className="whitespace-nowrap text-sm font-bold text-red-600">
+                                    R$ {p.price.toFixed(2)}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-4">
+                  {!selectedProduct ? (
+                    <div className="text-sm text-gray-600">
+                      Selecione um produto na lista para definir a quantidade.
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="text-xs uppercase tracking-widest font-bold text-gray-500">
+                          Produto
+                        </div>
+                        <div className="font-semibold text-gray-900">
+                          {selectedProduct.name}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          Preço unitário: R$ {selectedProduct.price.toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Quantidade <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={modalQuantidade}
+                          onChange={(e) => {
+                            setModalQuantidade(e.target.value);
+                            setProdutoAtual((prev) => ({ ...prev, quantidade: e.target.value }));
+                          }}
+                        />
+                        {selectedProduct.stock > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Estoque máximo: {selectedProduct.stock}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-4">
+                        <div className="flex justify-between text-sm text-gray-700">
+                          <span>Subtotal</span>
+                          <span className="font-bold text-red-600">
+                            R$
+                            {(
+                              (parseFloat(modalQuantidade) || 1) *
+                              (selectedProduct?.price ?? 0)
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex gap-3 justify-end pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsAddItemDialogOpen(false);
+                        resetModalState();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleConfirmAddItem}
+                      disabled={!selectedProduct}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar ao Orçamento
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="hidden" />
+            </DialogContent>
+          </Dialog>
 
           {/* Frete e Descontos */}
           <div className="bg-white rounded-lg shadow p-6">
@@ -364,14 +718,26 @@ export default function AdminOrcamentoPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Desconto (R$)</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={desconto}
-                  onChange={(e) => setDesconto(e.target.value.replace(/[^0-9,.-]/g, ''))}
-                  placeholder="0,00"
-                />
+                <label className="block text-sm font-medium mb-1">Desconto</label>
+
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  <select
+                    value={descontoTipo}
+                    onChange={(e) => setDescontoTipo(e.target.value as 'reais' | 'percentual')}
+                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="reais">R$</option>
+                    <option value="percentual">%</option>
+                  </select>
+
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={desconto}
+                    onChange={(e) => setDesconto(e.target.value.replace(/[^0-9,.-]/g, ''))}
+                    placeholder={descontoTipo === 'reais' ? '0,00' : '10'}
+                  />
+                </div>
               </div>
             </div>
           </div>

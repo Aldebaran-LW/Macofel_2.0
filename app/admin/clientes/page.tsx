@@ -12,12 +12,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { formatCpf, isValidCpf, normalizeCpf } from '@/lib/cpf';
 
 interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  cpf?: string | null;
   phone?: string;
   address?: string;
   createdAt: string;
@@ -32,6 +34,7 @@ export default function AdminClientesPage() {
     password: '',
     firstName: '',
     lastName: '',
+    cpf: '',
     phone: '',
     address: '',
   });
@@ -60,6 +63,7 @@ export default function AdminClientesPage() {
       password: '',
       firstName: '',
       lastName: '',
+      cpf: '',
       phone: '',
       address: '',
     });
@@ -78,8 +82,14 @@ export default function AdminClientesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
+    const cpfClean = normalizeCpf(formData.cpf);
+    if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !cpfClean) {
       toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (!isValidCpf(cpfClean)) {
+      toast.error('CPF inválido');
       return;
     }
 
@@ -92,6 +102,7 @@ export default function AdminClientesPage() {
           password: formData.password,
           firstName: formData.firstName,
           lastName: formData.lastName,
+          cpf: cpfClean,
           phone: formData.phone || null,
           address: formData.address || null,
         }),
@@ -148,6 +159,12 @@ export default function AdminClientesPage() {
                   <div className="flex items-center">
                     <Phone className="h-4 w-4 mr-2" />
                     {client.phone}
+                  </div>
+                )}
+                {client.cpf && (
+                  <div className="flex items-center">
+                    <span className="text-xs font-bold mr-2 text-gray-500">CPF:</span>
+                    <span>{client.cpf}</span>
                   </div>
                 )}
                 {client.address && (
@@ -231,6 +248,19 @@ export default function AdminClientesPage() {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="(00) 00000-0000"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                CPF <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={formData.cpf}
+                onChange={(e) => setFormData({ ...formData, cpf: formatCpf(e.target.value) })}
+                placeholder="000.000.000-00"
+                required
+                inputMode="numeric"
               />
             </div>
 

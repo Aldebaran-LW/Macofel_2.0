@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/db';
+import { isValidCpf, normalizeCpf } from '@/lib/cpf';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, firstName, lastName, phone, address } = body;
+    const { email, password, firstName, lastName, phone, address, cpf } = body;
 
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !password || !firstName || !lastName || !cpf) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios faltando' },
+        { error: 'Campos obrigatórios faltando (incluindo CPF)' },
         { status: 400 }
       );
+    }
+
+    const cpfClean = normalizeCpf(String(cpf));
+    if (!isValidCpf(cpfClean)) {
+      return NextResponse.json({ error: 'CPF inválido' }, { status: 400 });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -27,6 +33,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const existingCpf = await prisma.user.findFirst({
+      where: { cpf: cpfClean },
+      select: { id: true },
+    });
+
+    if (existingCpf) {
+      return NextResponse.json({ error: 'CPF já cadastrado' }, { status: 400 });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
@@ -35,6 +50,7 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         firstName,
         lastName,
+        cpf: cpfClean,
         phone: phone ?? null,
         address: address ?? null,
         role: 'CLIENT',

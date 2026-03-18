@@ -63,14 +63,16 @@ export default function LoginPage() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="relative h-20 w-64">
-              <Image
-                src="/logo-macofel.png"
-                alt="MACOFEL"
-                fill
-                className="object-contain"
-              />
-            </div>
+            <Link href="/" aria-label="Voltar para a página inicial" className="block">
+              <div className="relative h-20 w-64">
+                <Image
+                  src="/logo-macofel.png"
+                  alt="MACOFEL"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </Link>
           </div>
 
           <div className="text-center mb-8">
