@@ -7,7 +7,22 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    // `req.json()` pode falhar se o body chegar vazio/mal formatado.
+    // Para facilitar debug (dev), lemos como texto primeiro.
+    const raw = await req.text();
+    let body: any = {};
+    try {
+      body = raw ? JSON.parse(raw) : {};
+    } catch (e: any) {
+      return NextResponse.json(
+        {
+          error: 'JSON inválido no body',
+          details: e?.message ?? 'Falha ao fazer parse do JSON',
+          raw: process.env.NODE_ENV === 'development' ? raw?.slice(0, 300) : undefined,
+        },
+        { status: 400 }
+      );
+    }
     const { email, password, firstName, lastName, phone, address, cpf } = body;
 
     if (!email || !password || !firstName || !lastName || !cpf) {

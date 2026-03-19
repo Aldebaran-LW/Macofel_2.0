@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useSearchParams } from 'next/navigation';
 
 interface HeroSlide {
   id: string;
@@ -77,6 +78,9 @@ export default function AdminHeroImagesPage() {
     order: 0,
     active: true,
   });
+
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
 
   useEffect(() => {
     fetchSlides();
@@ -200,6 +204,17 @@ export default function AdminHeroImagesPage() {
     setIsDialogOpen(false);
     resetForm();
   };
+
+  // Se vier `?edit=<id>`, abre o editor do slide correspondente.
+  useEffect(() => {
+    if (loading) return;
+    if (!editId) return;
+    if (isDialogOpen) return;
+
+    const slide = slides.find((s) => s.id === editId);
+    if (slide) handleOpenDialog(slide);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, editId, slides, isDialogOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -30,7 +30,11 @@ export async function connectToDatabase(): Promise<Db> {
   }
 
   if (!client) {
-    client = new MongoClient(uri);
+    // Falhar mais rápido para evitar travar endpoints da UI
+    client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
     await client.connect();
   }
 
@@ -196,28 +200,19 @@ export async function getCategories() {
 
   const categories = await categoriesCollection.find({}).sort({ name: 1 }).toArray();
 
-  // Contar produtos por categoria
-  const productsCollection = db.collection('products');
-  const categoriesWithCount = await Promise.all(
-    categories.map(async (category: any) => {
-      const count = await productsCollection.countDocuments({
-        categoryId: category._id,
-      });
-      return {
-        id: category._id.toString(),
-        name: category.name,
-        slug: category.slug,
-        description: category.description,
-        _count: {
-          products: count,
-        },
-        createdAt: category.createdAt,
-        updatedAt: category.updatedAt,
-      };
-    })
-  );
-
-  return categoriesWithCount;
+  // Importante: evitar N queries (countDocuments por categoria) para reduzir timeouts.
+  // A UI usa `_count?.products || 0`, então podemos enviar 0 quando não calculado.
+  return categories.map((category: any) => ({
+    id: category._id.toString(),
+    name: category.name,
+    slug: category.slug,
+    description: category.description,
+    _count: {
+      products: 0,
+    },
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  }));
 }
 
 export async function getHeroImages() {

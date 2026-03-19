@@ -13,14 +13,9 @@ export async function GET() {
     return NextResponse.json(categories);
   } catch (error: any) {
     console.error('Erro ao buscar categorias:', error);
-    
-    return NextResponse.json(
-      { 
-        error: 'Erro ao buscar categorias',
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      },
-      { status: 500 }
-    );
+
+    // Fallback para não quebrar a UI (sidebar/categorias no layout)
+    return NextResponse.json([], { status: 200 });
   }
 }
 

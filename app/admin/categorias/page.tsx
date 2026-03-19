@@ -5,6 +5,7 @@ import { FolderTree, Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useSearchParams } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,9 @@ export default function AdminCategoriasPage() {
     name: '',
     description: '',
   });
+
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
 
   useEffect(() => {
     fetchCategories();
@@ -77,6 +81,17 @@ export default function AdminCategoriasPage() {
     setIsDialogOpen(false);
     resetForm();
   };
+
+  // Se vier `?edit=<id>` abre o editor já com a categoria selecionada
+  useEffect(() => {
+    if (loading) return;
+    if (!editId) return;
+    if (isDialogOpen) return;
+
+    const cat = categories.find((c) => c.id === editId);
+    if (cat) handleOpenDialog(cat);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, editId, categories, isDialogOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
