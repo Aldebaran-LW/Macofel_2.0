@@ -82,7 +82,9 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/login',
-    signOut: '/',
+    // Rota dedicada para a tela/fluxo de logout.
+    // Evita efeitos colaterais de navegar para a homepage durante/apos signOut.
+    signOut: '/logout',
   },
   secret: process.env.NEXTAUTH_SECRET,
   // Configurações para produção (HTTPS)

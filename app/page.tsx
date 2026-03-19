@@ -1,10 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Truck,
-  ShieldCheck,
-  CreditCard,
-  MessageCircle,
   ShoppingCart,
   Star,
   ChevronLeft,
@@ -18,6 +14,10 @@ import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
 import CategoryProductsCarousel from '@/components/category-products-carousel';
 import HeroCarousel from '@/components/hero-carousel';
 import HeaderMobile from '@/components/header-mobile';
+import StoreTopBar from '@/components/store-top-bar';
+import StoreFooter from '@/components/store-footer';
+import StoreWhatsAppFloat from '@/components/store-whatsapp-float';
+import StoreServiceBadges from '@/components/store-service-badges';
 import { getHeroSlides, getProducts } from '@/lib/mongodb-native';
 import { HERO_DEFAULT_SLIDES } from '@/lib/hero-default-slides';
 
@@ -181,18 +181,6 @@ async function ProductsByCategory() {
 }
 
 // Componentes no estilo Decar
-function TopBar() {
-  return (
-    <div className="bg-emerald-600 text-white text-center py-2 text-sm font-medium">
-      <span>Compre com 10% OFF no PIX!</span>
-      <span className="mx-2">/</span>
-      <span>Enviamos para todo o Brasil</span>
-      <span className="mx-2">/</span>
-      <span>Envie sua lista de materiais</span>
-    </div>
-  );
-}
-
 function Header() {
   return <HeaderMobile />;
 }
@@ -230,27 +218,7 @@ async function HeroBanner() {
 }
 
 function ServiceBadges() {
-  const services = [
-    { icon: <Truck className="w-5 h-5" />, text: 'Entrega rápida', color: 'text-red-600' },
-    { icon: <MessageCircle className="w-5 h-5" />, text: 'Envie sua lista de materiais', color: 'text-emerald-600' },
-    { icon: <CreditCard className="w-5 h-5" />, text: 'Desconto no Pix', color: 'text-amber-600' },
-    { icon: <ShieldCheck className="w-5 h-5" />, text: 'Fale pelo WhatsApp', color: 'text-green-600' },
-  ];
-
-  return (
-    <div className="bg-white py-4 border-b border-gray-100">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
-          {services.map((s, i) => (
-            <div key={i} className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
-              <span className={s.color}>{s.icon}</span>
-              <span className="text-sm font-semibold text-gray-700">{s.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  return <StoreServiceBadges />;
 }
 
 function ProductCard({ product }: { product: any }) {
@@ -370,80 +338,6 @@ function CategoryCards() {
   );
 }
 
-function Footer() {
-  return (
-    <footer className="bg-gray-900 text-white py-12">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          {/* Logo e Info */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl font-black">
-                MACO<span className="text-red-500">FEL</span>
-              </span>
-            </div>
-            <p className="text-gray-400 text-sm mb-4">
-              Materiais para Construção de qualidade em Parapuã e região.
-            </p>
-            <div className="text-sm text-gray-400 space-y-1">
-              <p>📍 Av. São Paulo, 699 - Centro</p>
-              <p>Parapuã - SP, 17730-000</p>
-              <p>📞 (18) 99814-5495</p>
-            </div>
-          </div>
-
-          {/* Links */}
-          <div>
-            <h4 className="font-bold mb-4">Institucional</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link href="#" className="hover:text-white">Sobre nós</Link></li>
-              <li><Link href="#" className="hover:text-white">Política de Privacidade</Link></li>
-              <li><Link href="#" className="hover:text-white">Termos de Uso</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold mb-4">Atendimento</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link href="#" className="hover:text-white">Fale Conosco</Link></li>
-              <li><Link href="#" className="hover:text-white">Trocas e Devoluções</Link></li>
-              <li><Link href="/meus-pedidos" className="hover:text-white">Meus Pedidos</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold mb-4">Formas de Pagamento</h4>
-            <div className="flex gap-2 flex-wrap">
-              <span className="bg-white/10 px-3 py-1 rounded text-xs">Visa</span>
-              <span className="bg-white/10 px-3 py-1 rounded text-xs">Master</span>
-              <span className="bg-green-600 px-3 py-1 rounded text-xs">Pix</span>
-              <span className="bg-white/10 px-3 py-1 rounded text-xs">Boleto</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
-          <p>© 2026 MACOFEL - Materiais para Construção. Todos os direitos reservados.</p>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-function WhatsAppFloating() {
-  return (
-    <a
-      href="https://wa.me/5518998145495?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20MACOFEL%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-      target="_blank"
-      rel="noopener noreferrer"
-      className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-lg transition-colors"
-    >
-      <MessageCircle className="w-5 h-5" />
-      <span className="font-bold text-sm">Fale conosco</span>
-    </a>
-  );
-}
-
 async function FeaturedProducts() {
   const products = await getFeaturedProducts();
 
@@ -499,15 +393,15 @@ async function FeaturedProducts() {
 export default async function HomePageDecarStyle() {
   return (
     <div className="min-h-screen bg-white">
-      <TopBar />
+      <StoreTopBar />
       <Header />
       <HeroBanner />
       <ServiceBadges />
       <CategoryCards />
       <FeaturedProducts />
       <ProductsByCategory />
-      <Footer />
-      <WhatsAppFloating />
+      <StoreFooter />
+      <StoreWhatsAppFloat />
     </div>
   );
 }

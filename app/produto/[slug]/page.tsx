@@ -22,9 +22,11 @@ import {
   Clock,
   Phone,
 } from 'lucide-react';
-import HeaderV2 from '@/components/header-v2';
-import FooterV2 from '@/components/footer-v2';
-import WhatsAppButton from '@/components/whatsapp-button';
+import HeaderMobile from '@/components/header-mobile';
+import StoreTopBar from '@/components/store-top-bar';
+import StoreFooter from '@/components/store-footer';
+import StoreWhatsAppFloat from '@/components/store-whatsapp-float';
+import StoreServiceBadges from '@/components/store-service-badges';
 import { toast } from 'sonner';
 
 interface Product {
@@ -107,8 +109,10 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <>
-        <HeaderV2 />
+      <div className="min-h-screen bg-white">
+        <StoreTopBar />
+        <HeaderMobile />
+        <StoreServiceBadges />
         <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-12">
           <div className="grid md:grid-cols-2 gap-12">
             <div className="skeleton aspect-square rounded-2xl" />
@@ -122,8 +126,9 @@ export default function ProductPage() {
             </div>
           </div>
         </div>
-        <FooterV2 />
-      </>
+        <StoreFooter />
+        <StoreWhatsAppFloat />
+      </div>
     );
   }
 
@@ -133,8 +138,11 @@ export default function ProductPage() {
   const installment = (product.price / 12).toFixed(2).replace('.', ',');
 
   return (
-    <>
-      <HeaderV2 />
+    <div className="min-h-screen bg-white">
+      <StoreTopBar />
+      <HeaderMobile />
+
+      <StoreServiceBadges />
 
       <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8">
         {/* Breadcrumb */}
@@ -433,8 +441,8 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <FooterV2 />
-      <WhatsAppButton />
-    </>
+      <StoreFooter />
+      <StoreWhatsAppFloat />
+    </div>
   );
 }

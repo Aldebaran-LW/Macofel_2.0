@@ -372,7 +372,7 @@ export default function AdminHeroImagesPage() {
                         src={slide.imageUrl}
                         alt={slide.title || slide.subtitle || 'Slide do Hero'}
                         fill
-                        className="object-cover"
+                        className="object-cover object-center"
                         unoptimized
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />

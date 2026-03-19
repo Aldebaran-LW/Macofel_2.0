@@ -137,9 +137,6 @@ export default function Header() {
                 <Link href="/login" className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all active:scale-95">
                   Falar com Consultor
                 </Link>
-                <Link href="/admin/login" className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg">
-                  🔐 Admin Login
-                </Link>
                 <button 
                   className="lg:hidden p-2"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

@@ -148,16 +148,6 @@ export default function LoginPage() {
                 Cadastre-se
               </Link>
             </p>
-            <div className="pt-3 border-t border-gray-200">
-              <Link
-                href="/admin/login"
-                className="text-sm text-gray-600 hover:text-red-600 transition-colors flex items-center justify-center gap-2 mx-auto font-medium"
-              >
-                <Shield className="h-4 w-4" />
-                Acesso Administrativo
-                <span>→</span>
-              </Link>
-            </div>
           </div>
         </div>
       </div>

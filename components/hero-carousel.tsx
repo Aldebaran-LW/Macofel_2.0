@@ -57,15 +57,16 @@ export default function HeroCarousel({
   const isExternalLink = hasCtaLink && /^https?:\/\//i.test(currentSlide.href!);
 
   return (
-    <section className="relative overflow-hidden">
-      <div className="relative h-[250px] sm:h-[300px] md:h-[400px] lg:h-[500px]">
+    <section className="relative overflow-hidden w-full">
+      <div className="relative w-full h-[250px] sm:h-[300px] md:h-[400px] lg:h-[500px]">
         {/* Imagem de fundo */}
         <Image
           src={currentSlide.image}
           alt={currentSlide.title || 'Banner'}
           fill
-          className="object-cover"
+          className="object-cover object-center"
           priority
+          unoptimized
           sizes="100vw"
         />
 

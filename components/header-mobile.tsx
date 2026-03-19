@@ -114,16 +114,16 @@ export default function HeaderMobile() {
 
       {/* Menu de Categorias - Desktop (sincronizado com URL e API) */}
       <nav className="hidden md:block border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-4">
-          <ul className="flex items-center justify-center gap-8 py-3 text-sm font-semibold text-gray-700">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex justify-center">
+          <ul className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:gap-x-6 rounded-xl bg-slate-50/90 border border-slate-100/80 px-4 py-2.5 text-sm font-semibold text-gray-700">
             {categories.map((cat) => (
-              <li key={cat.slug || 'all'}>
+              <li key={cat.slug || 'all'} className="shrink-0">
                 <Link
                   href={cat.href}
                   className={
                     cat.isActive
-                      ? 'text-emerald-600 font-bold'
-                      : 'hover:text-emerald-600 transition-colors'
+                      ? 'text-emerald-600 font-bold whitespace-nowrap'
+                      : 'hover:text-emerald-600 transition-colors whitespace-nowrap'
                   }
                 >
                   {cat.name}
