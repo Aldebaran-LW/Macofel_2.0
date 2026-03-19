@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Plus, Save, X } from 'lucide-react';
+import { Mail, Phone, MapPin, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { formatCpf, isValidCpf, normalizeCpf } from '@/lib/cpf';
 
@@ -29,6 +39,9 @@ export default function AdminClientesPage() {
   const [clients, setClients] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -70,12 +83,28 @@ export default function AdminClientesPage() {
   };
 
   const handleOpenDialog = () => {
+    setEditingId(null);
     resetForm();
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (client: User) => {
+    setEditingId(client.id);
+    setFormData({
+      email: client.email,
+      password: '',
+      firstName: client.firstName,
+      lastName: client.lastName,
+      cpf: client.cpf ? formatCpf(client.cpf) : '',
+      phone: client.phone ?? '',
+      address: client.address ?? '',
+    });
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
+    setEditingId(null);
     resetForm();
   };
 
@@ -83,8 +112,13 @@ export default function AdminClientesPage() {
     e.preventDefault();
 
     const cpfClean = normalizeCpf(formData.cpf);
-    if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !cpfClean) {
+    if (!formData.email || !formData.firstName || !formData.lastName || !cpfClean) {
       toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (!editingId && !formData.password) {
+      toast.error('Informe a senha para novo cliente');
       return;
     }
 
@@ -94,6 +128,37 @@ export default function AdminClientesPage() {
     }
 
     try {
+      if (editingId) {
+        const body: Record<string, unknown> = {
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          cpf: cpfClean,
+          phone: formData.phone || null,
+          address: formData.address || null,
+        };
+        if (formData.password.trim()) {
+          body.password = formData.password;
+        }
+
+        const res = await fetch(`/api/admin/clients/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          toast.success('Cliente atualizado!');
+          handleCloseDialog();
+          fetchClients();
+        } else {
+          toast.error(data.error || 'Erro ao atualizar cliente');
+        }
+        return;
+      }
+
       const res = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +184,27 @@ export default function AdminClientesPage() {
       }
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao criar cliente');
+      toast.error(editingId ? 'Erro ao atualizar cliente' : 'Erro ao criar cliente');
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!deleteId) return;
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/admin/clients/${deleteId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao excluir');
+      }
+      toast.success('Cliente excluído');
+      setDeleteId(null);
+      fetchClients();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? 'Erro ao excluir');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -129,6 +214,31 @@ export default function AdminClientesPage() {
 
   return (
     <div>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O cadastro será removido (pedidos e carrinho vinculados também, conforme o banco de dados).
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDeleteClient();
+              }}
+            >
+              {deleting ? 'Excluindo…' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Clientes Cadastrados</h1>
         <Button onClick={handleOpenDialog} className="bg-red-600 hover:bg-red-700">
@@ -146,11 +256,35 @@ export default function AdminClientesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {clients.map((client) => (
-            <div key={client.id} className="bg-white rounded-lg shadow p-6">
-              <h3 className="font-semibold text-lg mb-2">
-                {client.firstName} {client.lastName}
-              </h3>
-              <div className="space-y-2 text-sm text-gray-600">
+            <div key={client.id} className="bg-white rounded-lg shadow p-6 flex flex-col">
+              <div className="flex justify-between items-start gap-2 mb-2">
+                <h3 className="font-semibold text-lg">
+                  {client.firstName} {client.lastName}
+                </h3>
+                <div className="flex gap-1 shrink-0">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    onClick={() => handleOpenEdit(client)}
+                    aria-label="Editar cliente"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="h-8 w-8"
+                    onClick={() => setDeleteId(client.id)}
+                    aria-label="Excluir cliente"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm text-gray-600 flex-1">
                 <div className="flex items-center">
                   <Mail className="h-4 w-4 mr-2" />
                   {client.email}
@@ -183,10 +317,10 @@ export default function AdminClientesPage() {
       )}
 
       {/* Dialog para Criar Cliente */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Adicionar Novo Cliente</DialogTitle>
+            <DialogTitle>{editingId ? 'Editar cliente' : 'Adicionar novo cliente'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -229,15 +363,15 @@ export default function AdminClientesPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1">
-                Senha <span className="text-red-500">*</span>
+                Senha {!editingId && <span className="text-red-500">*</span>}
               </label>
               <Input
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Mínimo 6 caracteres"
-                required
-                minLength={6}
+                placeholder={editingId ? 'Deixe em branco para manter a atual' : 'Mínimo 6 caracteres'}
+                required={!editingId}
+                minLength={editingId ? undefined : 6}
               />
             </div>
 
@@ -280,7 +414,7 @@ export default function AdminClientesPage() {
               </Button>
               <Button type="submit" className="bg-red-600 hover:bg-red-700">
                 <Save className="h-4 w-4 mr-2" />
-                Criar Cliente
+                {editingId ? 'Salvar alterações' : 'Criar cliente'}
               </Button>
             </DialogFooter>
           </form>

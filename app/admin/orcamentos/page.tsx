@@ -3,10 +3,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, Search as SearchIcon } from 'lucide-react';
+import { FileText, Pencil, Search as SearchIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type OrcamentoListItem = {
   id: string;
@@ -23,6 +33,8 @@ export default function OrcamentosSavedPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -59,6 +71,33 @@ export default function OrcamentosSavedPage() {
     };
   }, [query]);
 
+  const handleDeleteOrcamento = async () => {
+    if (!deleteId) return;
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/orcamentos/${deleteId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? 'Erro ao excluir');
+      }
+      toast.success('Orçamento excluído');
+      setDeleteId(null);
+      const resList = await fetch(`/api/orcamentos?${query}`);
+      if (resList.ok) {
+        const data = await resList.json();
+        setOrcamentos(data?.orcamentos ?? []);
+        setTotalPages(data?.pagination?.totalPages ?? 1);
+      } else {
+        setOrcamentos((prev) => prev.filter((o) => o.id !== deleteId));
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? 'Erro ao excluir');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -93,6 +132,30 @@ export default function OrcamentosSavedPage() {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
+          <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir orçamento?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O orçamento será removido permanentemente. Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={deleting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleDeleteOrcamento();
+                  }}
+                >
+                  {deleting ? 'Excluindo…' : 'Excluir'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>
@@ -116,9 +179,25 @@ export default function OrcamentosSavedPage() {
                         {date ? date.toLocaleDateString('pt-BR') : '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <Link href={`/admin/orcamentos/${o.id}`}>
-                          <Button size="sm" variant="outline">Abrir</Button>
-                        </Link>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <Link href={`/admin/orcamentos/${o.id}`}>
+                            <Button size="sm" variant="outline">Abrir</Button>
+                          </Link>
+                          <Link href={`/admin/orcamentos/${o.id}?edit=1`}>
+                            <Button size="sm" variant="secondary">
+                              <Pencil className="h-3.5 w-3.5 mr-1" />
+                              Editar
+                            </Button>
+                          </Link>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setDeleteId(o.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Excluir
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );

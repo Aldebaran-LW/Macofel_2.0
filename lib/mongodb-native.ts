@@ -630,8 +630,54 @@ export async function getOrcamentoById(id: string) {
   const db = await connectToDatabase();
   const orcamentosCollection = db.collection('orcamentos');
 
-  const doc = await orcamentosCollection.findOne({ _id: new ObjectId(id) });
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return null;
+  }
+
+  const doc = await orcamentosCollection.findOne({ _id: oid });
   if (!doc) return null;
 
   return normalizeOrcamento(doc);
+}
+
+export async function updateOrcamento(id: string, data: OrcamentoDoc): Promise<boolean> {
+  const db = await connectToDatabase();
+  const orcamentosCollection = db.collection('orcamentos');
+
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return false;
+  }
+
+  const result = await orcamentosCollection.updateOne(
+    { _id: oid },
+    {
+      $set: {
+        ...data,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  return result.matchedCount > 0;
+}
+
+export async function deleteOrcamento(id: string): Promise<boolean> {
+  const db = await connectToDatabase();
+  const orcamentosCollection = db.collection('orcamentos');
+
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return false;
+  }
+
+  const result = await orcamentosCollection.deleteOne({ _id: oid });
+  return result.deletedCount > 0;
 }
