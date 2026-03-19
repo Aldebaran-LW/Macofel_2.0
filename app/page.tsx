@@ -18,7 +18,8 @@ import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
 import CategoryProductsCarousel from '@/components/category-products-carousel';
 import HeroCarousel from '@/components/hero-carousel';
 import HeaderMobile from '@/components/header-mobile';
-import { getProducts } from '@/lib/mongodb-native';
+import { getHeroSlides, getProducts } from '@/lib/mongodb-native';
+import { HERO_DEFAULT_SLIDES } from '@/lib/hero-default-slides';
 
 export const dynamic = 'force-dynamic';
 
@@ -196,38 +197,35 @@ function Header() {
   return <HeaderMobile />;
 }
 
-function HeroBanner() {
-  const slides = [
-    {
-      id: '1',
-      image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1920&auto=format&fit=crop',
-      subtitle: 'RESGATE SEU CUPOM',
-      title: 'PRIMEIRACOMPRA',
-      text: 'E APROVEITE OFERTAS EM TODO O SITE • ENTREGAS PARA TODO O BRASIL',
-    },
-    {
-      id: '2',
-      image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=1920&auto=format&fit=crop',
-      subtitle: 'FERRAMENTAS DE QUALIDADE',
-      title: 'CONSTRUA COM CONFIANÇA',
-      text: 'As melhores ferramentas para sua obra • Até 12x sem juros',
-    },
-    {
-      id: '3',
-      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1920&auto=format&fit=crop',
-      subtitle: 'MATERIAIS ELÉTRICOS',
-      title: 'INSTALAÇÃO COMPLETA',
-      text: 'Tudo para sua instalação elétrica • Entrega rápida e segura',
-    },
-    {
-      id: '4',
-      image: 'https://macofel-tres.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
-      subtitle: 'MATERIAIS HIDRÁULICOS',
-      title: 'QUALIDADE GARANTIDA',
-      text: 'Produtos certificados • Melhor preço da região',
-    },
-  ];
+async function getHeroBannerSlides() {
+  try {
+    const dbSlides = await getHeroSlides();
+    if (dbSlides.length > 0) {
+      return dbSlides.map((slide) => ({
+        id: String(slide.id),
+        image: slide.imageUrl,
+        subtitle: slide.subtitle ?? undefined,
+        title: slide.title ?? undefined,
+        text: slide.text ?? undefined,
+        href: slide.href ?? undefined,
+      }));
+    }
+  } catch (error) {
+    console.error('Erro ao buscar slides do hero no MongoDB:', error);
+  }
 
+  return HERO_DEFAULT_SLIDES.map((slide, index) => ({
+    id: String(index + 1),
+    image: slide.imageUrl,
+    subtitle: slide.subtitle ?? undefined,
+    title: slide.title ?? undefined,
+    text: slide.text ?? undefined,
+    href: slide.href ?? undefined,
+  }));
+}
+
+async function HeroBanner() {
+  const slides = await getHeroBannerSlides();
   return <HeroCarousel slides={slides} autoPlayInterval={5000} />;
 }
 

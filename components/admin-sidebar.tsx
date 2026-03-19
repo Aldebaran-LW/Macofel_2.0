@@ -26,16 +26,13 @@ const menuItems = [
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
 ];
 
-type CategorySide = { id: string; name: string };
 type HeroSlideSide = { id: string; title?: string | null; subtitle?: string | null; active?: boolean };
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
-  const [categories, setCategories] = useState<CategorySide[]>([]);
   const [heroSlides, setHeroSlides] = useState<HeroSlideSide[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingHeroSlides, setLoadingHeroSlides] = useState(false);
 
   useEffect(() => {
@@ -48,26 +45,6 @@ export default function AdminSidebar() {
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      try {
-        setLoadingCategories(true);
-        const res = await fetch('/api/categories');
-        if (!res.ok) throw new Error('Falha ao carregar categorias');
-        const data = await res.json();
-        const list: CategorySide[] = Array.isArray(data)
-          ? data
-              .map((c: any) => ({
-                id: String(c.id ?? c._id ?? ''),
-                name: String(c.name ?? ''),
-              }))
-              .filter((c) => c.id && c.name)
-          : [];
-        if (!cancelled) setCategories(list);
-      } catch (e) {
-        if (!cancelled) setCategories([]);
-      } finally {
-        if (!cancelled) setLoadingCategories(false);
-      }
-
       if ((session?.user as any)?.role !== 'ADMIN') return;
 
       try {
@@ -189,22 +166,6 @@ export default function AdminSidebar() {
             >
               Gerenciar categorias
             </Link>
-            {loadingCategories ? (
-              <div className="text-xs text-gray-400 px-2 py-2">Carregando...</div>
-            ) : (
-              categories.slice().sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/admin/categorias?edit=${encodeURIComponent(c.id)}`}
-                  className={cn(
-                    'block px-2 py-2 rounded-lg transition-colors text-sm',
-                    pathname?.startsWith('/admin/categorias') ? 'text-gray-200 hover:bg-gray-800' : 'text-gray-300 hover:bg-gray-800'
-                  )}
-                >
-                  {c.name}
-                </Link>
-              ))
-            )}
           </div>
         </details>
 

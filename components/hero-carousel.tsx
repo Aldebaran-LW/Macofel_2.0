@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HeroSlide {
@@ -10,6 +11,7 @@ interface HeroSlide {
   title?: string;
   subtitle?: string;
   text?: string;
+  href?: string;
 }
 
 interface HeroCarouselProps {
@@ -51,6 +53,8 @@ export default function HeroCarousel({
   if (slides.length === 0) return null;
 
   const currentSlide = slides[currentIndex];
+  const hasCtaLink = !!currentSlide.href?.trim();
+  const isExternalLink = hasCtaLink && /^https?:\/\//i.test(currentSlide.href!);
 
   return (
     <section className="relative overflow-hidden">
@@ -86,6 +90,24 @@ export default function HeroCarousel({
                 {currentSlide.text}
               </p>
             )}
+            {hasCtaLink &&
+              (isExternalLink ? (
+                <a
+                  href={currentSlide.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex mt-4 sm:mt-6 px-4 py-2 sm:px-5 sm:py-2.5 rounded-md bg-red-600 hover:bg-red-700 transition-colors text-sm sm:text-base font-semibold"
+                >
+                  Saiba mais
+                </a>
+              ) : (
+                <Link
+                  href={currentSlide.href!}
+                  className="inline-flex mt-4 sm:mt-6 px-4 py-2 sm:px-5 sm:py-2.5 rounded-md bg-red-600 hover:bg-red-700 transition-colors text-sm sm:text-base font-semibold"
+                >
+                  Saiba mais
+                </Link>
+              ))}
           </div>
         </div>
 

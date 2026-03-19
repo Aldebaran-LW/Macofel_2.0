@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, ErrorInfo } from 'react';
-import { Edit, Image as ImageIcon, Link2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
+import { Download, Edit, Image as ImageIcon, Link2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
 
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface HeroSlide {
   id: string;
@@ -69,6 +69,7 @@ export default function AdminHeroImagesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSlide, setEditingSlide] = useState<HeroSlide | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [importingCurrentHero, setImportingCurrentHero] = useState(false);
   const [formData, setFormData] = useState({
     imageUrl: '',
     subtitle: '',
@@ -79,6 +80,8 @@ export default function AdminHeroImagesPage() {
     active: true,
   });
 
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
 
@@ -200,9 +203,16 @@ export default function AdminHeroImagesPage() {
     setIsDialogOpen(true);
   };
 
+  /** Fecha o modal e remove `?edit=` da URL (senão o useEffect reabre o diálogo). */
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     resetForm();
+    if (searchParams.get('edit')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('edit');
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
   };
 
   // Se vier `?edit=<id>`, abre o editor do slide correspondente.
@@ -275,6 +285,36 @@ export default function AdminHeroImagesPage() {
     }
   };
 
+  const handleImportCurrentHero = async () => {
+    try {
+      setImportingCurrentHero(true);
+
+      const res = await fetch('/api/admin/hero-slides/import-current', {
+        method: 'POST',
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        toast.error(data.error || 'Erro ao importar hero atual');
+        return;
+      }
+
+      if (data.skipped) {
+        toast.info(data.message || 'Importação ignorada: já existem slides cadastrados.');
+      } else {
+        toast.success(`Slides importados com sucesso (${String(data.imported ?? 0)}).`);
+      }
+
+      await fetchSlides();
+    } catch (error) {
+      console.error('Erro ao importar hero atual:', error);
+      toast.error('Erro ao importar hero atual');
+    } finally {
+      setImportingCurrentHero(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -292,10 +332,21 @@ export default function AdminHeroImagesPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">Slides do Hero</h1>
-          <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Slide
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleImportCurrentHero}
+              disabled={importingCurrentHero}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {importingCurrentHero ? 'Importando...' : 'Importar hero atual'}
+            </Button>
+            <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Slide
+            </Button>
+          </div>
         </div>
 
         {safeSlides.length === 0 ? (
@@ -402,7 +453,13 @@ export default function AdminHeroImagesPage() {
           </div>
         )}
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            if (open) setIsDialogOpen(true);
+            else handleCloseDialog();
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingSlide ? 'Editar Slide do Hero' : 'Adicionar Novo Slide do Hero'}</DialogTitle>
