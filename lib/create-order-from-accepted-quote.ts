@@ -11,6 +11,12 @@ export type QuoteRequestDocForOrder = NonNullable<
   Awaited<ReturnType<typeof getQuoteRequestById>>
 >;
 
+type QuoteRequestItemForOrder = {
+  productId: string;
+  quantity: number;
+  price?: number | string | null;
+};
+
 /**
  * Cria um registo em `orders` (PostgreSQL) quando o cliente aceita a proposta,
  * para o pedido aparecer em **Admin → Pedidos**.
@@ -86,7 +92,8 @@ export async function createOrderFromAcceptedQuote(
         deliveryAddress,
         notes,
         items: {
-          create: doc.items.map((it) => ({
+          // Tipagem explícita para evitar `noImplicitAny` no build (Vercel).
+          create: (doc.items as QuoteRequestItemForOrder[]).map((it) => ({
             productId: it.productId,
             quantity: it.quantity,
             price: Number(it.price) || 0,

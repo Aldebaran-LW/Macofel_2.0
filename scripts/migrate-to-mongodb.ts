@@ -1,4 +1,5 @@
 // Script para migrar produtos e categorias do Supabase para MongoDB
+// @ts-nocheck
 // @ts-ignore
 import { PrismaClient as PostgresPrisma } from '../.prisma/postgres-client';
 // @ts-ignore
