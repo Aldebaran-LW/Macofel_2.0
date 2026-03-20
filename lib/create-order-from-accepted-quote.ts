@@ -7,15 +7,22 @@ import { computeQuoteProposalTotals } from '@/lib/quote-proposal-totals';
 
 type CreateResult = { ok: boolean; orderId?: string; skipped?: boolean; error?: string };
 
+export type QuoteRequestDocForOrder = NonNullable<
+  Awaited<ReturnType<typeof getQuoteRequestById>>
+>;
+
 /**
  * Cria um registo em `orders` (PostgreSQL) quando o cliente aceita a proposta,
  * para o pedido aparecer em **Admin → Pedidos**.
+ *
+ * @param preloaded — documento já lido após o PATCH (evita segunda leitura / estado inconsistente).
  */
 export async function createOrderFromAcceptedQuote(
-  quoteRequestId: string
+  quoteRequestId: string,
+  preloaded?: QuoteRequestDocForOrder | null
 ): Promise<CreateResult> {
   try {
-    const doc = await getQuoteRequestById(quoteRequestId);
+    const doc = preloaded ?? (await getQuoteRequestById(quoteRequestId));
     if (!doc) return { ok: false, error: 'Solicitação não encontrada' };
     if (doc.clientDecision !== 'accepted') {
       return { ok: false, skipped: true, error: 'Cliente não aceitou' };

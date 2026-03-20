@@ -759,8 +759,9 @@ function normalizeQuoteProposalDoc(raw: any): QuoteProposalStored | null {
 }
 
 function normalizeClientDecision(raw: any, proposalSentAt: any): QuoteClientDecision | null {
-  if (!proposalSentAt) return null;
+  /** Decisão final gravada no Mongo tem prioridade (evita anular "accepted" se proposalSentAt vier ausente na leitura). */
   if (raw === 'accepted' || raw === 'rejected') return raw;
+  if (!proposalSentAt) return null;
   return 'pending';
 }
 

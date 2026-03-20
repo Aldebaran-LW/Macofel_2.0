@@ -91,7 +91,7 @@ export async function PATCH(
             clientName: after.userName,
             clientEmail: after.userEmail,
           });
-          const orderRes = await createOrderFromAcceptedQuote(id);
+          const orderRes = await createOrderFromAcceptedQuote(id, after);
           if (!orderRes.ok && !orderRes.skipped) {
             console.error('[quote-requests] Pedido a partir do orçamento:', orderRes.error);
           }

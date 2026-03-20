@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { getAuthUserFromRequest } from '@/lib/get-authenticated-user-id';
 import prisma from '@/lib/db';
 import { enrichOrderItems, getCartProductsForOrder, updateProductStock } from '@/lib/order-helpers';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    let userId: string | null = null;
+    let userRole = '';
 
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    const auth = await getAuthUserFromRequest(req);
+    if (auth?.userId) {
+      userId = auth.userId;
+      userRole = auth.role;
+    } else {
+      const session = await getServerSession(authOptions);
+      if (!session?.user) {
+        return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+      userId = (session.user as any).id;
+      userRole = (session.user as any).role;
     }
 
-    const userId = (session.user as any).id;
-    const userRole = (session.user as any).role;
+    if (!userId) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    }
 
     const where: any = userRole === 'ADMIN' ? {} : { userId };
 
