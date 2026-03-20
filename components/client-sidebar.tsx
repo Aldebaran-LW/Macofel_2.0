@@ -26,7 +26,11 @@ const menuItems = [
   { href: '/minha-conta/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
-export default function ClientSidebar() {
+type ClientSidebarProps = {
+  onNavigate?: () => void;
+};
+
+export default function ClientSidebar({ onNavigate }: ClientSidebarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -39,6 +43,8 @@ export default function ClientSidebar() {
       toast.error('Erro ao fazer logout');
     }
   };
+
+  const nav = () => onNavigate?.();
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 min-h-screen p-6 flex flex-col">
@@ -57,6 +63,7 @@ export default function ClientSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={nav}
               className={cn(
                 'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors',
                 isActive
@@ -74,13 +81,17 @@ export default function ClientSidebar() {
       <div className="space-y-2 border-t border-gray-200 pt-4">
         <Link
           href="/"
+          onClick={nav}
           className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
         >
           <Home className="h-5 w-5" />
           <span className="font-medium">Voltar ao Site</span>
         </Link>
         <button
-          onClick={handleLogout}
+          onClick={() => {
+            nav();
+            void handleLogout();
+          }}
           className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
         >
           <LogOut className="h-5 w-5" />

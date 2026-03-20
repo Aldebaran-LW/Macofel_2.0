@@ -28,7 +28,12 @@ const menuItems = [
 
 type HeroSlideSide = { id: string; title?: string | null; subtitle?: string | null; active?: boolean };
 
-export default function AdminSidebar() {
+type AdminSidebarProps = {
+  /** Fecha o menu retrátil ao clicar em um link (mobile) */
+  onNavigate?: () => void;
+};
+
+export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
@@ -86,6 +91,8 @@ export default function AdminSidebar() {
     }
   };
 
+  const nav = () => onNavigate?.();
+
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen p-4 flex flex-col">
       <div className="mb-8">
@@ -102,6 +109,7 @@ export default function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={nav}
               className={cn(
                 'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors',
                 isActive
@@ -127,6 +135,7 @@ export default function AdminSidebar() {
           <div className="pl-6 space-y-1 pb-1">
             <Link
               href="/admin/orcamento"
+              onClick={nav}
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/orcamento')
@@ -138,6 +147,7 @@ export default function AdminSidebar() {
             </Link>
             <Link
               href="/admin/orcamentos"
+              onClick={nav}
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/orcamentos')
@@ -159,6 +169,7 @@ export default function AdminSidebar() {
           <div className="pl-6 space-y-1 pb-1">
             <Link
               href="/admin/categorias"
+              onClick={nav}
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/categorias') ? 'bg-red-600 text-white' : 'text-gray-300 hover:bg-gray-800'
@@ -178,6 +189,7 @@ export default function AdminSidebar() {
           <div className="pl-6 space-y-1 pb-1">
             <Link
               href="/admin/hero-images"
+              onClick={nav}
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/hero-images') ? 'bg-red-600 text-white' : 'text-gray-300 hover:bg-gray-800'
@@ -195,6 +207,7 @@ export default function AdminSidebar() {
                   <Link
                     key={s.id}
                     href={`/admin/hero-images?edit=${encodeURIComponent(s.id)}`}
+                    onClick={nav}
                     className="block px-2 py-2 rounded-lg transition-colors text-sm text-gray-300 hover:bg-gray-800"
                   >
                     <span className="inline-flex items-center gap-2">
@@ -211,13 +224,17 @@ export default function AdminSidebar() {
       <div className="space-y-2 border-t border-gray-700 pt-4">
         <Link
           href="/"
+          onClick={nav}
           className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
         >
           <Home className="h-5 w-5" />
           <span>Voltar ao Site</span>
         </Link>
         <button
-          onClick={handleLogout}
+          onClick={() => {
+            nav();
+            void handleLogout();
+          }}
           className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
         >
           <LogOut className="h-5 w-5" />
