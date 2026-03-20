@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn, useSession } from 'next-auth/react';
+import { getSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -13,7 +13,6 @@ import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { data: session } = useSession();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,22 +31,32 @@ export default function LoginPage() {
       if (result?.error) {
         toast.error('Email ou senha incorretos');
       } else {
-        // Aguardar um pouco para a sessão ser atualizada
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Verificar se é admin e redirecionar adequadamente
-        const res = await fetch('/api/auth/session', { cache: 'no-store' });
+        // Sincroniza o cache do SessionProvider e garante cookie JWT antes da navegação
+        await getSession();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const res = await fetch('/api/auth/session', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
         const sessionData = await res.json();
         const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
 
         if (userRole === 'ADMIN') {
           toast.success('Login realizado com sucesso! Redirecionando para área administrativa...');
-          router.push('/admin/dashboard');
-        } else {
-          toast.success('Login realizado com sucesso!');
-          router.push('/minha-conta');
+          router.replace('/admin/dashboard');
+          router.refresh();
+          return;
         }
-        router.refresh();
+
+        toast.success('Login realizado com sucesso!');
+        // Navegação completa evita estado “deslogado” no App Router com JWT recém-criado
+        if (typeof window !== 'undefined') {
+          window.location.assign('/');
+        } else {
+          router.replace('/');
+          router.refresh();
+        }
       }
     } catch (error) {
       toast.error('Erro ao fazer login');

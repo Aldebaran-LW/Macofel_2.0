@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -183,6 +184,10 @@ async function ProductsByCategory() {
 // Componentes no estilo Decar
 function Header() {
   return <HeaderMobile />;
+}
+
+function HeaderFallback() {
+  return <div className="bg-white shadow-sm sticky top-0 z-50 h-24 border-b border-gray-100" aria-hidden />;
 }
 
 async function getHeroBannerSlides() {
@@ -394,7 +399,9 @@ export default async function HomePageDecarStyle() {
   return (
     <div className="min-h-screen bg-white">
       <StoreTopBar />
-      <Header />
+      <Suspense fallback={<HeaderFallback />}>
+        <Header />
+      </Suspense>
       <HeroBanner />
       <ServiceBadges />
       <CategoryCards />

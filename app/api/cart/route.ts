@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/db';
+import { getAuthenticatedUserId } from '@/lib/get-authenticated-user-id';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { ObjectId } from 'mongodb';
 
@@ -63,15 +62,12 @@ async function enrichCartItems(cartItems: any[]) {
   return itemsWithProducts;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
-
-    const userId = (session.user as any).id;
 
     let cart = await prisma.cart.findUnique({
       where: { userId },
@@ -107,13 +103,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
-
-    const userId = (session.user as any).id;
     const body = await req.json();
     const { productId, quantity } = body;
 
@@ -147,7 +140,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (product.stock < quantity) {
+    const stock = typeof product.stock === 'number' ? product.stock : 0;
+    if (stock < quantity) {
       return NextResponse.json(
         { error: 'Estoque insuficiente' },
         { status: 400 }
@@ -179,7 +173,7 @@ export async function POST(req: NextRequest) {
       // Atualizar quantidade
       const newQuantity = existingItem.quantity + quantity;
 
-      if (newQuantity > product.stock) {
+      if (newQuantity > stock) {
         return NextResponse.json(
           { error: 'Estoque insuficiente' },
           { status: 400 }
@@ -234,13 +228,10 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
-
-    const userId = (session.user as any).id;
 
     await prisma.cartItem.deleteMany({
       where: { cart: { userId } },

@@ -5,11 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Header from '@/components/header';
 import Footer from '@/components/footer';
+import { DIRECT_CHECKOUT_ENABLED } from '@/lib/sales-mode';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -39,6 +48,9 @@ export default function CarrinhoPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteMessage, setQuoteMessage] = useState('');
+  const [quoteSending, setQuoteSending] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -51,7 +63,7 @@ export default function CarrinhoPage() {
 
   const fetchCart = async () => {
     try {
-      const res = await fetch('/api/cart');
+      const res = await fetch('/api/cart', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setCart(data);
@@ -71,6 +83,7 @@ export default function CarrinhoPage() {
       const res = await fetch(`/api/cart/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ quantity: newQuantity }),
       });
 
@@ -94,6 +107,7 @@ export default function CarrinhoPage() {
     try {
       const res = await fetch(`/api/cart/${itemId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (res.ok) {
@@ -110,11 +124,49 @@ export default function CarrinhoPage() {
     }
   };
 
+  const sendQuoteRequest = async () => {
+    const items = cart?.items ?? [];
+    if (items.length === 0) {
+      toast.error('Adicione produtos ao carrinho primeiro');
+      return;
+    }
+    try {
+      setQuoteSending(true);
+      const payload = {
+        message: quoteMessage.trim() || null,
+        items: items.map((item) => ({
+          productId: item.product?.id,
+          name: item.product?.name,
+          slug: item.product?.slug,
+          quantity: item.quantity,
+          price: item.product?.price,
+        })),
+      };
+      const res = await fetch('/api/quote-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Erro ao enviar');
+      }
+      toast.success('Solicitação enviada! Entraremos em contato em breve.');
+      setQuoteOpen(false);
+      setQuoteMessage('');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Erro ao enviar solicitação');
+    } finally {
+      setQuoteSending(false);
+    }
+  };
+
   const clearCart = async () => {
     if (!confirm('Deseja realmente limpar o carrinho?')) return;
 
     try {
-      const res = await fetch('/api/cart', { method: 'DELETE' });
+      const res = await fetch('/api/cart', { method: 'DELETE', credentials: 'include' });
       if (res.ok) {
         await fetchCart();
         toast.success('Carrinho limpo');
@@ -149,7 +201,18 @@ export default function CarrinhoPage() {
       <Header />
 
       <main className="flex-1 container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Carrinho de Compras</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Lista para orçamento</h1>
+          <p className="text-gray-600 text-sm mt-2 max-w-2xl">
+            Monte a lista de materiais com quantidades. Envie a solicitação e a MACOFEL responde com
+            condições comerciais.{' '}
+            {!DIRECT_CHECKOUT_ENABLED && (
+              <span className="text-gray-500">
+                Compra com pagamento online ficará disponível numa fase seguinte.
+              </span>
+            )}
+          </p>
+        </div>
 
         {isEmpty ? (
           <div className="text-center py-16">
@@ -158,7 +221,7 @@ export default function CarrinhoPage() {
               Seu carrinho está vazio
             </h2>
             <p className="text-gray-600 mb-6">
-              Adicione produtos para começar suas compras
+              Adicione produtos ao catálogo para montar a sua lista e solicitar um orçamento.
             </p>
             <Link href="/catalogo">
               <Button className="bg-red-600 hover:bg-red-700">
@@ -262,40 +325,86 @@ export default function CarrinhoPage() {
             {/* Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow p-6 sticky top-20">
-                <h2 className="text-xl font-bold mb-4">Resumo do Pedido</h2>
+                <h2 className="text-xl font-bold mb-4">Resumo (referência)</h2>
+                <p className="text-xs text-gray-500 mb-4">
+                  Valores do catálogo para referência; o orçamento oficial será tratado pela equipe.
+                </p>
 
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-gray-600">
-                    <span>Subtotal</span>
+                    <span>Subtotal referência</span>
                     <span>R$ {subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Entrega</span>
-                    <span className="text-green-600">A calcular</span>
+                    <span className="text-amber-700">No orçamento</span>
                   </div>
                   <div className="border-t pt-3 flex justify-between text-lg font-bold">
-                    <span>Total</span>
+                    <span>Total referência</span>
                     <span className="text-red-600">R$ {subtotal.toFixed(2)}</span>
                   </div>
                 </div>
 
-                <Link href="/checkout">
-                  <Button size="lg" className="w-full bg-red-600 hover:bg-red-700">
-                    Finalizar Compra
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setQuoteOpen(true)}
+                >
+                  <Send className="mr-2 h-5 w-5" />
+                  Solicitar orçamento destes itens
+                </Button>
 
                 <Link href="/catalogo">
                   <Button variant="outline" size="lg" className="w-full mt-3">
-                    Continuar Comprando
+                    Continuar a montar a lista
                   </Button>
                 </Link>
+
+                {DIRECT_CHECKOUT_ENABLED && (
+                  <Link href="/checkout" className="block mt-3">
+                    <Button size="lg" className="w-full bg-red-600 hover:bg-red-700">
+                      Finalizar compra
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
         )}
       </main>
+
+      <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitar orçamento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            Envie a lista atual do carrinho para nossa equipe. Você receberá retorno por e-mail ou WhatsApp.
+          </p>
+          <Textarea
+            placeholder="Observações (opcional): prazo, endereço de entrega, quantidade alternativa…"
+            value={quoteMessage}
+            onChange={(e) => setQuoteMessage(e.target.value)}
+            rows={4}
+            className="resize-none"
+          />
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setQuoteOpen(false)} disabled={quoteSending}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => void sendQuoteRequest()}
+              disabled={quoteSending || (cart?.items?.length ?? 0) === 0}
+            >
+              {quoteSending ? 'Enviando…' : 'Enviar solicitação'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Footer />
     </div>

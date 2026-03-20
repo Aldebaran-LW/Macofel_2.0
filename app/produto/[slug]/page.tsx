@@ -82,6 +82,7 @@ export default function ProductPage() {
       const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ productId: product?.id, quantity }),
       });
       if (res.ok) {
@@ -302,7 +303,7 @@ export default function ProductPage() {
                   ) : (
                     <>
                       <ShoppingCart className="w-5 h-5" />
-                      Adicionar ao Carrinho
+                      Adicionar à lista
                     </>
                   )}
                 </button>

@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { ShoppingCart, Menu, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShoppingCart, Menu, X, User, LogOut } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
+import { toast } from 'sonner';
 
 interface NavCategory {
   name: string;
@@ -16,11 +19,16 @@ interface NavCategory {
 export default function HeaderMobile() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [rawCategories, setRawCategories] = useState<Array<{ name: string; slug: string }>>([]);
+  const [cartCount, setCartCount] = useState(0);
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession() ?? {};
   const currentCategory = pathname === '/catalogo' ? (searchParams?.get('category') ?? '') : '';
 
-  // Buscar categorias da mesma API do catálogo (uma vez) para slugs sincronizados
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const isLoggedIn = status === 'authenticated' && !!session?.user;
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/categories')
@@ -30,10 +38,30 @@ export default function HeaderMobile() {
         setRawCategories(list.map((c) => ({ name: c.name, slug: c.slug })));
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Derivar links e estado ativo a partir da URL
+  useEffect(() => {
+    if (status !== 'authenticated' || isAdmin) {
+      setCartCount(0);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/cart', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.items) setCartCount(data.items.length);
+      })
+      .catch(() => {
+        if (!cancelled) setCartCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, isAdmin, pathname]);
+
   const categories: NavCategory[] = [
     ...rawCategories.map((c) => ({
       name: c.name,
@@ -44,11 +72,24 @@ export default function HeaderMobile() {
     { name: '+ Categorias', slug: '', href: '/catalogo', isActive: !currentCategory },
   ];
 
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      toast.success('Logout realizado com sucesso');
+      setMobileMenuOpen(false);
+      router.push('/');
+      router.refresh();
+    } catch {
+      toast.error('Erro ao fazer logout');
+    }
+  };
+
+  const cartBadge = (n: number) => (n > 99 ? '99+' : String(n));
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-4">
-          {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <Image
               src="/logo-macofel.png"
@@ -67,7 +108,6 @@ export default function HeaderMobile() {
             </div>
           </Link>
 
-          {/* Busca - Ocultar no mobile muito pequeno */}
           <div className="hidden sm:flex flex-1 max-w-2xl">
             <div className="relative w-full">
               <input
@@ -83,36 +123,78 @@ export default function HeaderMobile() {
             </div>
           </div>
 
-          {/* Ações - Desktop */}
-          <div className="hidden md:flex items-center gap-6 shrink-0">
-            <Link href="/login" className="text-sm text-gray-600 hover:text-emerald-600">
-              <span className="font-bold">Entre</span> ou<br />
-              <span className="font-bold">Cadastre-se</span>
-            </Link>
-            <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600">
-              <ShoppingCart className="w-6 h-6" />
-              <span className="font-bold">0</span>
-            </Link>
+          {/* Desktop: conta + carrinho */}
+          <div className="hidden md:flex items-center gap-4 shrink-0">
+            {status === 'loading' ? (
+              <div className="h-9 w-28 bg-gray-100 rounded animate-pulse" />
+            ) : isLoggedIn ? (
+              <div className="flex items-center gap-4 text-sm">
+                {isAdmin ? (
+                  <Link href="/admin/dashboard" className="text-gray-600 hover:text-emerald-600 font-semibold">
+                    Painel admin
+                  </Link>
+                ) : (
+                  <Link href="/minha-conta" className="text-gray-600 hover:text-emerald-600 font-semibold inline-flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    Minha conta
+                  </Link>
+                )}
+                {!isAdmin && (
+                  <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600">
+                    <ShoppingCart className="w-6 h-6" />
+                    <span className="font-bold">{cartBadge(cartCount)}</span>
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="inline-flex items-center gap-1 text-gray-500 hover:text-red-600 font-medium"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm text-gray-600 hover:text-emerald-600">
+                  <span className="font-bold">Entre</span> ou<br />
+                  <span className="font-bold">Cadastre-se</span>
+                </Link>
+                <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600">
+                  <ShoppingCart className="w-6 h-6" />
+                  <span className="font-bold">0</span>
+                </Link>
+              </>
+            )}
           </div>
 
-          {/* Hambúrguer - Mobile */}
-          <div className="flex md:hidden items-center">
+          {/* Mobile: carrinho + hambúrguer */}
+          <div className="flex md:hidden items-center gap-1">
+            {!isAdmin && (
+              <Link
+                href="/carrinho"
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-700 relative"
+                aria-label="Carrinho"
+              >
+                <ShoppingCart className="w-6 h-6" />
+                {isLoggedIn && cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white px-1">
+                    {cartBadge(cartCount)}
+                  </span>
+                )}
+              </Link>
+            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
               aria-label="Menu"
             >
-              {mobileMenuOpen ? (
-                <X className="w-6 h-6 text-gray-700" />
-              ) : (
-                <Menu className="w-6 h-6 text-gray-700" />
-              )}
+              {mobileMenuOpen ? <X className="w-6 h-6 text-gray-700" /> : <Menu className="w-6 h-6 text-gray-700" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Menu de Categorias - Desktop (sincronizado com URL e API) */}
       <nav className="hidden md:block border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-4 py-2 flex justify-center">
           <ul className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:gap-x-6 rounded-xl bg-slate-50/90 border border-slate-100/80 px-4 py-2.5 text-sm font-semibold text-gray-700">
@@ -134,7 +216,6 @@ export default function HeaderMobile() {
         </div>
       </nav>
 
-      {/* Menu Mobile Hambúrguer */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
           <div
@@ -154,33 +235,82 @@ export default function HeaderMobile() {
               </button>
             </div>
 
-             {/* Links de Login/Cadastro */}
-             <div className="p-4 border-b border-gray-200">
-               <Link
-                 href="/login"
-                 onClick={() => setMobileMenuOpen(false)}
-                 className="block w-full text-center py-3 px-4 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors mb-2"
-               >
-                 Entrar
-               </Link>
-               <Link
-                 href="/cadastro"
-                 onClick={() => setMobileMenuOpen(false)}
-                 className="block w-full text-center py-3 px-4 border-2 border-emerald-600 text-emerald-600 font-bold rounded-lg hover:bg-emerald-50 transition-colors mb-2"
-               >
-                 Cadastre-se
-               </Link>
-               <Link
-                 href="/carrinho"
-                 onClick={() => setMobileMenuOpen(false)}
-                 className="flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors"
-               >
-                 <ShoppingCart className="w-5 h-5" />
-                 Carrinho (0)
-               </Link>
-             </div>
+            <div className="p-4 border-b border-gray-200 space-y-2">
+              {status === 'loading' ? (
+                <div className="h-10 bg-gray-100 rounded animate-pulse" />
+              ) : isLoggedIn ? (
+                <>
+                  {isAdmin ? (
+                    <Link
+                      href="/admin/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block w-full text-center py-3 px-4 bg-gray-900 text-white font-bold rounded-lg"
+                    >
+                      Painel administrativo
+                    </Link>
+                  ) : (
+                    <>
+                      <Link
+                        href="/minha-conta"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full text-center py-3 px-4 bg-emerald-600 text-white font-bold rounded-lg"
+                      >
+                        Minha conta
+                      </Link>
+                      <Link
+                        href="/minha-conta/solicitacoes-orcamento"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full text-center py-3 px-4 border-2 border-emerald-600 text-emerald-700 font-bold rounded-lg"
+                      >
+                        Solicitar orçamento
+                      </Link>
+                    </>
+                  )}
+                  <Link
+                    href="/carrinho"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-bold rounded-lg"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Carrinho ({isAdmin ? 0 : cartBadge(cartCount)})
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleLogout()}
+                    className="flex items-center justify-center gap-2 w-full py-3 px-4 text-red-600 font-bold rounded-lg border border-red-200"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Sair
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block w-full text-center py-3 px-4 bg-emerald-600 text-white font-bold rounded-lg"
+                  >
+                    Entrar
+                  </Link>
+                  <Link
+                    href="/cadastro"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block w-full text-center py-3 px-4 border-2 border-emerald-600 text-emerald-600 font-bold rounded-lg"
+                  >
+                    Cadastre-se
+                  </Link>
+                  <Link
+                    href="/carrinho"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-bold rounded-lg"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Carrinho
+                  </Link>
+                </>
+              )}
+            </div>
 
-            {/* Busca Mobile */}
             <div className="p-4 border-b border-gray-200">
               <div className="relative">
                 <input
@@ -196,7 +326,6 @@ export default function HeaderMobile() {
               </div>
             </div>
 
-            {/* Categorias (sincronizado com API e URL) */}
             <div className="p-4">
               <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Categorias</h3>
               <ul className="space-y-2">
@@ -218,7 +347,6 @@ export default function HeaderMobile() {
               </ul>
             </div>
 
-            {/* Links Adicionais */}
             <div className="p-4 border-t border-gray-200">
               <ul className="space-y-2">
                 <li>

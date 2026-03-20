@@ -13,6 +13,7 @@ import {
   LogOut,
   FileText,
   Sparkles,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
@@ -24,6 +25,7 @@ const menuItems = [
   { href: '/admin/produtos', label: 'Produtos', icon: Package },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
+  { href: '/admin/solicitacoes-orcamento', label: 'Solicitações de orçamento', icon: ClipboardList },
 ];
 
 type HeroSlideSide = { id: string; title?: string | null; subtitle?: string | null; active?: boolean };

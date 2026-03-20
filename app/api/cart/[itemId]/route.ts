@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/db';
+import { getAuthenticatedUserId } from '@/lib/get-authenticated-user-id';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { ObjectId } from 'mongodb';
 
@@ -12,9 +11,8 @@ export async function PATCH(
   { params }: { params: { itemId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
@@ -30,9 +28,10 @@ export async function PATCH(
 
     const item = await prisma.cartItem.findUnique({
       where: { id: params?.itemId },
+      include: { cart: { select: { userId: true } } },
     });
 
-    if (!item) {
+    if (!item || item.cart.userId !== userId) {
       return NextResponse.json(
         { error: 'Item não encontrado' },
         { status: 404 }
@@ -62,7 +61,8 @@ export async function PATCH(
       );
     }
 
-    if (quantity > (product.stock ?? 0)) {
+    const stock = typeof product.stock === 'number' ? product.stock : 0;
+    if (quantity > stock) {
       return NextResponse.json(
         { error: 'Estoque insuficiente' },
         { status: 400 }
@@ -89,10 +89,21 @@ export async function DELETE(
   { params }: { params: { itemId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    }
+
+    const item = await prisma.cartItem.findUnique({
+      where: { id: params?.itemId },
+      include: { cart: { select: { userId: true } } },
+    });
+
+    if (!item || item.cart.userId !== userId) {
+      return NextResponse.json(
+        { error: 'Item não encontrado' },
+        { status: 404 }
+      );
     }
 
     await prisma.cartItem.delete({

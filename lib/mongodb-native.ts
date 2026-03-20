@@ -681,3 +681,122 @@ export async function deleteOrcamento(id: string): Promise<boolean> {
   const result = await orcamentosCollection.deleteOne({ _id: oid });
   return result.deletedCount > 0;
 }
+
+// ----------------------------
+// SOLICITAÇÕES DE ORÇAMENTO (cliente → admin)
+// ----------------------------
+
+export type QuoteRequestItem = {
+  productId: string;
+  name: string;
+  slug?: string;
+  quantity: number;
+  price?: number;
+};
+
+export type QuoteRequestStatus = 'pending' | 'viewed' | 'answered' | 'archived';
+
+export type QuoteRequestInsert = {
+  userId: string;
+  userEmail: string;
+  userName: string;
+  message?: string | null;
+  items: QuoteRequestItem[];
+  status: QuoteRequestStatus;
+};
+
+function normalizeQuoteRequest(doc: any) {
+  return {
+    id: doc._id.toString(),
+    userId: String(doc.userId ?? ''),
+    userEmail: String(doc.userEmail ?? ''),
+    userName: String(doc.userName ?? ''),
+    message: doc.message ?? null,
+    items: Array.isArray(doc.items) ? doc.items : [],
+    status: (doc.status as QuoteRequestStatus) || 'pending',
+    createdAt: doc.createdAt ?? null,
+    updatedAt: doc.updatedAt ?? null,
+  };
+}
+
+export async function createQuoteRequest(data: QuoteRequestInsert): Promise<string> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  const now = new Date();
+  const result = await col.insertOne({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return result.insertedId.toString();
+}
+
+export async function listQuoteRequestsByUser(userId: string) {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  const docs = await col.find({ userId }).sort({ createdAt: -1 }).limit(100).toArray();
+  return docs.map(normalizeQuoteRequest);
+}
+
+export async function listQuoteRequestsAdmin(filters?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  const page = filters?.page ?? 1;
+  const limit = Math.min(filters?.limit ?? 30, 100);
+  const skip = (page - 1) * limit;
+
+  const query: any = {};
+  if (filters?.status && filters.status !== 'all') {
+    query.status = filters.status;
+  }
+
+  const total = await col.countDocuments(query);
+  const docs = await col.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray();
+
+  return {
+    solicitacoes: docs.map(normalizeQuoteRequest),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  };
+}
+
+export async function getQuoteRequestById(id: string) {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return null;
+  }
+  const doc = await col.findOne({ _id: oid });
+  if (!doc) return null;
+  return normalizeQuoteRequest(doc);
+}
+
+export async function updateQuoteRequestStatus(
+  id: string,
+  status: QuoteRequestStatus
+): Promise<boolean> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return false;
+  }
+  const result = await col.updateOne(
+    { _id: oid },
+    { $set: { status, updatedAt: new Date() } }
+  );
+  return result.matchedCount > 0;
+}

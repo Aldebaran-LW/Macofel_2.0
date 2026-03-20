@@ -1,8 +1,13 @@
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
+import { DIRECT_CHECKOUT_ENABLED } from '@/lib/sales-mode';
 
 export default withAuth(
   function middleware(req) {
+    if (req.nextUrl.pathname.startsWith('/checkout') && !DIRECT_CHECKOUT_ENABLED) {
+      return NextResponse.redirect(new URL('/carrinho', req.url));
+    }
+
     const token = req.nextauth.token;
     const isAdmin = token?.role === 'ADMIN';
     const isAdminRoute = req.nextUrl.pathname.startsWith('/admin');

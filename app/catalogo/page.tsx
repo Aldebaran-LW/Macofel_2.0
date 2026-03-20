@@ -138,6 +138,7 @@ function CatalogoContent() {
       const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ productId: product.id, quantity: 1 }),
       });
       if (res.ok) toast.success('Adicionado ao carrinho!');

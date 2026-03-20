@@ -10,7 +10,8 @@ import {
   Heart, 
   Settings,
   Home,
-  LogOut
+  LogOut,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut } from 'next-auth/react';
@@ -24,6 +25,7 @@ const menuItems = [
   { href: '/minha-conta/enderecos', label: 'Endereços', icon: MapPin },
   { href: '/minha-conta/favoritos', label: 'Favoritos', icon: Heart },
   { href: '/minha-conta/configuracoes', label: 'Configurações', icon: Settings },
+  { href: '/minha-conta/solicitacoes-orcamento', label: 'Solicitar orçamento', icon: ClipboardList },
 ];
 
 type ClientSidebarProps = {
