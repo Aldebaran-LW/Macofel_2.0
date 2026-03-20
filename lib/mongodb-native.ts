@@ -736,6 +736,7 @@ function normalizeQuoteRequest(doc: any) {
     proposalSentAt: doc.proposalSentAt ?? null,
     clientDecision: normalizeClientDecision(doc.clientDecision, doc.proposalSentAt),
     clientDecidedAt: doc.clientDecidedAt ?? null,
+    linkedOrderId: doc.linkedOrderId != null ? String(doc.linkedOrderId) : null,
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
   };
@@ -973,4 +974,24 @@ export async function setQuoteRequestClientDecision(
     }
   );
   return { ok: result.modifiedCount > 0 };
+}
+
+/** Liga pedido Postgres criado após o cliente aceitar a proposta. */
+export async function setQuoteRequestLinkedOrderId(
+  quoteRequestId: string,
+  orderId: string
+): Promise<boolean> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(quoteRequestId);
+  } catch {
+    return false;
+  }
+  const result = await col.updateOne(
+    { _id: oid },
+    { $set: { linkedOrderId: orderId, updatedAt: new Date() } }
+  );
+  return result.matchedCount > 0;
 }

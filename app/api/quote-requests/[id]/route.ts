@@ -14,6 +14,7 @@ import {
   notifyAdminsProposalAccepted,
   notifyAdminsProposalRejected,
 } from '@/lib/email-notifications';
+import { createOrderFromAcceptedQuote } from '@/lib/create-order-from-accepted-quote';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,28 @@ export async function PATCH(
         }
         return NextResponse.json({ error: r.error }, { status: 400 });
       }
+
+      const after = await getQuoteRequestById(id);
+      if (after) {
+        if (decision === 'accepted') {
+          notifyAdminsProposalAccepted({
+            quoteId: id,
+            clientName: after.userName,
+            clientEmail: after.userEmail,
+          });
+          const orderRes = await createOrderFromAcceptedQuote(id);
+          if (!orderRes.ok && !orderRes.skipped) {
+            console.error('[quote-requests] Pedido a partir do orçamento:', orderRes.error);
+          }
+        } else {
+          notifyAdminsProposalRejected({
+            quoteId: id,
+            clientName: after.userName,
+            clientEmail: after.userEmail,
+          });
+        }
+      }
+
       return NextResponse.json({ ok: true });
     }
 

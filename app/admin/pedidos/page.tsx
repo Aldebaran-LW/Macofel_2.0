@@ -12,6 +12,7 @@ interface Order {
   customerName: string;
   customerEmail: string;
   deliveryAddress: string;
+  notes?: string | null;
   createdAt: string;
   items: Array<{ id: string; quantity: number; price: number; product: { name: string } }>;
   user: { email: string; firstName: string; lastName: string };
@@ -79,7 +80,10 @@ export default function AdminPedidosPage() {
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhum pedido encontrado</h3>
-            <p className="text-gray-600">Os pedidos aparecerão aqui quando os clientes fizerem compras</p>
+            <p className="text-gray-600">
+              Aparecem aqui compras finalizadas no checkout e pedidos gerados quando o cliente{' '}
+              <strong>aceita uma proposta de orçamento</strong> enviada pelo admin.
+            </p>
           </div>
         ) : (
           orders.map((order) => {
@@ -90,7 +94,14 @@ export default function AdminPedidosPage() {
               <div key={order.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="font-semibold text-lg">Pedido #{order.id.substring(0, 8)}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-lg">Pedido #{order.id.substring(0, 8)}</p>
+                      {order.notes?.includes('[Orçamento aprovado]') ? (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                          Orçamento aprovado
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-sm text-gray-600">
                       {order.user.firstName} {order.user.lastName} ({order.user.email})
                     </p>
@@ -117,6 +128,11 @@ export default function AdminPedidosPage() {
                 <div className="border-t pt-4 mb-4">
                   <p className="text-sm"><strong>Endereço:</strong> {order.deliveryAddress}</p>
                   <p className="text-sm"><strong>Email:</strong> {order.customerEmail}</p>
+                  {order.notes ? (
+                    <p className="text-sm mt-2 text-gray-600">
+                      <strong>Notas:</strong> {order.notes}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex gap-2">

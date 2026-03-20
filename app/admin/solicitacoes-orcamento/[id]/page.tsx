@@ -44,6 +44,7 @@ type Doc = {
   proposalSentAt: string | null;
   clientDecision: 'pending' | 'accepted' | 'rejected' | null;
   clientDecidedAt: string | null;
+  linkedOrderId?: string | null;
 };
 
 const emptyProposal = (): QuoteProposalStored => ({
@@ -179,6 +180,17 @@ export default function AdminSolicitacaoDetailPage() {
           {clientLabel}
           {doc.clientDecidedAt ? ` · ${new Date(doc.clientDecidedAt).toLocaleString('pt-BR')}` : ''}
         </p>
+        {doc.linkedOrderId ? (
+          <p className="text-sm mt-3">
+            <span className="text-gray-600">Pedido gerado: </span>
+            <Link
+              href="/admin/pedidos"
+              className="font-semibold text-red-600 hover:underline"
+            >
+              #{doc.linkedOrderId.slice(0, 8)}… — ver em Pedidos
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
