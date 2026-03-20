@@ -44,6 +44,13 @@ Edite o arquivo `.env` e configure:
 - `NEXTAUTH_SECRET` - Chave secreta (gere com: `openssl rand -base64 32`)
 - `NEXTAUTH_URL` - URL da aplicação (ex: `http://localhost:3000`)
 
+**E-mails de orçamento (opcional, não usa Supabase):** notifica o admin em novas solicitações / aceite ou recusa, e o cliente quando a proposta é enviada. Configure `EMAIL_FROM` e **um** dos envios abaixo:
+
+- **Resend** (recomendado em produção): `RESEND_API_KEY` — crie em [resend.com](https://resend.com), verifique o domínio e use `EMAIL_FROM` como `Nome <noreply@seudominio.com>`.
+- **SMTP** (Gmail, Hostinger, etc.): `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`; opcionais `SMTP_PORT` (padrão 587), `SMTP_SECURE=true` se usar porta 465.
+
+Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por vírgula). Sem essas variáveis, o site continua a funcionar — só não envia e-mail.
+
 ### Configuração do Supabase
 
 1. Acesse o [Supabase Dashboard](https://app.supabase.com)

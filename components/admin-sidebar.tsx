@@ -25,7 +25,6 @@ const menuItems = [
   { href: '/admin/produtos', label: 'Produtos', icon: Package },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
-  { href: '/admin/solicitacoes-orcamento', label: 'Solicitações de orçamento', icon: ClipboardList },
 ];
 
 type HeroSlideSide = { id: string; title?: string | null; subtitle?: string | null; active?: boolean };
@@ -125,27 +124,53 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
           );
         })}
 
-        {/* Orçamento (mesma seção) */}
+        {/* Orçamento: montagem interna, histórico e pedidos dos clientes */}
         <details
           className="px-1"
-          open={pathname?.startsWith('/admin/orcamento') || pathname?.startsWith('/admin/orcamentos')}
+          open={
+            pathname === '/admin/orcamento' ||
+            pathname?.startsWith('/admin/orcamentos') ||
+            pathname?.startsWith('/admin/solicitacoes-orcamento')
+          }
         >
-          <summary className="cursor-pointer flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors list-none text-gray-300 hover:bg-gray-800">
+          <summary
+            className={cn(
+              'cursor-pointer flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors list-none hover:bg-gray-800',
+              pathname === '/admin/orcamento' ||
+                pathname?.startsWith('/admin/orcamentos') ||
+                pathname?.startsWith('/admin/solicitacoes-orcamento')
+                ? 'bg-gray-800 text-white'
+                : 'text-gray-300'
+            )}
+          >
             <FileText className="h-5 w-5" />
             <span>Orçamento</span>
           </summary>
           <div className="pl-6 space-y-1 pb-1">
             <Link
-              href="/admin/orcamento"
+              href="/admin/solicitacoes-orcamento"
               onClick={nav}
               className={cn(
-                'block px-2 py-2 rounded-lg transition-colors text-sm',
-                pathname?.startsWith('/admin/orcamento')
+                'flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-sm',
+                pathname?.startsWith('/admin/solicitacoes-orcamento')
                   ? 'bg-red-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800'
               )}
             >
-              Orçamento
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              Solicitações dos clientes
+            </Link>
+            <Link
+              href="/admin/orcamento"
+              onClick={nav}
+              className={cn(
+                'block px-2 py-2 rounded-lg transition-colors text-sm',
+                pathname === '/admin/orcamento'
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800'
+              )}
+            >
+              Montar orçamento
             </Link>
             <Link
               href="/admin/orcamentos"

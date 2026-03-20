@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -22,7 +23,20 @@ type Solicitacao = {
   items: Item[];
   status: string;
   createdAt: string | null;
+  shippingCep?: string | null;
+  shippingCityState?: string | null;
+  requestShippingQuote?: boolean;
+  requestPixDiscount?: boolean;
+  proposalSentAt?: string | null;
+  clientDecision?: 'pending' | 'accepted' | 'rejected' | null;
 };
+
+function formatCep(cep: string | null | undefined): string {
+  if (!cep) return '—';
+  const d = String(cep).replace(/\D/g, '');
+  if (d.length !== 8) return d || '—';
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+}
 
 const statusLabels: Record<string, string> = {
   pending: 'Pendente',
@@ -137,6 +151,23 @@ export default function AdminSolicitacoesOrcamentoPage() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
+                  {s.proposalSentAt && (
+                    <span
+                      className={`text-xs font-bold px-2 py-1 rounded ${
+                        s.clientDecision === 'accepted'
+                          ? 'bg-green-100 text-green-900'
+                          : s.clientDecision === 'rejected'
+                            ? 'bg-red-100 text-red-900'
+                            : 'bg-blue-100 text-blue-900'
+                      }`}
+                    >
+                      {s.clientDecision === 'accepted'
+                        ? 'Cliente aprovou'
+                        : s.clientDecision === 'rejected'
+                          ? 'Cliente recusou'
+                          : 'Proposta enviada — aguardando'}
+                    </span>
+                  )}
                   <span
                     className={`text-xs font-bold px-2 py-1 rounded ${
                       s.status === 'pending'
@@ -164,6 +195,27 @@ export default function AdminSolicitacoesOrcamentoPage() {
                   </select>
                 </div>
               </div>
+              <div className="grid gap-2 sm:grid-cols-2 text-sm mb-3 bg-slate-50 rounded-lg p-3 border border-slate-100">
+                <div>
+                  <span className="text-gray-500">Frete no orçamento:</span>{' '}
+                  <strong>{s.requestShippingQuote ? 'Sim' : 'Não'}</strong>
+                  {s.requestShippingQuote && (
+                    <div className="mt-1 text-gray-700">
+                      CEP: <strong>{formatCep(s.shippingCep)}</strong>
+                      {s.shippingCityState ? (
+                        <>
+                          {' · '}
+                          {s.shippingCityState}
+                        </>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <span className="text-gray-500">Desconto (PIX / à vista):</span>{' '}
+                  <strong>{s.requestPixDiscount ? 'Cliente pediu condições' : 'Não solicitado'}</strong>
+                </div>
+              </div>
               {s.message && (
                 <p className="text-sm text-gray-700 bg-gray-50 rounded p-3 mb-3">{s.message}</p>
               )}
@@ -188,6 +240,14 @@ export default function AdminSolicitacoesOrcamentoPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="mt-4">
+                <Link
+                  href={`/admin/solicitacoes-orcamento/${s.id}`}
+                  className="inline-flex text-sm font-semibold text-red-600 hover:underline"
+                >
+                  Montar proposta (frete, PIX, parcelas) →
+                </Link>
               </div>
             </div>
           ))}

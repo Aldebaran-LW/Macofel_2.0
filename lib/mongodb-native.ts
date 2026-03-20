@@ -1,5 +1,6 @@
 // Cliente MongoDB Nativo (sem Prisma) - Apenas para exibir produtos
 import { MongoClient, Db, ObjectId } from 'mongodb';
+import type { QuoteProposalStored } from './quote-proposal-totals';
 
 // Função para garantir que a connection string tenha nome do banco
 function ensureDatabaseName(uri: string): string {
@@ -696,6 +697,11 @@ export type QuoteRequestItem = {
 
 export type QuoteRequestStatus = 'pending' | 'viewed' | 'answered' | 'archived';
 
+/** Resposta do cliente à proposta enviada pelo admin */
+export type QuoteClientDecision = 'pending' | 'accepted' | 'rejected';
+
+export type { QuoteProposalStored } from './quote-proposal-totals';
+
 export type QuoteRequestInsert = {
   userId: string;
   userEmail: string;
@@ -703,6 +709,14 @@ export type QuoteRequestInsert = {
   message?: string | null;
   items: QuoteRequestItem[];
   status: QuoteRequestStatus;
+  /** CEP só dígitos (até 8), para cálculo de frete */
+  shippingCep?: string | null;
+  /** Cidade / UF ou referência de entrega */
+  shippingCityState?: string | null;
+  /** Cliente pede valor de frete envio no orçamento */
+  requestShippingQuote?: boolean;
+  /** Cliente pede condições de desconto (ex.: PIX, à vista) */
+  requestPixDiscount?: boolean;
 };
 
 function normalizeQuoteRequest(doc: any) {
@@ -714,10 +728,54 @@ function normalizeQuoteRequest(doc: any) {
     message: doc.message ?? null,
     items: Array.isArray(doc.items) ? doc.items : [],
     status: (doc.status as QuoteRequestStatus) || 'pending',
+    shippingCep: doc.shippingCep != null ? String(doc.shippingCep) : null,
+    shippingCityState: doc.shippingCityState != null ? String(doc.shippingCityState) : null,
+    requestShippingQuote: doc.requestShippingQuote === true,
+    requestPixDiscount: doc.requestPixDiscount === true,
+    proposal: normalizeQuoteProposalDoc(doc.proposal),
+    proposalSentAt: doc.proposalSentAt ?? null,
+    clientDecision: normalizeClientDecision(doc.clientDecision, doc.proposalSentAt),
+    clientDecidedAt: doc.clientDecidedAt ?? null,
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
   };
 }
+
+function normalizeQuoteProposalDoc(raw: any): QuoteProposalStored | null {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    freightValue: Number(raw.freightValue) || 0,
+    pixDiscountType:
+      raw.pixDiscountType === 'fixed' || raw.pixDiscountType === 'percent'
+        ? raw.pixDiscountType
+        : 'none',
+    pixDiscountValue: Number(raw.pixDiscountValue) || 0,
+    installmentMax: Math.max(1, Math.min(48, parseInt(String(raw.installmentMax ?? 1), 10) || 1)),
+    installmentInterestMonthlyPercent: Math.max(0, Number(raw.installmentInterestMonthlyPercent) || 0),
+    installmentNotes: raw.installmentNotes != null ? String(raw.installmentNotes).slice(0, 2000) : null,
+    messageToClient: raw.messageToClient != null ? String(raw.messageToClient).slice(0, 4000) : null,
+  };
+}
+
+function normalizeClientDecision(raw: any, proposalSentAt: any): QuoteClientDecision | null {
+  if (!proposalSentAt) return null;
+  if (raw === 'accepted' || raw === 'rejected') return raw;
+  return 'pending';
+}
+
+/** Totais para exibição (desconto PIX sobre subtotal dos produtos; frete somado ao final). */
+/** Cliente não deve ver rascunho da proposta antes do envio. */
+export function sanitizeQuoteRequestForClient(doc: any) {
+  if (doc?.proposalSentAt) return doc;
+  return {
+    ...doc,
+    proposal: null,
+    clientDecision: null,
+    clientDecidedAt: null,
+  };
+}
+
+export { computeQuoteProposalTotals } from './quote-proposal-totals';
 
 export async function createQuoteRequest(data: QuoteRequestInsert): Promise<string> {
   const db = await connectToDatabase();
@@ -799,4 +857,120 @@ export async function updateQuoteRequestStatus(
     { $set: { status, updatedAt: new Date() } }
   );
   return result.matchedCount > 0;
+}
+
+function parseProposalBody(body: any): QuoteProposalStored | null {
+  if (body == null || typeof body !== 'object') return null;
+  const freightValue = Math.max(0, Number(body.freightValue) || 0);
+  const pixType = body.pixDiscountType;
+  const pixDiscountType =
+    pixType === 'fixed' || pixType === 'percent' ? pixType : 'none';
+  let pixDiscountValue = Math.max(0, Number(body.pixDiscountValue) || 0);
+  if (pixDiscountType === 'percent') {
+    pixDiscountValue = Math.min(100, pixDiscountValue);
+  }
+  const installmentMax = Math.max(1, Math.min(48, parseInt(String(body.installmentMax ?? 1), 10) || 1));
+  const installmentInterestMonthlyPercent = Math.max(
+    0,
+    Number(body.installmentInterestMonthlyPercent) || 0
+  );
+  const installmentNotes =
+    body.installmentNotes != null ? String(body.installmentNotes).trim().slice(0, 2000) : null;
+  const messageToClient =
+    body.messageToClient != null ? String(body.messageToClient).trim().slice(0, 4000) : null;
+
+  return {
+    freightValue,
+    pixDiscountType,
+    pixDiscountValue,
+    installmentMax,
+    installmentInterestMonthlyPercent,
+    installmentNotes: installmentNotes || null,
+    messageToClient: messageToClient || null,
+  };
+}
+
+/** Admin: grava valores da proposta sem enviar ao cliente. */
+export async function saveQuoteRequestProposalDraft(id: string, proposal: any): Promise<boolean> {
+  const p = parseProposalBody(proposal);
+  if (!p) return false;
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return false;
+  }
+  const result = await col.updateOne(
+    { _id: oid },
+    { $set: { proposal: p, updatedAt: new Date() } }
+  );
+  return result.matchedCount > 0;
+}
+
+/** Admin: envia (ou reenvia) proposta ao cliente — aguarda aprovação. */
+export async function sendQuoteRequestProposalToClient(id: string, proposal: any): Promise<boolean> {
+  const p = parseProposalBody(proposal);
+  if (!p) return false;
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return false;
+  }
+  const now = new Date();
+  const result = await col.updateOne(
+    { _id: oid },
+    {
+      $set: {
+        proposal: p,
+        proposalSentAt: now,
+        clientDecision: 'pending',
+        clientDecidedAt: null,
+        status: 'answered',
+        updatedAt: now,
+      },
+    }
+  );
+  return result.matchedCount > 0;
+}
+
+/** Cliente: aceita ou recusa proposta já enviada. */
+export async function setQuoteRequestClientDecision(
+  id: string,
+  userId: string,
+  decision: 'accepted' | 'rejected'
+): Promise<{ ok: boolean; error?: string }> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(id);
+  } catch {
+    return { ok: false, error: 'ID inválido' };
+  }
+
+  const doc = await col.findOne({ _id: oid });
+  if (!doc) return { ok: false, error: 'Não encontrado' };
+  if (String(doc.userId) !== String(userId)) return { ok: false, error: 'Sem permissão' };
+  if (!doc.proposalSentAt) return { ok: false, error: 'Nenhuma proposta enviada' };
+  const decided = doc.clientDecision === 'accepted' || doc.clientDecision === 'rejected';
+  if (decided) {
+    return { ok: false, error: 'Resposta já registrada' };
+  }
+
+  const result = await col.updateOne(
+    { _id: oid },
+    {
+      $set: {
+        clientDecision: decision,
+        clientDecidedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    }
+  );
+  return { ok: result.modifiedCount > 0 };
 }

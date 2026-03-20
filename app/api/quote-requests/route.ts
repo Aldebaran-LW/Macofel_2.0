@@ -4,8 +4,10 @@ import {
   createQuoteRequest,
   listQuoteRequestsAdmin,
   listQuoteRequestsByUser,
+  sanitizeQuoteRequestForClient,
   type QuoteRequestItem,
 } from '@/lib/mongodb-native';
+import { notifyAdminsNewQuoteRequest } from '@/lib/email-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +32,9 @@ export async function GET(req: NextRequest) {
 
     if (role === 'CLIENT') {
       const list = await listQuoteRequestsByUser(userId);
-      return NextResponse.json({ solicitacoes: list });
+      return NextResponse.json({
+        solicitacoes: list.map(sanitizeQuoteRequestForClient),
+      });
     }
 
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
@@ -56,7 +60,8 @@ export async function POST(req: NextRequest) {
     const name = auth.name || email;
 
     const body = await req.json();
-    const { message, items } = body ?? {};
+    const { message, items, shippingCep, shippingCityState, requestShippingQuote, requestPixDiscount } =
+      body ?? {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Informe ao menos um item' }, { status: 400 });
@@ -76,6 +81,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const cepDigits =
+      shippingCep != null && String(shippingCep).trim() !== ''
+        ? String(shippingCep).replace(/\D/g, '').slice(0, 8)
+        : null;
+    const cityState =
+      shippingCityState != null && String(shippingCityState).trim() !== ''
+        ? String(shippingCityState).trim().slice(0, 200)
+        : null;
+
     const id = await createQuoteRequest({
       userId,
       userEmail: String(email),
@@ -83,6 +97,17 @@ export async function POST(req: NextRequest) {
       message: message != null ? String(message).slice(0, 4000) : null,
       items: normalized,
       status: 'pending',
+      shippingCep: cepDigits ? cepDigits : null,
+      shippingCityState: cityState,
+      requestShippingQuote: requestShippingQuote === true,
+      requestPixDiscount: requestPixDiscount === true,
+    });
+
+    notifyAdminsNewQuoteRequest({
+      quoteId: id,
+      clientName: String(name),
+      clientEmail: String(email),
+      itemCount: normalized.length,
     });
 
     return NextResponse.json({ id }, { status: 201 });

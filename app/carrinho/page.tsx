@@ -8,7 +8,9 @@ import Link from 'next/link';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -50,7 +52,19 @@ export default function CarrinhoPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteMessage, setQuoteMessage] = useState('');
+  const [quoteShippingCep, setQuoteShippingCep] = useState('');
+  const [quoteShippingCityState, setQuoteShippingCityState] = useState('');
+  const [quoteRequestShipping, setQuoteRequestShipping] = useState(true);
+  const [quoteRequestPixDiscount, setQuoteRequestPixDiscount] = useState(true);
   const [quoteSending, setQuoteSending] = useState(false);
+
+  const resetQuoteForm = () => {
+    setQuoteMessage('');
+    setQuoteShippingCep('');
+    setQuoteShippingCityState('');
+    setQuoteRequestShipping(true);
+    setQuoteRequestPixDiscount(true);
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -134,6 +148,10 @@ export default function CarrinhoPage() {
       setQuoteSending(true);
       const payload = {
         message: quoteMessage.trim() || null,
+        shippingCep: quoteShippingCep.trim() || null,
+        shippingCityState: quoteShippingCityState.trim() || null,
+        requestShippingQuote: quoteRequestShipping,
+        requestPixDiscount: quoteRequestPixDiscount,
         items: items.map((item) => ({
           productId: item.product?.id,
           name: item.product?.name,
@@ -154,7 +172,7 @@ export default function CarrinhoPage() {
       }
       toast.success('Solicitação enviada! Entraremos em contato em breve.');
       setQuoteOpen(false);
-      setQuoteMessage('');
+      resetQuoteForm();
     } catch (e: any) {
       toast.error(e?.message ?? 'Erro ao enviar solicitação');
     } finally {
@@ -375,23 +393,101 @@ export default function CarrinhoPage() {
         )}
       </main>
 
-      <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={quoteOpen}
+        onOpenChange={(open) => {
+          setQuoteOpen(open);
+          if (!open) resetQuoteForm();
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Solicitar orçamento</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600">
-            Envie a lista atual do carrinho para nossa equipe. Você receberá retorno por e-mail ou WhatsApp.
+            Envie a lista para nossa equipe. Inclua CEP e cidade se quiser{' '}
+            <strong>valor de frete</strong> e marque se deseja <strong>condições de desconto</strong>{' '}
+            (ex.: PIX ou à vista) no retorno.
           </p>
-          <Textarea
-            placeholder="Observações (opcional): prazo, endereço de entrega, quantidade alternativa…"
-            value={quoteMessage}
-            onChange={(e) => setQuoteMessage(e.target.value)}
-            rows={4}
-            className="resize-none"
-          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="quote-cep">CEP (entrega)</Label>
+              <Input
+                id="quote-cep"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                placeholder="00000-000"
+                value={quoteShippingCep}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, '').slice(0, 8);
+                  const fmt =
+                    d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5)}`;
+                  setQuoteShippingCep(fmt);
+                }}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="quote-cidade">Cidade / UF ou referência de entrega</Label>
+              <Input
+                id="quote-cidade"
+                placeholder="Ex.: Parapuã - SP"
+                value={quoteShippingCityState}
+                onChange={(e) => setQuoteShippingCityState(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="quote-frete"
+                checked={quoteRequestShipping}
+                onCheckedChange={(v) => setQuoteRequestShipping(v === true)}
+              />
+              <div className="grid gap-1">
+                <Label htmlFor="quote-frete" className="font-normal cursor-pointer">
+                  Quero incluir <strong>custo de envio / frete</strong> no orçamento
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Informe o CEP acima para facilitar o cálculo.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="quote-pix"
+                checked={quoteRequestPixDiscount}
+                onCheckedChange={(v) => setQuoteRequestPixDiscount(v === true)}
+              />
+              <Label htmlFor="quote-pix" className="font-normal cursor-pointer leading-snug">
+                Quero saber sobre <strong>desconto</strong> (ex.: PIX, pagamento à vista ou outras formas)
+              </Label>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quote-msg">Observações (opcional)</Label>
+            <Textarea
+              id="quote-msg"
+              placeholder="Prazo desejado, quantidades alternativas, horário para contato…"
+              value={quoteMessage}
+              onChange={(e) => setQuoteMessage(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setQuoteOpen(false)} disabled={quoteSending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setQuoteOpen(false);
+                resetQuoteForm();
+              }}
+              disabled={quoteSending}
+            >
               Cancelar
             </Button>
             <Button
