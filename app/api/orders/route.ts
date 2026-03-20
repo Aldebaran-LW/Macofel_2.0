@@ -16,6 +16,14 @@ export async function GET(req: NextRequest) {
     if (auth?.userId) {
       userId = auth.userId;
       userRole = auth.role;
+      // Alguns cenários de autenticação podem devolver `userId` sem `role` no token.
+      // Como o admin precisa ver tudo, fazemos fallback para session quando `role` vier vazio.
+      if (!userRole) {
+        const session = await getServerSession(authOptions);
+        if (session?.user) {
+          userRole = (session.user as any).role;
+        }
+      }
     } else {
       const session = await getServerSession(authOptions);
       if (!session?.user) {
