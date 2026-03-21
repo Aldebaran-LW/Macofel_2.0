@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProducts } from '@/lib/mongodb-native';
+import {
+  isCatalogApiRequestAllowed,
+  catalogForbiddenResponse,
+  getCatalogCorsHeaders,
+} from '@/lib/api-catalog-guard';
 
 export const dynamic = 'force-dynamic';
 
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: getCatalogCorsHeaders(req) });
+}
+
 export async function GET(req: NextRequest) {
+  if (!isCatalogApiRequestAllowed(req)) {
+    return catalogForbiddenResponse();
+  }
+
+  const cors = getCatalogCorsHeaders(req);
+
   try {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') ?? '1');
@@ -26,24 +41,27 @@ export async function GET(req: NextRequest) {
       sort: sort && ['price_asc', 'price_desc', 'name', 'relevance'].includes(sort) ? sort : undefined,
     });
 
-    return NextResponse.json({
-      products: result.products,
-      pagination: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
+    return NextResponse.json(
+      {
+        products: result.products,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
       },
-    });
+      { headers: cors }
+    );
   } catch (error: any) {
     console.error('Erro ao buscar produtos:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Erro ao buscar produtos',
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined,
       },
-      { status: 500 }
+      { status: 500, headers: cors }
     );
   }
 }

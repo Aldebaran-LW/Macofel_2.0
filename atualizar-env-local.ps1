@@ -68,8 +68,13 @@ NODE_ENV="development"
 # ============================================
 # PDV (desktop PDV-Macofel) — mesma chave em PDV/.env como MACOFEL_API_KEY
 # ============================================
-# Protege rotas /api/pdv/* quando implementadas. Troque em produção.
+# Catálogo: GET /api/products e /api/categories exigem browser no site (Sec-Fetch-Site)
+# ou esta chave (Bearer / X-API-Key). Em produção na Vercel defina também
+# ALLOWED_CATALOG_API_HOSTS com hosts extras (ex.: loja.macofelparapua.com,macofelparapua.com).
 PDV_API_KEY="macofel-pdv-dev-compartilhada-altere-em-producao"
+
+# Hostnames permitidos além do hostname de NEXTAUTH_URL (opcional; dev local costuma vazio)
+# ALLOWED_CATALOG_API_HOSTS="loja.macofelparapua.com,macofelparapua.com"
 
 # ============================================
 # INSTRUÇÕES PARA VERCEL

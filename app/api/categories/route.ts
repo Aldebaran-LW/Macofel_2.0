@@ -3,19 +3,34 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getCategories, connectToDatabase } from '@/lib/mongodb-native';
 import { ObjectId } from 'mongodb';
+import {
+  isCatalogApiRequestAllowed,
+  catalogForbiddenResponse,
+  getCatalogCorsHeaders,
+} from '@/lib/api-catalog-guard';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: getCatalogCorsHeaders(req) });
+}
+
+export async function GET(req: NextRequest) {
+  if (!isCatalogApiRequestAllowed(req)) {
+    return catalogForbiddenResponse();
+  }
+
+  const cors = getCatalogCorsHeaders(req);
+
   try {
     const categories = await getCategories();
 
-    return NextResponse.json(categories);
+    return NextResponse.json(categories, { headers: cors });
   } catch (error: any) {
     console.error('Erro ao buscar categorias:', error);
 
     // Fallback para não quebrar a UI (sidebar/categorias no layout)
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json([], { status: 200, headers: cors });
   }
 }
 

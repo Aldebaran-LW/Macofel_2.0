@@ -53,9 +53,11 @@ Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por 
 
 ### PDV desktop (PDV-Macofel)
 
-- Chave compartilhada com o app de loja física: `PDV_API_KEY` (defina no `.env`; o script `atualizar-env-local.ps1` já inclui um valor de desenvolvimento).
-- No repositório **PDV-Macofel**, use o **mesmo** valor em `MACOFEL_API_KEY` e aponte `MACOFEL_BASE_URL` para esta API (ex.: `http://localhost:3003` se usar `npm run dev:3003`).
-- Referência rápida: arquivo **`PDV.env.example`** na raiz deste projeto.
+- Chave compartilhada com o app de loja física: `PDV_API_KEY` no **site** (`.env` / Vercel). O script `atualizar-env-local.ps1` já inclui um valor só para desenvolvimento.
+- **`MACOFEL_BASE_URL` não entra no `.env` do Next.js** — é variável **só do PDV**, com a URL pública do site (ex.: `https://www.macofelparapua.com`), sem barra no final. Em local: `http://localhost:3003` com `npm run dev:3003`.
+- No **PDV-Macofel**: `MACOFEL_API_KEY` = mesmo valor que `PDV_API_KEY`.
+- **Vendas do PDV:** `POST /api/pdv/sale` (implementado em `app/api/pdv/sale/route.ts`) grava em MongoDB na coleção `pdv_sales` e decrementa `stock` nos documentos de `products` quando o `produto_id` é um ObjectId válido.
+- Referência: **`PDV.env.example`** na raiz deste projeto.
 
 ### Configuração do Supabase
 
