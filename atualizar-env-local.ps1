@@ -66,6 +66,12 @@ MONGODB_URI="mongodb+srv://Vercel-Admin-materiais_de_construcao:O8ooXYIy89sb5cfR
 NODE_ENV="development"
 
 # ============================================
+# PDV (desktop PDV-Macofel) — mesma chave em PDV/.env como MACOFEL_API_KEY
+# ============================================
+# Protege rotas /api/pdv/* quando implementadas. Troque em produção.
+PDV_API_KEY="macofel-pdv-dev-compartilhada-altere-em-producao"
+
+# ============================================
 # INSTRUÇÕES PARA VERCEL
 # ============================================
 # 1. Acesse: https://vercel.com
@@ -88,6 +94,7 @@ Write-Host "   - NEXT_PUBLIC_SUPABASE_URL" -ForegroundColor White
 Write-Host "   - NEXT_PUBLIC_SUPABASE_ANON_KEY" -ForegroundColor White
 Write-Host "   - SUPABASE_SERVICE_ROLE_KEY" -ForegroundColor White
 Write-Host "   - MONGODB_URI" -ForegroundColor White
+Write-Host "   - PDV_API_KEY (PDV-Macofel: use o mesmo valor em MACOFEL_API_KEY)" -ForegroundColor White
 Write-Host "   - NODE_ENV (development)" -ForegroundColor White
 Write-Host ""
 Write-Host "Lembre-se:" -ForegroundColor Yellow

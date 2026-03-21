@@ -51,6 +51,12 @@ Edite o arquivo `.env` e configure:
 
 Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por vírgula). Sem essas variáveis, o site continua a funcionar — só não envia e-mail.
 
+### PDV desktop (PDV-Macofel)
+
+- Chave compartilhada com o app de loja física: `PDV_API_KEY` (defina no `.env`; o script `atualizar-env-local.ps1` já inclui um valor de desenvolvimento).
+- No repositório **PDV-Macofel**, use o **mesmo** valor em `MACOFEL_API_KEY` e aponte `MACOFEL_BASE_URL` para esta API (ex.: `http://localhost:3003` se usar `npm run dev:3003`).
+- Referência rápida: arquivo **`PDV.env.example`** na raiz deste projeto.
+
 ### Configuração do Supabase
 
 1. Acesse o [Supabase Dashboard](https://app.supabase.com)
