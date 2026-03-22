@@ -6,6 +6,7 @@ import {
   validateMasterRoleDemotion,
 } from '@/lib/master-role-policy';
 import type { UserRole } from '@/lib/permissions';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,20 @@ export async function PATCH(
       firstName: true,
       lastName: true,
       role: true,
+    },
+  });
+
+  const actor = auth.session.user as { id?: string; email?: string | null };
+  await writeAuditLog({
+    actorId: actor.id ?? null,
+    actorEmail: actor.email ?? null,
+    action: 'user.role_changed',
+    targetType: 'user',
+    targetId: updated.id,
+    metadata: {
+      targetEmail: updated.email,
+      fromRole: currentRole,
+      toRole: newRole,
     },
   });
 
