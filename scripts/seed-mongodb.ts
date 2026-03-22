@@ -1,8 +1,27 @@
-// Script para popular MongoDB com produtos iniciais
+/**
+ * Seed de DEMONSTRAÇÃO para MongoDB: apaga TODO o catálogo e recria ~20 produtos fictícios.
+ *
+ * NÃO use em produção (site canónico + clientes reais): preços e itens são de exemplo.
+ * Em produção o catálogo deve ser o da loja — criar/editar em /admin/produtos (mesma base que o PDV).
+ *
+ * Para executar (dev ou reset consciente de demo):
+ *   ALLOW_SEED_MONGODB_DEMO=true npm run seed-mongodb
+ */
 import { mongoPrisma } from '../lib/mongodb';
 
 async function main() {
-  console.log('🌱 Iniciando seed do MongoDB...\n');
+  if (process.env.ALLOW_SEED_MONGODB_DEMO !== 'true') {
+    console.error(
+      '\n❌ Seed de catálogo demo BLOQUEADO (proteção produção).\n' +
+        '   Este script APAGA produtos e categorias e recria dados fictícios.\n' +
+        '   Produção: use o painel Admin para produtos reais.\n' +
+        '   Para forçar demo (só se souber o que faz):\n' +
+        '   ALLOW_SEED_MONGODB_DEMO=true npm run seed-mongodb\n'
+    );
+    process.exit(1);
+  }
+
+  console.log('🌱 Iniciando seed DEMO do MongoDB (ALLOW_SEED_MONGODB_DEMO=true)...\n');
 
   // Limpar dados existentes
   await mongoPrisma.product.deleteMany();

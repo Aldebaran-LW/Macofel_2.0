@@ -17,7 +17,10 @@
     "seed-users": "tsx --require dotenv/config scripts/seed-users-only.ts",
     "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts",
     "test-all": "tsx --require dotenv/config scripts/test-all.ts",
-    "pdv:embed": "node scripts/copy-pdv-embed.mjs"
+    "pdv:embed": "node scripts/copy-pdv-embed.mjs",
+    "test:pdv-connections": "node scripts/test-pdv-connections.mjs",
+    "catalog:archive-products": "tsx --require dotenv/config scripts/archive-catalog-products.ts",
+    "catalog:restore-products": "tsx --require dotenv/config scripts/restore-catalog-products.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

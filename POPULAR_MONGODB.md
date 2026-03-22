@@ -1,51 +1,41 @@
-# 🌱 Popular MongoDB com Produtos
+# 🌱 MongoDB — catálogo
 
-## ⚠️ Problema
+## ⚠️ Produção (site canónico + PDV)
 
-Os produtos não estão aparecendo porque o **MongoDB ainda não foi populado** com dados iniciais.
+O catálogo **real** da loja fica no **MongoDB** e deve ser mantido no **Painel Admin** (`/admin/produtos`).  
+É a **mesma base** que o site e o PDV consomem — não dependas de produtos “de mentira” para clientes.
 
-## ✅ Solução: Executar Seed do MongoDB
+O script `seed-mongodb` recria **apenas dados de demonstração** (fictícios). **Não o uses** em produção após a loja estar no ar, salvo reset consciente de ambiente de testes.
 
-### Opção 1: Localmente (Desenvolvimento)
+## Seed demo (só desenvolvimento / reset local)
+
+Os produtos não aparecem em **dev** quando o MongoDB está vazio. Aí pode fazer seed **demo** com confirmação explícita:
 
 ```powershell
-cd nextjs_space
+cd "Macofel 2.0"
+$env:ALLOW_SEED_MONGODB_DEMO='true'
 npm run seed-mongodb
 ```
 
 **O que faz:**
 - Limpa produtos e categorias existentes no MongoDB
 - Cria 6 categorias
-- Cria 20 produtos com imagens CDN
+- Cria ~20 produtos fictícios com imagens CDN
 - Mostra resumo final
+
+Sem `ALLOW_SEED_MONGODB_DEMO=true` o comando **falha de propósito** para não apagar o catálogo real por engano.
 
 **Tempo estimado:** 5-10 segundos
 
-### Opção 2: Via Vercel (Produção)
+### Primeira vez em produção
 
-O MongoDB precisa ser populado **manualmente** na primeira vez, pois o seed não roda automaticamente no deploy.
+1. **Preferível:** criar categorias e produtos reais no **Admin** (`/admin/produtos` e `/admin/categorias`), alinhados ao stock e preços da loja (e ao que o PDV sincroniza).
+2. **Só se quiser um vazio inicial para preencher depois:** não rode o seed demo na base de produção.
+3. **Bootstrap rápido com dados fictícios** (útil em ambiente de teste, não para loja aberta ao público): na máquina local com `.env` apontando ao cluster, use `ALLOW_SEED_MONGODB_DEMO=true npm run seed-mongodb` — **apaga** o catálogo atual.
 
-#### Passo 1: Executar Localmente com Variáveis de Produção
+#### MongoDB Compass / Atlas
 
-1. Copie as variáveis de ambiente do Vercel:
-   - `MONGODB_URI`
-   - `DATABASE_URL`
-   - Outras variáveis necessárias
-
-2. Crie um arquivo `.env.local` com essas variáveis
-
-3. Execute:
-```powershell
-cd nextjs_space
-npm run seed-mongodb
-```
-
-#### Passo 2: Ou usar MongoDB Compass/Atlas
-
-1. Acesse: https://cloud.mongodb.com
-2. Conecte ao cluster
-3. Use o script `seed-mongodb.ts` como referência
-4. Insira os dados manualmente
+Pode importar ou editar documentos manualmente em `products` / `categories`; use `seed-mongodb.ts` só como **referência de campos**, não como rotina em produção.
 
 ## 📋 O que será criado:
 
@@ -120,4 +110,4 @@ Verifique a `MONGODB_URI` no `.env`:
 
 ---
 
-**Execute `npm run seed-mongodb` agora!** 🚀
+Em **produção canónica**, trate o catálogo como **dados reais**; o seed demo é só para dev ou laboratório, com `ALLOW_SEED_MONGODB_DEMO=true`.
