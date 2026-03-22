@@ -6,8 +6,8 @@ import { Users, Settings, ScrollText, Download, KeyRound, ArrowRight } from 'luc
 const cards = [
   {
     href: '/admin/master/equipe',
-    title: 'Equipe & roles',
-    desc: 'Criar e editar Admins e Master Admins; atribuir papéis à equipa.',
+    title: 'Equipe interna',
+    desc: 'Criar funcionários e atribuir papéis. Clientes do site ficam em Admin → Clientes.',
     icon: Users,
   },
   {
@@ -31,7 +31,7 @@ const cards = [
   {
     href: '/admin/master/senhas',
     title: 'Redefinição de senhas',
-    desc: 'Fluxo para resetar senha de qualquer utilizador.',
+    desc: 'Equipa interna. Clientes: painel Admin → Clientes.',
     icon: KeyRound,
   },
 ];

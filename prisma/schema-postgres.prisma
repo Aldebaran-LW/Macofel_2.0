@@ -5,9 +5,13 @@ generator client {
   binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
+// DATABASE_URL = pooler (ex. :6543 + pgbouncer) para a app em runtime.
+// DIRECT_URL = conexão direta ao Postgres (:5432) — obrigatória para `prisma migrate` com Supabase.
+// Se não usares pooler, podes repetir a mesma URL nas duas variáveis.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -34,6 +38,8 @@ model User {
   password  String
   firstName String
   lastName  String
+  /// Login curto no PDV (único entre funcionários). Site continua com email + senha.
+  pdvUserName String? @unique @map("pdv_user_name")
   cpf       String?  @unique
   phone     String?
   address   String?

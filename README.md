@@ -40,7 +40,8 @@ cp env.example .env
 ```
 
 Edite o arquivo `.env` e configure:
-- `DATABASE_URL` - String de conexão do Supabase PostgreSQL
+- `DATABASE_URL` - Supabase em modo **pooler** (ex. `*.pooler.supabase.com:6543` com `pgbouncer=true`) para a aplicação
+- `DIRECT_URL` - Conexão **direta** ao Postgres (ex. `db.<ref>.supabase.co:5432`) — usada pelo Prisma em **`prisma migrate`** com `schema-postgres.prisma`. No painel: *Settings → Database → URI* na secção **direct**. Se não usares pooler, podes repetir o mesmo valor em `DATABASE_URL` e `DIRECT_URL`.
 - `NEXTAUTH_SECRET` - Chave secreta (gere com: `openssl rand -base64 32`)
 - `NEXTAUTH_URL` - URL da aplicação (ex: `http://localhost:3000`)
 

@@ -31,6 +31,7 @@ export default function CheckoutPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [taxPercent, setTaxPercent] = useState(0);
   const [formData, setFormData] = useState({
     customerName: '',
     customerEmail: '',
@@ -58,9 +59,17 @@ export default function CheckoutPage() {
 
   const fetchCart = async () => {
     try {
-      const res = await fetch('/api/cart');
-      if (res.ok) {
-        const data = await res.json();
+      const [cartRes, taxRes] = await Promise.all([
+        fetch('/api/cart'),
+        fetch('/api/public/site-settings', { cache: 'no-store' }),
+      ]);
+      if (taxRes.ok) {
+        const t = await taxRes.json();
+        const p = typeof t?.tax_default_percent === 'number' ? t.tax_default_percent : 0;
+        setTaxPercent(Math.min(100, Math.max(0, p)));
+      }
+      if (cartRes.ok) {
+        const data = await cartRes.json();
         if ((data?.items?.length ?? 0) === 0) {
           toast.error('Seu carrinho está vazio');
           router.push('/carrinho');
@@ -124,6 +133,8 @@ export default function CheckoutPage() {
     (sum, item) => sum + (item?.product?.price ?? 0) * (item?.quantity ?? 0),
     0
   );
+  const taxAmount = taxPercent > 0 ? Math.round(subtotal * (taxPercent / 100) * 100) / 100 : 0;
+  const estimatedTotal = Math.round((subtotal + taxAmount) * 100) / 100;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -250,9 +261,15 @@ export default function CheckoutPage() {
                     </div>
                   ))}
 
+                  {taxPercent > 0 && (
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Taxa ({taxPercent}%)</span>
+                      <span>R$ {taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="border-t pt-3 flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-red-600">R$ {subtotal.toFixed(2)}</span>
+                    <span>Total estimado</span>
+                    <span className="text-red-600">R$ {estimatedTotal.toFixed(2)}</span>
                   </div>
                 </div>
 

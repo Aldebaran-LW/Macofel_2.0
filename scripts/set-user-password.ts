@@ -11,8 +11,8 @@
  */
 
 import { PrismaClient as PostgresPrismaClient } from '../.prisma/postgres-client';
-import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import { hashPassword } from '../lib/password-hash';
 
 dotenv.config();
 
@@ -35,7 +35,7 @@ async function main() {
     process.exit(1);
   }
 
-  const hashedPassword = await bcrypt.hash(plain, 10);
+  const hashedPassword = await hashPassword(plain);
 
   const updated = await prisma.user.update({
     where: { email },

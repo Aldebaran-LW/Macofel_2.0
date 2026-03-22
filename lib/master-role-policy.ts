@@ -11,6 +11,11 @@ export const ASSIGNABLE_ROLES: UserRole[] = [
   'MASTER_ADMIN',
 ];
 
+/** Roles que o Master pode criar no cadastro de funcionário (não inclui CLIENT — usa /signup). */
+export const MASTER_STAFF_CREATION_ROLES: UserRole[] = ASSIGNABLE_ROLES.filter(
+  (r) => r !== 'CLIENT'
+);
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   CLIENT: 'Cliente',
   LOGISTICS: 'Logística',

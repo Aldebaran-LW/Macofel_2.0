@@ -5,6 +5,7 @@ import { isAdminDashboardRole } from '@/lib/permissions';
 import { getAuthUserFromRequest } from '@/lib/get-authenticated-user-id';
 import prisma from '@/lib/db';
 import { enrichOrderItems, getCartProductsForOrder, updateProductStock } from '@/lib/order-helpers';
+import { getTaxDefaultPercent } from '@/lib/server-app-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,11 +135,14 @@ export async function POST(req: NextRequest) {
       total += product.price * item.quantity;
     }
 
+    const taxPct = await getTaxDefaultPercent();
+    const totalWithTax = taxPct > 0 ? Math.round(total * (1 + taxPct / 100) * 100) / 100 : total;
+
     // Criar pedido e itens
     const order = await prisma.order.create({
       data: {
         userId,
-        total,
+        total: totalWithTax,
         customerName,
         customerEmail,
         customerPhone,

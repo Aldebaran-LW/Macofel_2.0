@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getCatalogCorsHeaders } from '@/lib/api-catalog-guard';
+import { getTaxDefaultPercent } from '@/lib/server-app-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
 
     const db = await connectToDatabase();
     const sales = db.collection('pdv_sales');
+    const siteTaxDefaultPercent = await getTaxDefaultPercent();
 
     await sales.insertOne({
       pdvVendaId: body.id,
@@ -101,6 +103,8 @@ export async function POST(req: NextRequest) {
       status: body.status,
       itens: body.itens,
       receivedAt: new Date(),
+      /** Referência à taxa configurada no site no momento da sincronização (o total vem do PDV). */
+      siteTaxDefaultPercent,
     });
 
     const products = db.collection('products');

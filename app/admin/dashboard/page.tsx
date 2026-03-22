@@ -10,6 +10,7 @@ interface Stats {
   totalOrders: number;
   totalCustomers: number;
   totalRevenue: number;
+  taxDefaultPercent: number;
 }
 
 export default function DashboardPage() {
@@ -19,6 +20,7 @@ export default function DashboardPage() {
     totalOrders: 0,
     totalCustomers: 0,
     totalRevenue: 0,
+    taxDefaultPercent: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -45,6 +47,8 @@ export default function DashboardPage() {
           totalOrders: data?.totalOrders ?? 0,
           totalCustomers: data?.totalCustomers ?? 0,
           totalRevenue: data?.totalRevenue ?? 0,
+          taxDefaultPercent:
+            typeof data?.taxDefaultPercent === 'number' ? data.taxDefaultPercent : 0,
         });
       } else {
         toast.error('Erro ao carregar estatísticas');
@@ -120,6 +124,10 @@ export default function DashboardPage() {
         <h2 className="text-xl font-semibold mb-4">Bem-vindo ao Painel Administrativo</h2>
         <p className="text-gray-600">
           Gerencie produtos, categorias, pedidos e clientes do seu e-commerce.
+        </p>
+        <p className="mt-2 text-sm text-gray-500">
+          Taxa padrão no checkout (Master → Configurações):{' '}
+          <span className="font-medium text-gray-800">{stats.taxDefaultPercent}%</span>
         </p>
       </div>
     </div>

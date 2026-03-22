@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { Inter, Montserrat, Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
+import { getServerSession } from 'next-auth';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
 import SessionProviderWrapper from '@/components/session-provider-wrapper';
+import { authOptions } from '@/lib/auth-options';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -55,18 +57,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
       </head>
       <body className={`${inter.variable} ${montserrat.variable} ${plusJakartaSans.variable} ${playfairDisplay.variable} font-sans`}>
-        <SessionProviderWrapper>
+        <SessionProviderWrapper session={session}>
           <ThemeProvider
             attribute="class"
             defaultTheme="light"

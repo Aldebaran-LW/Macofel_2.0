@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
 import prisma from '@/lib/db';
 import { connectToDatabase, getProducts } from '@/lib/mongodb-native';
+import { getTaxDefaultPercent } from '@/lib/server-app-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,8 @@ export async function GET() {
     await connectToDatabase();
 
     // Buscar produtos do MongoDB e estatísticas do PostgreSQL
-    const [productsResult, totalOrders, totalCustomers, orders, recentOrders] = await Promise.all([
+    const [productsResult, totalOrders, totalCustomers, orders, recentOrders, taxDefaultPercent] =
+      await Promise.all([
       getProducts({}), // Buscar todos os produtos para contar
       prisma.order.count(),
       prisma.user.count({ where: { role: 'CLIENT' } }),
@@ -35,6 +37,7 @@ export async function GET() {
           customerName: true,
         },
       }),
+      getTaxDefaultPercent(),
     ]);
 
     const totalProducts = productsResult.total;
@@ -49,6 +52,7 @@ export async function GET() {
       totalRevenue,
       pendingOrders,
       completedOrders,
+      taxDefaultPercent,
       recentOrders: recentOrders.map((order: any) => ({
         id: order.id,
         customerName: order.customerName,
