@@ -57,6 +57,7 @@ Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por 
 - **`MACOFEL_BASE_URL` não entra no `.env` do Next.js** — é variável **só do PDV**, com a URL pública do site (ex.: `https://www.macofelparapua.com`), sem barra no final. Em local: `http://localhost:3003` com `npm run dev:3003`.
 - No **PDV-Macofel**: `MACOFEL_API_KEY` = mesmo valor que `PDV_API_KEY`.
 - **Vendas do PDV:** `POST /api/pdv/sale` (implementado em `app/api/pdv/sale/route.ts`) grava em MongoDB na coleção `pdv_sales` e decrementa `stock` nos documentos de `products` quando o `produto_id` é um ObjectId válido.
+- **PDV no site (`/loja`):** só utilizadores com `role === ADMIN` (middleware + `app/loja/page.tsx`). A UI estática do PDV fica em `public/loja/` (build com base `/loja/`). Para regenerar a partir do repo **PDV-Macofel** ao lado deste: `npm run pdv:embed` na raiz do Macofel. A chave `PDV_API_KEY` **não** vai no bundle do Vite: a página Next envia-a ao iframe via `postMessage` após login admin.
 - Referência: **`PDV.env.example`** na raiz deste projeto.
 
 ### Configuração do Supabase

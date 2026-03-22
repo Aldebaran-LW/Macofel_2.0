@@ -1,8 +1,14 @@
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
+import type { NextFetchEvent, NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { DIRECT_CHECKOUT_ENABLED } from '@/lib/sales-mode';
 
-export default withAuth(
+function isLojaRoute(pathname: string) {
+  return pathname === '/loja' || pathname.startsWith('/loja/');
+}
+
+const authMiddleware = withAuth(
   function middleware(req) {
     if (req.nextUrl.pathname.startsWith('/checkout') && !DIRECT_CHECKOUT_ENABLED) {
       return NextResponse.redirect(new URL('/carrinho', req.url));
@@ -13,17 +19,14 @@ export default withAuth(
     const isAdminRoute = req.nextUrl.pathname.startsWith('/admin');
     const isAdminLoginRoute = req.nextUrl.pathname === '/admin/login';
 
-    // Se tentando acessar área admin sem estar logado, redirecionar para login admin
     if (isAdminRoute && !isAdminLoginRoute && !token) {
       return NextResponse.redirect(new URL('/admin/login', req.url));
     }
 
-    // Se tentando acessar área admin sem ser admin, redirecionar para login admin
     if (isAdminRoute && !isAdminLoginRoute && token && !isAdmin) {
       return NextResponse.redirect(new URL('/admin/login', req.url));
     }
 
-    // Se já está logado como admin e tenta acessar login admin, redirecionar para dashboard
     if (isAdminLoginRoute && token && isAdmin) {
       return NextResponse.redirect(new URL('/admin/dashboard', req.url));
     }
@@ -35,24 +38,53 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const isAdminRoute = req.nextUrl.pathname.startsWith('/admin');
         const isAdminLoginRoute = req.nextUrl.pathname === '/admin/login';
-        
-        // Permitir acesso ao login admin sem autenticação
+
         if (isAdminLoginRoute) {
           return true;
         }
-        
-        // Para outras rotas admin, precisa estar autenticado E ser admin
+
         if (isAdminRoute) {
           return !!token && token.role === 'ADMIN';
         }
-        
-        // Para outras rotas protegidas, precisa estar autenticado
+
         return !!token;
       },
     },
   }
 );
 
+export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+  const pathname = req.nextUrl.pathname;
+
+  if (isLojaRoute(pathname)) {
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+    const token = await getToken({ req, secret });
+    if (!token) {
+      const u = new URL('/login', req.url);
+      u.searchParams.set('callbackUrl', `${pathname}${req.nextUrl.search}`);
+      return NextResponse.redirect(u);
+    }
+    if (token.role !== 'ADMIN') {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+    return NextResponse.next();
+  }
+
+  return authMiddleware(req as never, event);
+}
+
 export const config = {
-  matcher: ['/admin/:path*', '/perfil/:path*', '/meus-pedidos/:path*', '/minha-conta/:path*', '/carrinho/:path*', '/checkout/:path*'],
+  matcher: [
+    '/admin/:path*',
+    '/perfil/:path*',
+    '/meus-pedidos/:path*',
+    '/minha-conta/:path*',
+    '/carrinho/:path*',
+    '/checkout/:path*',
+    '/loja',
+    '/loja/:path*',
+  ],
 };

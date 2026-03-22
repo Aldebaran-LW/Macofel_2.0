@@ -16,7 +16,8 @@
     "seed-hero-images": "tsx --require dotenv/config scripts/seed-hero-images.ts",
     "seed-users": "tsx --require dotenv/config scripts/seed-users-only.ts",
     "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts",
-    "test-all": "tsx --require dotenv/config scripts/test-all.ts"
+    "test-all": "tsx --require dotenv/config scripts/test-all.ts",
+    "pdv:embed": "node scripts/copy-pdv-embed.mjs"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

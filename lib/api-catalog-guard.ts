@@ -77,7 +77,7 @@ export function catalogForbiddenResponse() {
   return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
 }
 
-/** CORS para PDV web em outro host (ex.: loja.*) consumir www.*/api/* */
+/** CORS para PDV web em outro host (ex.: loja) consumir rotas /api no domínio principal */
 export function getCatalogCorsHeaders(req: NextRequest): Record<string, string> {
   const raw = req.headers.get('origin');
   if (!raw) return {};
