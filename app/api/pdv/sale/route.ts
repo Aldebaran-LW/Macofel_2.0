@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getCatalogCorsHeaders } from '@/lib/api-catalog-guard';
 import { getTaxDefaultPercent } from '@/lib/server-app-settings';
+import { authenticatePdvWrite } from '@/lib/pdv-write-api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,19 +42,6 @@ interface PdvSaleBody {
   itens: PdvItem[];
 }
 
-function autenticarPdv(req: NextRequest): boolean {
-  const expected = process.env.PDV_API_KEY;
-  if (!expected) return false;
-  const auth = req.headers.get('authorization');
-  const bearer =
-    auth?.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : null;
-  const key = req.headers.get('x-api-key')?.trim();
-  return (
-    (bearer !== null && bearer === expected) ||
-    (key !== null && key === expected)
-  );
-}
-
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
     status: 204,
@@ -71,7 +59,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!autenticarPdv(req)) {
+  if (!authenticatePdvWrite(req)) {
     return NextResponse.json(
       { error: 'Não autorizado' },
       { status: 401, headers: cors }
@@ -90,7 +78,21 @@ export async function POST(req: NextRequest) {
 
     const db = await connectToDatabase();
     const sales = db.collection('pdv_sales');
+    const products = db.collection('products');
     const siteTaxDefaultPercent = await getTaxDefaultPercent();
+
+    const existing = await sales.findOne({ pdvVendaId: body.id });
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Venda já processada',
+          pdv_id: body.id,
+          duplicate: true,
+        },
+        { headers: cors }
+      );
+    }
 
     await sales.insertOne({
       pdvVendaId: body.id,
@@ -107,7 +109,6 @@ export async function POST(req: NextRequest) {
       siteTaxDefaultPercent,
     });
 
-    const products = db.collection('products');
     for (const item of body.itens) {
       try {
         const oid = new ObjectId(item.produto_id);
@@ -118,11 +119,18 @@ export async function POST(req: NextRequest) {
           { $inc: { stock: -q } }
         );
       } catch (e) {
-        console.warn('[PDV] Estoque não atualizado para', item.produto_id, e);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[PDV] Estoque não atualizado para', item.produto_id, e);
+        }
       }
     }
 
-    console.log(`[PDV] Venda #${body.numero ?? '?'} recebida — R$ ${body.total}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.info('[PDV] Venda recebida', {
+        numero: body.numero ?? null,
+        pdvPrefix: body.id.slice(0, 8),
+      });
+    }
 
     return NextResponse.json(
       {
@@ -133,7 +141,9 @@ export async function POST(req: NextRequest) {
       { headers: cors }
     );
   } catch (e) {
-    console.error('[PDV] Erro ao processar venda:', e);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[PDV] Erro ao processar venda:', e);
+    }
     return NextResponse.json(
       { error: 'Erro interno ao processar venda' },
       { status: 500, headers: cors }
@@ -141,6 +151,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * Lista últimas vendas PDV sincronizadas. Exige a mesma PDV_API_KEY que o POST.
+ *
+ * Segurança: expõe metadados de vendas a quem tem a chave — tratar como endpoint
+ * operacional; restringir rotação da chave e acesso (ver CHECKLIST_SEGURANCA.md Fase 3).
+ */
 export async function GET(req: NextRequest) {
   const cors = getCatalogCorsHeaders(req);
 
@@ -151,7 +167,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (!autenticarPdv(req)) {
+  if (!authenticatePdvWrite(req)) {
     return NextResponse.json(
       { error: 'Não autorizado' },
       { status: 401, headers: cors }
@@ -180,7 +196,9 @@ export async function GET(req: NextRequest) {
       { headers: cors }
     );
   } catch (e) {
-    console.error('[PDV] Erro ao listar vendas:', e);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[PDV] Erro ao listar vendas:', e);
+    }
     return NextResponse.json(
       { error: 'Erro ao listar' },
       { status: 500, headers: cors }

@@ -57,7 +57,9 @@ Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por 
 - Chave compartilhada com o app de loja física: `PDV_API_KEY` no **site** (`.env` / Vercel). O script `atualizar-env-local.ps1` já inclui um valor só para desenvolvimento.
 - **`MACOFEL_BASE_URL` não entra no `.env` do Next.js** — é variável **só do PDV**, com a URL pública do site (ex.: `https://www.macofelparapua.com`), sem barra no final. Em local: `http://localhost:3003` com `npm run dev:3003`.
 - No **PDV-Macofel**: `MACOFEL_API_KEY` = mesmo valor que `PDV_API_KEY`.
-- **Vendas do PDV:** `POST /api/pdv/sale` (implementado em `app/api/pdv/sale/route.ts`) grava em MongoDB na coleção `pdv_sales` e decrementa `stock` nos documentos de `products` quando o `produto_id` é um ObjectId válido.
+- **Vendas do PDV:** `POST /api/pdv/sale` (implementado em `app/api/pdv/sale/route.ts`) grava em MongoDB na coleção `pdv_sales` e decrementa `stock` nos documentos de `products` quando o `produto_id` é um ObjectId válido. **Idempotente:** o mesmo `id` de venda (UUID do PDV) não duplica registo nem stock.
+- **Estorno PDV → site:** `POST /api/pdv/sale/void` com corpo `{ venda_id, motivo, operador?, data_hora? }` e a mesma `PDV_API_KEY`; repõe stock e marca a venda como `cancelada` em `pdv_sales` (idempotente se já estornada).
+- **Segurança operacional:** `PDV_API_KEY` é segredo partilhado com o desktop — não commitar; em produção definir `NEXTAUTH_URL` corretamente (afeta o guard de catálogo em `lib/api-catalog-guard.ts`). Quem acede `/loja` (PDV embed): roles com PDV completo (`hasPdvFullWebAccess` em `lib/permissions.ts`). Checklist detalhado: `CHECKLIST_SEGURANCA.md`.
 - **PDV no site (`/loja`):** utilizadores com PDV completo — `MASTER_ADMIN`, `ADMIN`, `STORE_MANAGER`, `SELLER` (ver `lib/permissions.ts`, função `hasPdvFullWebAccess`). A UI estática do PDV fica em `public/loja/` (build com base `/loja/`). Para regenerar a partir do repo **PDV-Macofel** ao lado deste: `npm run pdv:embed` na raiz do Macofel. A chave `PDV_API_KEY` **não** vai no bundle do Vite: a página Next envia-a ao iframe via `postMessage` após login.
 - Referência: **`PDV.env.example`** na raiz deste projeto.
 
@@ -71,11 +73,7 @@ Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por 
 postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true
 ```
 
-**Credenciais do projeto atual:**
-- Project Ref: `vedrmtowoosqxzqxgxpb`
-- URL: `https://vedrmtowoosqxzqxgxpb.supabase.co`
-- Anon Key: (ver `env.example`)
-- Service Role Key: (ver `env.example`)
+**Credenciais:** use o painel Supabase (Settings → API / Database). Não commite chaves reais em `env.example` nem em documentação versionada.
 
 4. Execute as migrações do Prisma:
 ```bash
