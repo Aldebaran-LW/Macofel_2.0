@@ -14,12 +14,13 @@ import {
   FileText,
   Sparkles,
   ClipboardList,
+  Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isMasterAdminRole } from '@/lib/permissions';
 
 const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -103,6 +104,22 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
       </div>
 
       <nav className="flex-1 space-y-2">
+        {isMasterAdminRole((session?.user as any)?.role) && (
+          <Link
+            href="/admin/master/dashboard"
+            onClick={nav}
+            className={cn(
+              'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-amber-600/50 bg-amber-950/40',
+              pathname?.startsWith('/admin/master')
+                ? 'bg-amber-600 text-gray-950 border-amber-500'
+                : 'text-amber-200 hover:bg-amber-950/70'
+            )}
+          >
+            <Crown className="h-5 w-5 shrink-0" />
+            <span className="font-semibold">Área Master</span>
+          </Link>
+        )}
+
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname?.startsWith(item.href);

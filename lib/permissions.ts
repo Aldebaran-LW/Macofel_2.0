@@ -146,6 +146,16 @@ export function isAdminDashboardRole(role: string | undefined | null): boolean {
   return role === 'ADMIN' || role === 'MASTER_ADMIN';
 }
 
+/** Área exclusiva `/admin/master/*` — apenas MASTER_ADMIN. */
+export function isMasterAdminRole(role: string | undefined | null): boolean {
+  return role === 'MASTER_ADMIN';
+}
+
+/** Rota Next.js sob o painel admin reservada ao master. */
+export function isMasterAdminPathname(pathname: string): boolean {
+  return pathname === '/admin/master' || pathname.startsWith('/admin/master/');
+}
+
 /** PDV web `/loja`: venda completa (vendedor, gerente, admin). */
 export function hasPdvFullWebAccess(role: string | undefined | null): boolean {
   return (

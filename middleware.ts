@@ -3,7 +3,12 @@ import { NextResponse } from 'next/server';
 import type { NextFetchEvent, NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { DIRECT_CHECKOUT_ENABLED } from '@/lib/sales-mode';
-import { hasPdvFullWebAccess, isAdminDashboardRole } from '@/lib/permissions';
+import {
+  hasPdvFullWebAccess,
+  isAdminDashboardRole,
+  isMasterAdminPathname,
+  isMasterAdminRole,
+} from '@/lib/permissions';
 
 function isLojaRoute(pathname: string) {
   return pathname === '/loja' || pathname.startsWith('/loja/');
@@ -16,16 +21,24 @@ const authMiddleware = withAuth(
     }
 
     const token = req.nextauth.token;
-    const isAdmin = isAdminDashboardRole(token?.role as string | undefined);
-    const isAdminRoute = req.nextUrl.pathname.startsWith('/admin');
-    const isAdminLoginRoute = req.nextUrl.pathname === '/admin/login';
+    const pathname = req.nextUrl.pathname;
+    const role = token?.role as string | undefined;
+    const isAdmin = isAdminDashboardRole(role);
+    const isAdminRoute = pathname.startsWith('/admin');
+    const isAdminLoginRoute = pathname === '/admin/login';
+    const isMasterArea = isMasterAdminPathname(pathname);
 
     if (isAdminRoute && !isAdminLoginRoute && !token) {
       return NextResponse.redirect(new URL('/admin/login', req.url));
     }
 
-    if (isAdminRoute && !isAdminLoginRoute && token && !isAdmin) {
-      return NextResponse.redirect(new URL('/admin/login', req.url));
+    if (isAdminRoute && !isAdminLoginRoute && token) {
+      if (isMasterArea && !isMasterAdminRole(role)) {
+        return NextResponse.redirect(new URL('/admin/dashboard?master=forbidden', req.url));
+      }
+      if (!isMasterArea && !isAdmin) {
+        return NextResponse.redirect(new URL('/admin/login', req.url));
+      }
     }
 
     if (isAdminLoginRoute && token && isAdmin) {
@@ -37,15 +50,20 @@ const authMiddleware = withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        const isAdminRoute = req.nextUrl.pathname.startsWith('/admin');
-        const isAdminLoginRoute = req.nextUrl.pathname === '/admin/login';
+        const path = req.nextUrl.pathname;
+        const isAdminRoute = path.startsWith('/admin');
+        const isAdminLoginRoute = path === '/admin/login';
 
         if (isAdminLoginRoute) {
           return true;
         }
 
         if (isAdminRoute) {
-          return !!token && isAdminDashboardRole(token.role as string | undefined);
+          if (!token) return false;
+          if (isMasterAdminPathname(path)) {
+            return isMasterAdminRole(token.role as string | undefined);
+          }
+          return isAdminDashboardRole(token.role as string | undefined);
         }
 
         return !!token;

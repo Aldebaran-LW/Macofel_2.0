@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Package, ShoppingBag, Users, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -12,6 +13,7 @@ interface Stats {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats>({
     totalProducts: 0,
     totalOrders: 0,
@@ -23,6 +25,15 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchStats();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('master') === 'forbidden') {
+      toast.error('Esta área é exclusiva do Master Admin.');
+      router.replace('/admin/dashboard', { scroll: false });
+    }
+  }, [router]);
 
   const fetchStats = async () => {
     try {
