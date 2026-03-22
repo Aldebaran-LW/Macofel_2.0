@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import { getAllHeroImages, createHeroImage, deleteHeroImage, updateHeroImage } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export async function GET() {
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN') {
+    if (!isAdminDashboardRole(userRole)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN') {
+    if (!isAdminDashboardRole(userRole)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -87,7 +88,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN') {
+    if (!isAdminDashboardRole(userRole)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -141,7 +142,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN') {
+    if (!isAdminDashboardRole(userRole)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

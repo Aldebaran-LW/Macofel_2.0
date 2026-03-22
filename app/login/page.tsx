@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function LoginPage() {
         const sessionData = await res.json();
         const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
 
-        if (userRole === 'ADMIN') {
+        if (isAdminDashboardRole(userRole)) {
           toast.success('Login realizado com sucesso! Redirecionando para área administrativa...');
           router.replace('/admin/dashboard');
           router.refresh();

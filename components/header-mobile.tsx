@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { ShoppingCart, Menu, X, User, LogOut } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { toast } from 'sonner';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 interface NavCategory {
   name: string;
@@ -26,7 +27,7 @@ export default function HeaderMobile() {
   const { data: session, status } = useSession() ?? {};
   const currentCategory = pathname === '/catalogo' ? (searchParams?.get('category') ?? '') : '';
 
-  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
   const isLoggedIn = status === 'authenticated' && !!session?.user;
 
   useEffect(() => {

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Shield, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -20,9 +21,9 @@ export default function AdminLoginPage() {
     // Se já estiver logado como admin, redirecionar
     if (status === 'authenticated' && session?.user) {
       const role = (session.user as any)?.role;
-      if (role === 'ADMIN') {
+      if (isAdminDashboardRole(role)) {
         router.push('/admin/dashboard');
-      } else if (role && role !== 'ADMIN') {
+      } else if (role && !isAdminDashboardRole(role)) {
         // Se logado mas não é admin, fazer logout
         signOut({ redirect: false });
       }
@@ -52,7 +53,7 @@ export default function AdminLoginPage() {
         
         const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
         
-        if (userRole === 'ADMIN') {
+        if (isAdminDashboardRole(userRole)) {
           toast.success('Acesso autorizado');
           router.push('/admin/dashboard');
           router.refresh();

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function AdminPage() {
     
     if (!session) {
       router.push('/admin/login');
-    } else if ((session.user as any)?.role === 'ADMIN') {
+    } else if (isAdminDashboardRole((session.user as any)?.role)) {
       router.push('/admin/dashboard');
     } else {
       router.push('/admin/login');

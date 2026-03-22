@@ -33,4 +33,4 @@ export type Category = {
 // Order types
 export type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
 
-export type UserRole = 'CLIENT' | 'ADMIN'
+export type { UserRole, AppPermission } from './permissions'

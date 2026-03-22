@@ -16,6 +16,7 @@
     "seed-hero-images": "tsx --require dotenv/config scripts/seed-hero-images.ts",
     "seed-users": "tsx --require dotenv/config scripts/seed-users-only.ts",
     "reset-admin-password": "tsx --require dotenv/config scripts/reset-admin-password.ts",
+    "set-user-password": "tsx --require dotenv/config scripts/set-user-password.ts",
     "test-all": "tsx --require dotenv/config scripts/test-all.ts",
     "pdv:embed": "node scripts/copy-pdv-embed.mjs",
     "test:pdv-connections": "node scripts/test-pdv-connections.mjs",

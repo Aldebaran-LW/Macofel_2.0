@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import {
   deleteOrcamento,
   getOrcamentoById,
@@ -60,7 +61,7 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || (session.user as any).role !== 'ADMIN') {
+    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -94,7 +95,7 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || (session.user as any).role !== 'ADMIN') {
+    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -132,7 +133,7 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || (session.user as any).role !== 'ADMIN') {
+    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

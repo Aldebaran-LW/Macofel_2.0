@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import { getAuthUserFromRequest } from '@/lib/get-authenticated-user-id';
 import prisma from '@/lib/db';
 import { enrichOrderItems, getCartProductsForOrder, updateProductStock } from '@/lib/order-helpers';
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    const where: any = userRole === 'ADMIN' ? {} : { userId };
+    const where: any = isAdminDashboardRole(userRole) ? {} : { userId };
 
     const orders = await prisma.order.findMany({
       where,

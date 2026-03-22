@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { ShoppingCart, User, Search, Percent, Menu, X, Phone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 interface Category {
   id: string;
@@ -21,7 +22,7 @@ export default function HeaderDemo() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
 
   useEffect(() => {
     setMounted(true);

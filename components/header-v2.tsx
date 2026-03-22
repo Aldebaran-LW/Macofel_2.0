@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 interface Category {
   id: string;
@@ -53,7 +54,7 @@ export default function HeaderV2() {
   const [dropdownPos, setDropdownPos] = useState({ top: 155, left: 32 });
   const megaRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
 
   useEffect(() => {
     setMounted(true);

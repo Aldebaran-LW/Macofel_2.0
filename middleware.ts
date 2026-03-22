@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextFetchEvent, NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { DIRECT_CHECKOUT_ENABLED } from '@/lib/sales-mode';
+import { hasPdvFullWebAccess, isAdminDashboardRole } from '@/lib/permissions';
 
 function isLojaRoute(pathname: string) {
   return pathname === '/loja' || pathname.startsWith('/loja/');
@@ -15,7 +16,7 @@ const authMiddleware = withAuth(
     }
 
     const token = req.nextauth.token;
-    const isAdmin = token?.role === 'ADMIN';
+    const isAdmin = isAdminDashboardRole(token?.role as string | undefined);
     const isAdminRoute = req.nextUrl.pathname.startsWith('/admin');
     const isAdminLoginRoute = req.nextUrl.pathname === '/admin/login';
 
@@ -44,7 +45,7 @@ const authMiddleware = withAuth(
         }
 
         if (isAdminRoute) {
-          return !!token && token.role === 'ADMIN';
+          return !!token && isAdminDashboardRole(token.role as string | undefined);
         }
 
         return !!token;
@@ -67,7 +68,7 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
       u.searchParams.set('callbackUrl', `${pathname}${req.nextUrl.search}`);
       return NextResponse.redirect(u);
     }
-    if (token.role !== 'ADMIN') {
+    if (!hasPdvFullWebAccess(token.role as string | undefined)) {
       return NextResponse.redirect(new URL('/', req.url));
     }
     return NextResponse.next();

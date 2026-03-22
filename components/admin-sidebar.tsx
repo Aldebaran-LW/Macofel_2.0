@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,7 +44,7 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
 
   useEffect(() => {
     // Verificar se o usuário é admin
-    if (session && (session.user as any)?.role !== 'ADMIN') {
+    if (session && !isAdminDashboardRole((session.user as any)?.role)) {
       router.push('/admin/login');
     }
   }, [session, router]);
@@ -51,7 +52,7 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if ((session?.user as any)?.role !== 'ADMIN') return;
+      if (!isAdminDashboardRole((session?.user as any)?.role)) return;
 
       try {
         setLoadingHeroSlides(true);

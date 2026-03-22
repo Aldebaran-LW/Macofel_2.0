@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { HERO_DEFAULT_SLIDES } from '@/lib/hero-default-slides';
 
@@ -14,7 +15,7 @@ export async function POST() {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    if ((session.user as any).role !== 'ADMIN') {
+    if (!isAdminDashboardRole((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

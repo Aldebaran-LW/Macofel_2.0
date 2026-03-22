@@ -7,6 +7,7 @@ import { ShoppingCart, User, LogOut, Menu, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 export default function Header() {
   const [mounted, setMounted] = useState(false);
@@ -15,7 +16,7 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
 
   useEffect(() => {
     setMounted(true);

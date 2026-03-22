@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import prisma from '@/lib/db';
 import { enrichOrderItems } from '@/lib/order-helpers';
 
@@ -19,7 +20,7 @@ export async function PATCH(
 
     const userRole = (session.user as any).role;
 
-    if (userRole !== 'ADMIN') {
+    if (!isAdminDashboardRole(userRole)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

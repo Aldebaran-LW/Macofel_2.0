@@ -8,6 +8,7 @@ import AdminSidebar from '@/components/admin-sidebar';
 import { Toaster } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { isAdminDashboardRole } from '@/lib/permissions';
 
 export default function AdminLayout({
   children,
@@ -50,7 +51,7 @@ export default function AdminLayout({
       }
       
       const role = (session.user as any)?.role;
-      if (role !== 'ADMIN') {
+      if (!isAdminDashboardRole(role)) {
         router.push('/admin/login');
         return;
       }
@@ -68,7 +69,7 @@ export default function AdminLayout({
   }
 
   // Se ainda está carregando ou não é admin, mostrar loading
-  if (status === 'loading' || !session || (session.user as any)?.role !== 'ADMIN') {
+  if (status === 'loading' || !session || !isAdminDashboardRole((session.user as any)?.role)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="text-center">
