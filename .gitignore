@@ -52,6 +52,10 @@ next-env.d.ts
 # Backups locais do catálogo MongoDB (não commitar)
 /temp/
 
+# Instalador PDV (binários grandes — copiar para public/downloads no deploy)
+/public/downloads/*.exe
+/public/downloads/*.msi
+
 # Emergent
 .emergent/
 

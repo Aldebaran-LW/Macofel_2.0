@@ -61,6 +61,7 @@ Para o admin receber alertas: `ADMIN_NOTIFICATION_EMAIL` (vários separados por 
 - **Estorno PDV → site:** `POST /api/pdv/sale/void` com corpo `{ venda_id, motivo, operador?, data_hora? }` e a mesma `PDV_API_KEY`; repõe stock e marca a venda como `cancelada` em `pdv_sales` (idempotente se já estornada).
 - **Segurança operacional:** `PDV_API_KEY` é segredo partilhado com o desktop — não commitar; em produção definir `NEXTAUTH_URL` corretamente (afeta o guard de catálogo em `lib/api-catalog-guard.ts`). Quem acede `/loja` (PDV embed): roles com PDV completo (`hasPdvFullWebAccess` em `lib/permissions.ts`). Checklist detalhado: `CHECKLIST_SEGURANCA.md`.
 - **PDV no site (`/loja`):** utilizadores com PDV completo — `MASTER_ADMIN`, `ADMIN`, `STORE_MANAGER`, `SELLER` (ver `lib/permissions.ts`, função `hasPdvFullWebAccess`). A UI estática do PDV fica em `public/loja/` (build com base `/loja/`). Para regenerar a partir do repo **PDV-Macofel** ao lado deste: `npm run pdv:embed` na raiz do Macofel. A chave `PDV_API_KEY` **não** vai no bundle do Vite: a página Next envia-a ao iframe via `postMessage` após login.
+- **Instalador PDV Windows (loja física):** página **Master Admin → PDV Desktop** (`/admin/master/pdv-desktop`) com botão de descarga quando `PDV_DESKTOP_INSTALLER_URL` ou `PDV_DESKTOP_INSTALLER_PATH` + `NEXTAUTH_URL` estão definidos. Instruções em `public/downloads/README.md`.
 - Referência: **`PDV.env.example`** na raiz deste projeto.
 
 ### Configuração do Supabase

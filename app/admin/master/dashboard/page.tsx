@@ -1,7 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Users, Settings, ScrollText, Download, KeyRound, ArrowRight } from 'lucide-react';
+import {
+  Users,
+  Settings,
+  ScrollText,
+  Download,
+  KeyRound,
+  ArrowRight,
+  Monitor,
+} from 'lucide-react';
 
 const cards = [
   {
@@ -27,6 +35,12 @@ const cards = [
     title: 'Exportação de dados',
     desc: 'Exportar conjuntos completos para backup ou análise.',
     icon: Download,
+  },
+  {
+    href: '/admin/master/pdv-desktop',
+    title: 'PDV Desktop (Windows)',
+    desc: 'Descarregar o instalador do caixa para PCs da loja.',
+    icon: Monitor,
   },
   {
     href: '/admin/master/senhas',

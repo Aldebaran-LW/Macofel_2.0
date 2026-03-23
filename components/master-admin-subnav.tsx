@@ -9,6 +9,7 @@ import {
   ScrollText,
   Download,
   KeyRound,
+  Monitor,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,7 @@ const items = [
   { href: '/admin/master/configuracoes', label: 'Configurações globais', icon: Settings },
   { href: '/admin/master/auditoria', label: 'Auditoria', icon: ScrollText },
   { href: '/admin/master/exportacao', label: 'Exportação', icon: Download },
+  { href: '/admin/master/pdv-desktop', label: 'PDV Desktop', icon: Monitor },
   { href: '/admin/master/senhas', label: 'Senhas', icon: KeyRound },
 ];
 
