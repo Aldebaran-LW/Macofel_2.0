@@ -85,7 +85,7 @@ export function getCatalogCorsHeaders(req: NextRequest): Record<string, string> 
   if (!h || !allowedHosts().includes(h)) return {};
   return {
     'Access-Control-Allow-Origin': raw,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type',
     Vary: 'Origin',
   };
