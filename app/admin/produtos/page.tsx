@@ -29,6 +29,7 @@ interface Product {
   description: string;
   price: number;
   stock: number;
+  minStock?: number;
   weight?: number | null;
   imageUrl?: string | null;
   categoryId: string;
@@ -52,6 +53,7 @@ export default function AdminProdutosPage() {
     description: '',
     price: '',
     stock: '',
+    minStock: '',
     weight: '',
     imageUrl: '',
     categoryId: '',
@@ -99,6 +101,7 @@ export default function AdminProdutosPage() {
       description: '',
       price: '',
       stock: '',
+      minStock: '',
       weight: '',
       imageUrl: '',
       categoryId: '',
@@ -160,6 +163,7 @@ export default function AdminProdutosPage() {
         description: product.description,
         price: product.price.toString(),
         stock: product.stock.toString(),
+        minStock: String(product.minStock ?? 0),
         weight: product.weight?.toString() || '',
         imageUrl: product.imageUrl || '',
         categoryId: product.categoryId,
@@ -200,6 +204,7 @@ export default function AdminProdutosPage() {
           description: formData.description,
           price: formData.price,
           stock: formData.stock || '0',
+          minStock: formData.minStock || '0',
           weight: formData.weight || null,
           imageUrl: formData.imageUrl || null,
           categoryId: formData.categoryId,
@@ -409,7 +414,7 @@ export default function AdminProdutosPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Preço (R$) <span className="text-red-500">*</span>
@@ -432,6 +437,17 @@ export default function AdminProdutosPage() {
                   min="0"
                   value={formData.stock}
                   onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Estoque mínimo</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.minStock}
+                  onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
                   placeholder="0"
                 />
               </div>

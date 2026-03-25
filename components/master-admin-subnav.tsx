@@ -10,11 +10,13 @@ import {
   Download,
   KeyRound,
   Monitor,
+  Boxes,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
   { href: '/admin/master/dashboard', label: 'Visão geral', icon: LayoutDashboard },
+  { href: '/admin/master/estoque', label: 'Estoque', icon: Boxes },
   { href: '/admin/master/equipe', label: 'Equipe & roles', icon: Users },
   { href: '/admin/master/configuracoes', label: 'Configurações globais', icon: Settings },
   { href: '/admin/master/auditoria', label: 'Auditoria', icon: ScrollText },

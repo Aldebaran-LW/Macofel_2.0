@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
+  Boxes,
   FolderTree,
   ShoppingBag,
   Users,
@@ -141,6 +142,64 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
             </Link>
           );
         })}
+
+        {/* Estoque */}
+        <details className="px-1" open={pathname?.startsWith('/admin/estoque')}>
+          <summary className="cursor-pointer flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors list-none text-gray-300 hover:bg-gray-800">
+            <Boxes className="h-5 w-5" />
+            <span>Estoque</span>
+          </summary>
+          <div className="pl-6 space-y-1 pb-1">
+            <Link
+              href="/admin/estoque/alertas"
+              onClick={nav}
+              className={cn(
+                'block px-2 py-2 rounded-lg transition-colors text-sm',
+                pathname?.startsWith('/admin/estoque/alertas')
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800'
+              )}
+            >
+              Alertas
+            </Link>
+            <Link
+              href="/admin/estoque/movimentacoes"
+              onClick={nav}
+              className={cn(
+                'block px-2 py-2 rounded-lg transition-colors text-sm',
+                pathname?.startsWith('/admin/estoque/movimentacoes')
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800'
+              )}
+            >
+              Movimentações
+            </Link>
+            <Link
+              href="/admin/estoque/importacao"
+              onClick={nav}
+              className={cn(
+                'block px-2 py-2 rounded-lg transition-colors text-sm',
+                pathname?.startsWith('/admin/estoque/importacao')
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800'
+              )}
+            >
+              Importação
+            </Link>
+            <Link
+              href="/admin/estoque/relatorios"
+              onClick={nav}
+              className={cn(
+                'block px-2 py-2 rounded-lg transition-colors text-sm',
+                pathname?.startsWith('/admin/estoque/relatorios')
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800'
+              )}
+            >
+              Relatórios
+            </Link>
+          </div>
+        </details>
 
         {/* Orçamento: montagem interna, histórico e pedidos dos clientes */}
         <details
