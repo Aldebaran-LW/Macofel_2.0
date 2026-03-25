@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type Source = 'csv' | 'xlsx' | 'xml';
+type Source = 'csv' | 'xlsx' | 'xml' | 'pdf';
 
 type ParsedItem = {
   externalCode: string | null;
@@ -46,44 +46,6 @@ function toNumber(v: unknown) {
   const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
   if (!Number.isFinite(n)) return null;
   return n;
-}
-
-function parseCsvText(text: string): ParsedItem[] {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return [];
-
-  // tenta detectar header
-  const first = lines[0].toLowerCase();
-  const hasHeader = first.includes('codigo') || first.includes('cprod') || first.includes('produto') || first.includes('nome');
-  const dataLines = hasHeader ? lines.slice(1) : lines;
-
-  const out: ParsedItem[] = [];
-  for (const line of dataLines) {
-    const parts = line.split(';').length > line.split(',').length ? line.split(';') : line.split(',');
-    const a = norm(parts[0]);
-    const b = norm(parts[1]);
-    const c = norm(parts[2]);
-
-    // formatos suportados:
-    // 1) codigo,quantidade
-    // 2) codigo,nome,quantidade
-    const externalCode = a;
-    let name: string | null = null;
-    let quantity: number | null = null;
-
-    if (c !== null) {
-      name = b;
-      quantity = toNumber(c);
-    } else {
-      quantity = toNumber(b);
-    }
-
-    if (!externalCode && !name) continue;
-    if (!quantity || quantity <= 0) continue;
-
-    out.push({ externalCode, name, quantity });
-  }
-  return out;
 }
 
 function parseXlsx(file: File): Promise<ParsedItem[]> {
@@ -157,12 +119,185 @@ function parseNfeXml(text: string): ParsedItem[] {
 
 type StockImporterProps = {
   baseHref: '/admin/estoque' | '/admin/master/estoque';
+  showSubnav?: boolean;
 };
 
-export default function StockImporter({ baseHref }: StockImporterProps) {
+async function extractPdfText(file: File): Promise<string> {
+  // pdfjs-dist é pesado; importamos só quando o usuário realmente envia PDF
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = undefined;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await (pdfjsLib as any).getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    // eslint-disable-next-line no-await-in-loop
+    const page = await pdf.getPage(pageNum);
+    // eslint-disable-next-line no-await-in-loop
+    const content = await page.getTextContent();
+    const pageText = (content.items ?? [])
+      .map((i: any) => (typeof i?.str === 'string' ? i.str : ''))
+      .filter(Boolean)
+      .join(' ');
+    text += '\n' + pageText;
+    // Limite de segurança: evita travar o browser em PDFs enormes
+    if (text.length > 2_500_000) break;
+  }
+  return text;
+}
+
+function parsePdfDanfeText(text: string): ParsedItem[] {
+  // Heurística: tenta identificar linhas com (1) código (token alfanumérico) e (2) quantidade numérica.
+  // Observação: PDF de DANFE varia bastante; esse parser pode precisar de ajuste fino com exemplos reais.
+  const normalized = String(text ?? '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) return [];
+
+  const lines = normalized.split('\n').map((l) => l.trim()).filter(Boolean);
+  const out: ParsedItem[] = [];
+
+  const qtyRegex = /(\d{1,3}(?:[.,]\d{1,6})?|\d{1,10})/g;
+  const codeRegex = /([A-Za-z0-9]{3,30})/g;
+
+  for (const line of lines) {
+    if (out.length > 5000) break;
+
+    // Pula linhas muito pequenas
+    if (line.length < 6) continue;
+
+    const qtyMatches = Array.from(line.matchAll(qtyRegex)).slice(0, 6).map((m) => m[1]);
+    if (!qtyMatches.length) continue;
+
+    const codeMatches = Array.from(line.matchAll(codeRegex)).slice(0, 10).map((m) => m[1]);
+    if (!codeMatches.length) continue;
+
+    // Primeiro código "plausível" e primeira quantidade numérica
+    const externalCode = codeMatches[0];
+    const qtyRaw = qtyMatches[0];
+    const qtyStr = String(qtyRaw).replace(/\./g, '').replace(',', '.');
+    const quantity = Number(qtyStr);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    out.push({ externalCode, name: null, quantity });
+  }
+
+  return out;
+}
+
+function splitCsvRow(row: string, delimiter: string): string[] {
+  // Parse simples de CSV: respeita aspas duplas e delimitadores dentro de aspas.
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (ch === '"') {
+      const next = row[i + 1];
+      if (inQuotes && next === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (!inQuotes && ch === delimiter) {
+      out.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map((c) => c.trim().replace(/^"(.*)"$/, '$1').trim());
+}
+
+function detectDelimiter(headerLine: string): string {
+  const line = headerLine ?? '';
+  const commas = (line.match(/,/g) ?? []).length;
+  const semicolons = (line.match(/;/g) ?? []).length;
+  const tabs = (line.match(/\t/g) ?? []).length;
+  if (tabs > 0) return '\t';
+  if (semicolons > commas) return ';';
+  return ',';
+}
+
+function parseLocaleNumber(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const cleaned = s.replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, ''); // remove separador milhar
+  const normalized = cleaned.replace(',', '.');
+  const n = Number(normalized);
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
+function parseCsvText(text: string): ParsedItem[] {
+  const rawLines = String(text ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!rawLines.length) return [];
+
+  const delimiter = detectDelimiter(rawLines[0]);
+  const rows = rawLines.map((l) => splitCsvRow(l, delimiter));
+  if (!rows.length) return [];
+
+  const headerCells = rows[0].map((c) => String(c ?? '').toLowerCase());
+  const hasHeader = headerCells.some((c) =>
+    ['cprod', 'codigo', 'código', 'codigo_sistema', 'codigo_fornecedor', 'productid', 'idcodigo', 'id código', 'nome', 'xprod', 'qcom', 'quantidade', 'qtd', 'estoque', 'estoque_atual'].includes(c)
+  );
+
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+
+  const findColIndex = (candidates: string[]) => {
+    for (const cand of candidates) {
+      const idx = headerCells.findIndex((h) => h === cand || h.includes(cand));
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  };
+
+  const codeCol = hasHeader
+    ? findColIndex(['cprod', 'codigo', 'código', 'codigo_sistema', 'codigo_fornecedor', 'productid', 'id', 'idcodigo', 'id código', 'id_codigo', 'produto_id', 'codigo sistema'])
+    : 0;
+  const qtyCol = hasHeader
+    ? findColIndex(['qcom', 'quantidade', 'quantidade_comprada', 'quantidadecomprada', 'qtd', 'qtdcom', 'qtd_comprada', 'estoque', 'estoque_atual', 'qty'])
+    : hasHeader
+      ? 1
+      : 1;
+  const nameCol = hasHeader
+    ? findColIndex(['xprod', 'produto', 'nome', 'descricao', 'descrição'])
+    : -1;
+
+  const out: ParsedItem[] = [];
+
+  for (const r of dataRows) {
+    const code = codeCol >= 0 ? norm(r[codeCol]) : null;
+    const qty = qtyCol >= 0 ? parseLocaleNumber(r[qtyCol]) : null;
+    const name = nameCol >= 0 ? norm(r[nameCol]) : null;
+
+    // Se não tiver código, tenta usar a primeira coluna como fallback
+    const externalCode = code ?? norm(r[0]);
+    const quantity = qty;
+
+    if (!externalCode || !quantity || quantity <= 0) continue;
+    out.push({ externalCode, name, quantity });
+  }
+  return out;
+}
+
+export default function StockImporter({ baseHref, showSubnav = true }: StockImporterProps) {
   const [source, setSource] = useState<Source>('xml');
   const [documentText, setDocumentText] = useState('');
   const [csvText, setCsvText] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<{
     documentHash: string | null;
     resolved: PreviewResolved[];
@@ -203,7 +338,7 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
     };
   }, []);
 
-  async function runPreview(items: ParsedItem[], fileTextForHash: string | null) {
+  async function runPreview(items: ParsedItem[], fileTextForHash: string | null, preventDuplicateForThisRun: boolean) {
     if (!items.length) return toast.error('Nenhum item válido para prévia');
     setLoadingPreview(true);
     setPreview(null);
@@ -214,7 +349,7 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source,
-          preventDuplicate: preventDuplicate && source === 'xml',
+          preventDuplicate: preventDuplicateForThisRun && source === 'xml',
           documentText: source === 'xml' ? fileTextForHash : null,
           items,
         }),
@@ -238,37 +373,99 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
   }
 
   async function onUploadFile(file: File) {
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    try {
-      if (ext === 'xlsx' || ext === 'xls') {
-        setSource('xlsx');
-        const items = await parseXlsx(file);
-        // para XLSX não fazemos hash/dedupe nesta versão
-        await runPreview(items, null);
+    // Mantido por compatibilidade (quando selecionado 1 arquivo).
+    void onUploadFiles([file]);
+  }
+
+  async function parseUploadedFiles(files: File[]): Promise<{ items: ParsedItem[]; fileTextForHash: string | null; preventDuplicateForThisRun: boolean }> {
+    const allItems: ParsedItem[] = [];
+    let xmlTextForHash: string | null = null;
+    // dedupe só faz sentido quando for 1 arquivo XML
+    const onlySingleXml = (() => {
+      if (!preventDuplicate || files.length !== 1) return false;
+      const ext = files[0].name.split('.').pop()?.toLowerCase();
+      return ext === 'xml';
+    })();
+    const preventDuplicateForThisRun = onlySingleXml;
+
+    for (const file of files) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (ext === 'xml') {
+        const text = await file.text();
+        if (preventDuplicateForThisRun && !xmlTextForHash) xmlTextForHash = text;
+        allItems.push(...parseNfeXml(text));
       } else if (ext === 'csv') {
-        setSource('csv');
         const text = await file.text();
-        setCsvText(text);
-        await runPreview(parseCsvText(text), null);
-      } else if (ext === 'xml') {
-        setSource('xml');
-        const text = await file.text();
-        setDocumentText(text);
-        await runPreview(parseNfeXml(text), text);
+        allItems.push(...parseCsvText(text));
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+        for (const r of rows) {
+          const externalCode =
+            norm(r.cProd) ||
+            norm(r.CPROD) ||
+            norm(r.codigo) ||
+            norm(r.Codigo) ||
+            norm(r['Código']) ||
+            norm(r['ID']) ||
+            norm(r['ID Código']) ||
+            norm(r['IDCódigo']);
+
+          const name = norm(r.xProd) || norm(r.Produto) || norm(r.produto) || norm(r.nome) || null;
+          const quantity = parseLocaleNumber(r.qCom) ?? parseLocaleNumber(r.Quantidade) ?? parseLocaleNumber(r.quantidade);
+          if (!externalCode || !quantity || quantity <= 0) continue;
+          allItems.push({ externalCode, name, quantity });
+        }
       } else {
-        toast.error('Formato não suportado. Use CSV, XLSX ou XML.');
+        // PDF: parser baseado em heurísticas (requer pdfjs-dist)
+        if (ext === 'pdf') {
+          const text = await extractPdfText(file);
+          const parsed = parsePdfDanfeText(text);
+          allItems.push(...parsed);
+        }
       }
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao processar arquivo');
     }
+
+    return { items: allItems, fileTextForHash: xmlTextForHash, preventDuplicateForThisRun };
+  }
+
+  async function onUploadFiles(files: File[]) {
+    if (!files.length) return;
+    setSelectedFiles(files);
+    try {
+      setLoadingPreview(true);
+      setPreview(null);
+      setConflictResolutions({});
+
+      const { items, fileTextForHash, preventDuplicateForThisRun } = await parseUploadedFiles(files);
+      if (!items.length) {
+        toast.error('Nenhum item válido encontrado nos arquivos');
+        return;
+      }
+      await runPreview(items, fileTextForHash, preventDuplicateForThisRun);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao processar arquivos');
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  // Suporte a PDF: adicionamos um botão/fluxo específico.
+  async function onUploadPdfFiles(files: FileList | null) {
+    if (!files?.length) return;
+    const list = Array.from(files);
+    // O reconhecimento é via itens (parse heurístico do PDF). Dedupe fica desativado para multi-arquivos.
+    setSource('pdf');
+    await onUploadFiles(list);
   }
 
   async function applyImport() {
     if (!preview) return;
     if (preview.conflicts.length) {
       // exige resolução
-      const missing = preview.conflicts.filter((c) => {
-        const key = `${c.externalCode ?? ''}::${c.name ?? ''}::${c.quantity}`;
+      const missing = preview.conflicts.filter((_, idx) => {
+        const key = `idx:${idx}`;
         return !conflictResolutions[key];
       });
       if (missing.length) {
@@ -282,8 +479,8 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
         externalCode: r.externalCode,
         quantity: r.quantity,
       })),
-      ...preview.conflicts.map((c) => {
-        const key = `${c.externalCode ?? ''}::${c.name ?? ''}::${c.quantity}`;
+      ...preview.conflicts.map((c, idx) => {
+        const key = `idx:${idx}`;
         return {
           productId: conflictResolutions[key],
           externalCode: c.externalCode,
@@ -293,10 +490,10 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
     ];
 
     const mappingsToUpsert = preview.conflicts
-      .map((c) => {
+      .map((c, idx) => {
         const code = c.externalCode;
         if (!code) return null;
-        const key = `${c.externalCode ?? ''}::${c.name ?? ''}::${c.quantity}`;
+        const key = `idx:${idx}`;
         const productId = conflictResolutions[key];
         if (!productId) return null;
         return { externalCode: code, productId, source: source === 'xml' ? 'nfe_xml' : source };
@@ -339,7 +536,7 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
         </p>
       </div>
 
-      <StockSubnav baseHref={baseHref} />
+      {showSubnav ? <StockSubnav baseHref={baseHref} /> : null}
 
       <Card className="p-4 space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -353,6 +550,7 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
                 <SelectItem value="xml">XML (NF-e)</SelectItem>
                 <SelectItem value="csv">CSV</SelectItem>
                 <SelectItem value="xlsx">XLSX</SelectItem>
+                <SelectItem value="pdf">PDF</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -361,10 +559,18 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
             <div className="text-sm font-medium">Upload de arquivo</div>
             <Input
               type="file"
-              accept=".xml,.csv,.xlsx,.xls"
+              accept=".xml,.csv,.xlsx,.xls,.pdf"
+              multiple
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onUploadFile(f);
+                const list = e.target.files;
+                if (!list?.length) return;
+                // Se for PDF, usamos heurística.
+                const hasPdf = Array.from(list).some((f) => f.name.toLowerCase().endsWith('.pdf'));
+                if (hasPdf) {
+                  void onUploadPdfFiles(list);
+                } else {
+                  void onUploadFiles(Array.from(list));
+                }
                 e.currentTarget.value = '';
               }}
             />
@@ -386,7 +592,7 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
             <Textarea value={documentText} onChange={(e) => setDocumentText(e.target.value)} rows={10} />
             <Button
               variant="outline"
-              onClick={() => void runPreview(parseNfeXml(documentText), documentText)}
+              onClick={() => void runPreview(parseNfeXml(documentText), documentText, preventDuplicate)}
               disabled={loadingPreview}
             >
               {loadingPreview ? 'Gerando prévia...' : 'Prévia do XML'}
@@ -399,11 +605,15 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
             <div className="text-xs text-gray-500">Linhas válidas detectadas: {parsedItems.length}</div>
             <Button
               variant="outline"
-              onClick={() => void runPreview(parseCsvText(csvText), null)}
+              onClick={() => void runPreview(parseCsvText(csvText), null, false)}
               disabled={loadingPreview}
             >
               {loadingPreview ? 'Gerando prévia...' : 'Prévia do CSV'}
             </Button>
+          </div>
+        ) : source === 'pdf' ? (
+          <div className="text-sm text-gray-600">
+            Para PDF, use o upload acima. A extração de itens é heurística (pode precisar ajuste dependendo do DANFE).
           </div>
         ) : (
           <div className="text-sm text-gray-600">
@@ -437,7 +647,7 @@ export default function StockImporter({ baseHref }: StockImporterProps) {
               <div className="font-semibold">Conflitos</div>
               <div className="mt-3 space-y-3">
                 {preview.conflicts.map((c, idx) => {
-                  const key = `${c.externalCode ?? ''}::${c.name ?? ''}::${c.quantity}`;
+                  const key = `idx:${idx}`;
                   return (
                     <div key={`${key}::${idx}`} className="rounded-lg border p-3">
                       <div className="text-sm text-gray-700">

@@ -60,6 +60,9 @@ export async function POST(req: NextRequest) {
 
   let applied = 0;
   const errors: Array<{ productId: string; error: string }> = [];
+  
+  // Agrega por produto para reduzir chamadas ao Mongo em importações grandes.
+  const perProduct = new Map<string, { oid: ObjectId; value: number }>();
 
   for (const it of normalized) {
     let oid: ObjectId;
@@ -73,15 +76,45 @@ export async function POST(req: NextRequest) {
     const q = Math.round(it.quantity);
     if (q <= 0) continue;
 
+    const existing = perProduct.get(it.productId);
+    if (!existing) {
+      perProduct.set(it.productId, { oid, value: q });
+      continue;
+    }
+
+    if (mode === 'set') {
+      // Em modo set, considera o último valor recebido para o produto.
+      existing.value = q;
+      perProduct.set(it.productId, existing);
+    } else {
+      existing.value += q;
+      perProduct.set(it.productId, existing);
+    }
+  }
+
+  if (perProduct.size > 0) {
     try {
       if (mode === 'set') {
-        await products.updateOne({ _id: oid }, { $set: { stock: q } });
+        const ops = Array.from(perProduct.values()).map(({ oid, value }) => ({
+          updateOne: {
+            filter: { _id: oid },
+            update: { $set: { stock: value } },
+          },
+        }));
+        const res = await products.bulkWrite(ops, { ordered: false });
+        applied = (res.modifiedCount ?? 0) + (res.upsertedCount ?? 0);
       } else {
-        await products.updateOne({ _id: oid }, { $inc: { stock: q } });
+        const ops = Array.from(perProduct.values()).map(({ oid, value }) => ({
+          updateOne: {
+            filter: { _id: oid },
+            update: { $inc: { stock: value } },
+          },
+        }));
+        const res = await products.bulkWrite(ops, { ordered: false });
+        applied = (res.modifiedCount ?? 0) + (res.upsertedCount ?? 0);
       }
-      applied++;
     } catch (e: any) {
-      errors.push({ productId: it.productId, error: e?.message || 'Falha ao atualizar stock' });
+      errors.push({ productId: 'bulk', error: e?.message || 'Falha ao atualizar stock em lote' });
     }
   }
 
@@ -105,32 +138,47 @@ export async function POST(req: NextRequest) {
   }
 
   // Upsert mapeamentos (externalCode -> productId)
-  for (const m of mappingsToUpsert) {
-    const externalCode = String(m?.externalCode ?? '').trim();
-    const productId = String(m?.productId ?? '').trim();
-    if (!externalCode || !productId) continue;
-    try {
-      void new ObjectId(productId);
-    } catch {
-      continue;
+  if (mappingsToUpsert.length > 0) {
+    const mapOps = mappingsToUpsert
+      .map((m) => {
+        const externalCode = String(m?.externalCode ?? '').trim();
+        const productId = String(m?.productId ?? '').trim();
+        if (!externalCode || !productId) return null;
+        try {
+          void new ObjectId(productId);
+        } catch {
+          return null;
+        }
+
+        return {
+          updateOne: {
+            filter: { externalCode },
+            update: {
+              $set: {
+                externalCode,
+                productId,
+                source: typeof m?.source === 'string' ? m.source : source,
+                updatedAt: createdAt,
+                updatedBy: createdBy,
+              },
+              $setOnInsert: {
+                createdAt,
+                createdBy,
+              },
+            },
+            upsert: true,
+          },
+        };
+      })
+      .filter(Boolean) as any[];
+
+    if (mapOps.length) {
+      try {
+        await mappings.bulkWrite(mapOps, { ordered: false });
+      } catch (e: any) {
+        errors.push({ productId: 'mappings', error: e?.message || 'Falha ao gravar mapeamentos' });
+      }
     }
-    await mappings.updateOne(
-      { externalCode },
-      {
-        $set: {
-          externalCode,
-          productId,
-          source: typeof m?.source === 'string' ? m.source : source,
-          updatedAt: createdAt,
-          updatedBy: createdBy,
-        },
-        $setOnInsert: {
-          createdAt,
-          createdBy,
-        },
-      },
-      { upsert: true }
-    );
   }
 
   await imports.insertOne({
