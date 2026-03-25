@@ -48,7 +48,7 @@ export default function AdminEstoqueAlertasPage() {
         <p className="text-gray-600 mt-1">Produtos com estoque baixo ou zerado (baseado no estoque mínimo).</p>
       </div>
 
-      <StockSubnav baseHref="/admin/estoque" />
+      <StockSubnav />
 
       <Card className="p-4">
         {loading ? (

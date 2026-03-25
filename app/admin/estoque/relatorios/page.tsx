@@ -54,7 +54,7 @@ export default function AdminEstoqueRelatoriosPage() {
         <p className="text-gray-600 mt-1">Resumo do estoque e movimentações recentes.</p>
       </div>
 
-      <StockSubnav baseHref="/admin/estoque" />
+      <StockSubnav />
 
       {loading ? (
         <div className="py-10 text-center text-gray-600">Carregando...</div>

@@ -118,7 +118,6 @@ function parseNfeXml(text: string): ParsedItem[] {
 }
 
 type StockImporterProps = {
-  baseHref: '/admin/estoque' | '/admin/master/estoque';
   showSubnav?: boolean;
 };
 
@@ -293,7 +292,7 @@ function parseCsvText(text: string): ParsedItem[] {
   return out;
 }
 
-export default function StockImporter({ baseHref, showSubnav = true }: StockImporterProps) {
+export default function StockImporter({ showSubnav = true }: StockImporterProps) {
   const [source, setSource] = useState<Source>('xml');
   const [documentText, setDocumentText] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -536,7 +535,7 @@ export default function StockImporter({ baseHref, showSubnav = true }: StockImpo
         </p>
       </div>
 
-      {showSubnav ? <StockSubnav baseHref={baseHref} /> : null}
+      {showSubnav ? <StockSubnav /> : null}
 
       <Card className="p-4 space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">

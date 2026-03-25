@@ -104,7 +104,7 @@ export default function AdminEstoqueMovimentacoesPage() {
         <p className="text-gray-600 mt-1">Entradas e saídas manuais (não substitui as baixas do PDV).</p>
       </div>
 
-      <StockSubnav baseHref="/admin/estoque" />
+      <StockSubnav />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">

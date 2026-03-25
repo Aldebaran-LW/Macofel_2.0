@@ -16,6 +16,7 @@ import {
   Sparkles,
   ClipboardList,
   Crown,
+  UserCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
@@ -143,21 +144,35 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
           );
         })}
 
-        {/* Estoque */}
-        <details className="px-1" open={pathname?.startsWith('/admin/estoque')}>
-          <summary className="cursor-pointer flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors list-none text-gray-300 hover:bg-gray-800">
-            <Boxes className="h-5 w-5" />
-            <span>Estoque</span>
+        {/* Estoque e equipe (painel Admin — acento ciano, distinto do Master âmbar) */}
+        <details
+          className="px-1"
+          open={
+            pathname?.startsWith('/admin/estoque') ||
+            (!!isMasterAdminRole((session?.user as any)?.role) && pathname?.startsWith('/admin/master/equipe'))
+          }
+        >
+          <summary
+            className={cn(
+              'cursor-pointer flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors list-none border border-transparent',
+              pathname?.startsWith('/admin/estoque') ||
+                (!!isMasterAdminRole((session?.user as any)?.role) && pathname?.startsWith('/admin/master/equipe'))
+                ? 'border-cyan-600/40 bg-cyan-950/50 text-cyan-100'
+                : 'text-gray-300 hover:bg-gray-800'
+            )}
+          >
+            <Boxes className="h-5 w-5 shrink-0 text-cyan-400" />
+            <span>Estoque e equipe</span>
           </summary>
-          <div className="pl-6 space-y-1 pb-1">
+          <div className="pl-6 space-y-1 border-l border-cyan-800/40 ml-4 mt-1 pb-2">
             <Link
               href="/admin/estoque/alertas"
               onClick={nav}
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/estoque/alertas')
-                  ? 'bg-red-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-gray-300 hover:bg-cyan-950/30'
               )}
             >
               Alertas
@@ -168,8 +183,8 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/estoque/movimentacoes')
-                  ? 'bg-red-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-gray-300 hover:bg-cyan-950/30'
               )}
             >
               Movimentações
@@ -180,8 +195,8 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/estoque/importacao')
-                  ? 'bg-red-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-gray-300 hover:bg-cyan-950/30'
               )}
             >
               Importação
@@ -192,12 +207,27 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
               className={cn(
                 'block px-2 py-2 rounded-lg transition-colors text-sm',
                 pathname?.startsWith('/admin/estoque/relatorios')
-                  ? 'bg-red-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-gray-300 hover:bg-cyan-950/30'
               )}
             >
               Relatórios
             </Link>
+            {isMasterAdminRole((session?.user as any)?.role) && (
+              <Link
+                href="/admin/master/equipe"
+                onClick={nav}
+                className={cn(
+                  'flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-sm',
+                  pathname?.startsWith('/admin/master/equipe')
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-gray-300 hover:bg-cyan-950/30'
+                )}
+              >
+                <UserCog className="h-4 w-4 shrink-0" />
+                Equipe &amp; roles
+              </Link>
+            )}
           </div>
         </details>
 

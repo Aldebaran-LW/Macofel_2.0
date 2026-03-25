@@ -1,6 +1,5 @@
-import StockImporter from '@/components/stock-importer';
+import { redirect } from 'next/navigation';
 
-export default function MasterAdminEstoqueImportacaoPage() {
-  return <StockImporter baseHref="/admin/master/estoque" />;
+export default function MasterAdminEstoqueImportacaoRedirect() {
+  redirect('/admin/estoque/importacao');
 }
-
