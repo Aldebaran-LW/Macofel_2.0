@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth-options';
-import { hasPdvFullWebAccess } from '@/lib/permissions';
+import { hasPdvFullWebAccess, isMasterAdminRole } from '@/lib/permissions';
+import { resolvePdvInstallerDownloadUrl } from '@/lib/pdv-installer-url';
 import { PdvLojaShell } from './pdv-loja-shell';
 
 export const metadata = {
@@ -17,6 +18,15 @@ export default async function LojaPdvPage() {
   }
 
   const apiKey = process.env.PDV_API_KEY;
+  const desktopInstallerUrl = resolvePdvInstallerDownloadUrl();
+  const lojaAssetVersion =
+    process.env.VERCEL_DEPLOYMENT_ID?.trim() ||
+    process.env.VERCEL_GIT_COMMIT_SHA?.trim()?.slice(0, 12) ||
+    '';
+  const masterInstallerDocsHref = isMasterAdminRole(role)
+    ? '/admin/master/pdv-desktop'
+    : null;
+
   if (!apiKey) {
     return (
       <div className="mx-auto max-w-lg p-8 text-center text-neutral-700">
@@ -28,5 +38,12 @@ export default async function LojaPdvPage() {
     );
   }
 
-  return <PdvLojaShell apiKey={apiKey} />;
+  return (
+    <PdvLojaShell
+      apiKey={apiKey}
+      desktopInstallerUrl={desktopInstallerUrl}
+      lojaAssetVersion={lojaAssetVersion}
+      masterInstallerDocsHref={masterInstallerDocsHref}
+    />
+  );
 }

@@ -8,12 +8,15 @@ export function resolvePdvInstallerDownloadUrl(): string | null {
   if (explicit) return explicit;
 
   const rel = process.env.PDV_DESKTOP_INSTALLER_PATH?.trim();
-  if (!rel || !rel.startsWith('/')) return null;
+  if (!rel) return null;
+
+  if (rel.startsWith('http://') || rel.startsWith('https://')) return rel;
+  if (!rel.startsWith('/')) return null;
 
   const base =
     process.env.NEXTAUTH_URL?.replace(/\/$/, '') ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
 
-  if (!base) return null;
-  return `${base}${rel}`;
+  // Sem base (ex.: dev sem NEXTAUTH_URL): href relativo funciona no mesmo site.
+  return base ? `${base}${rel}` : rel;
 }

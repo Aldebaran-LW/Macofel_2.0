@@ -126,7 +126,11 @@ export async function getProducts(filters?: {
         description: product.description,
         price: product.price,
         stock: product.stock,
+        minStock: product.minStock ?? null,
+        weight: product.weight ?? null,
+        dimensionsCm: product.dimensionsCm ?? null,
         imageUrl: product.imageUrl,
+        imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
         featured: product.featured,
         categoryId: product.categoryId,
         category: category
@@ -180,7 +184,11 @@ export async function getProductBySlug(slug: string) {
     description: product.description,
     price: product.price,
     stock: product.stock,
+    minStock: product.minStock ?? null,
+    weight: product.weight ?? null,
+    dimensionsCm: product.dimensionsCm ?? null,
     imageUrl: product.imageUrl,
+    imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
     featured: product.featured,
     categoryId: product.categoryId,
     category: category
