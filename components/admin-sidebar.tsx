@@ -124,19 +124,21 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
           </Link>
         )}
 
-        <Link
-          href="/admin/area"
-          onClick={nav}
-          className={cn(
-            'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-emerald-600/40 bg-emerald-950/40',
-            pathname?.startsWith('/admin/area')
-              ? 'bg-emerald-500 text-gray-950 border-emerald-400'
-              : 'text-emerald-200 hover:bg-emerald-950/70'
-          )}
-        >
-          <Shield className="h-5 w-5 shrink-0" />
-          <span className="font-semibold">Admin</span>
-        </Link>
+        {!isMasterAdminRole((session?.user as any)?.role) && (
+          <Link
+            href="/admin/area"
+            onClick={nav}
+            className={cn(
+              'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-emerald-600/40 bg-emerald-950/40',
+              pathname?.startsWith('/admin/area')
+                ? 'bg-emerald-500 text-gray-950 border-emerald-400'
+                : 'text-emerald-200 hover:bg-emerald-950/70'
+            )}
+          >
+            <Shield className="h-5 w-5 shrink-0" />
+            <span className="font-semibold">Admin</span>
+          </Link>
+        )}
 
         {hasPdvFullWebAccess((session?.user as any)?.role) && (
           <Link

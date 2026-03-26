@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
 import mongoPrisma from '@/lib/mongodb';
+import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,25 @@ export async function POST(req: NextRequest) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
 
+    let enriched: Awaited<ReturnType<typeof getBuscarProdutoInfo>> = null;
+    try {
+      enriched = await getBuscarProdutoInfo(String(name));
+    } catch {
+      enriched = null;
+    }
+
+    const resolvedWeightKg =
+      weight != null && String(weight).trim() !== ''
+        ? parseFloat(String(weight))
+        : enriched?.weight_grams != null
+          ? Number((enriched.weight_grams / 1000).toFixed(3))
+          : null;
+
+    const resolvedImageUrl =
+      imageUrl && String(imageUrl).trim() !== ''
+        ? String(imageUrl).trim()
+        : enriched?.photos?.[0] || null;
+
     const product = await mongoPrisma.product.create({
       data: {
         name,
@@ -41,8 +61,10 @@ export async function POST(req: NextRequest) {
         price: parseFloat(price),
         stock: parseInt(stock) || 0,
         minStock: parseInt(minStock) || 0,
-        weight: weight ? parseFloat(weight) : null,
-        imageUrl: imageUrl || null,
+        weight: resolvedWeightKg,
+        dimensionsCm: enriched?.dimensions_cm ?? null,
+        imageUrl: resolvedImageUrl,
+        imageUrls: enriched?.photos ?? [],
         categoryId,
         featured: featured === true || featured === 'true',
       },

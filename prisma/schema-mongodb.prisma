@@ -31,7 +31,9 @@ model Product {
   stock       Int      @default(0)
   minStock    Int      @default(0)
   weight      Float?   // Peso em kg
+  dimensionsCm String? // Altura × largura × comprimento em cm
   imageUrl    String?
+  imageUrls   String[] @default([])
   categoryId  String   @db.ObjectId
   featured    Boolean  @default(false)
   createdAt   DateTime @default(now())
