@@ -24,12 +24,12 @@ export default function StockSubnav({ className }: StockSubnavProps) {
   return (
     <div
       className={cn(
-        'mb-6 rounded-xl border border-cyan-500/35 bg-gradient-to-r from-cyan-950/85 via-slate-900 to-slate-900 p-4 text-white shadow-lg',
+        'mb-6 rounded-xl border border-emerald-500/35 bg-gradient-to-r from-emerald-950/85 via-slate-900 to-slate-900 p-4 text-white shadow-lg',
         className
       )}
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-cyan-500/20 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-cyan-200">
+        <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-200">
           Admin • Estoque
         </span>
         <p className="text-sm text-slate-400">
@@ -48,7 +48,7 @@ export default function StockSubnav({ className }: StockSubnavProps) {
               className={cn(
                 'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 active
-                  ? 'bg-cyan-500 text-slate-950'
+                  ? 'bg-emerald-500 text-slate-950'
                   : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700'
               )}
             >

@@ -17,12 +17,14 @@ import {
   ClipboardList,
   Crown,
   UserCog,
+  Shield,
+  Monitor,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
-import { isAdminDashboardRole, isMasterAdminRole } from '@/lib/permissions';
+import { hasPdvFullWebAccess, isAdminDashboardRole, isMasterAdminRole } from '@/lib/permissions';
 
 const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -122,6 +124,36 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
           </Link>
         )}
 
+        <Link
+          href="/admin/area"
+          onClick={nav}
+          className={cn(
+            'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-emerald-600/40 bg-emerald-950/40',
+            pathname?.startsWith('/admin/area')
+              ? 'bg-emerald-500 text-gray-950 border-emerald-400'
+              : 'text-emerald-200 hover:bg-emerald-950/70'
+          )}
+        >
+          <Shield className="h-5 w-5 shrink-0" />
+          <span className="font-semibold">Admin</span>
+        </Link>
+
+        {hasPdvFullWebAccess((session?.user as any)?.role) && (
+          <Link
+            href="/loja"
+            onClick={nav}
+            className={cn(
+              'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-sky-600/40 bg-sky-950/40',
+              pathname?.startsWith('/loja')
+                ? 'bg-sky-500 text-gray-950 border-sky-400'
+                : 'text-sky-200 hover:bg-sky-950/70'
+            )}
+          >
+            <Monitor className="h-5 w-5 shrink-0" />
+            <span className="font-semibold">PDV (/loja)</span>
+          </Link>
+        )}
+
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname?.startsWith(item.href);
@@ -143,93 +175,6 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
             </Link>
           );
         })}
-
-        {/* Estoque e equipe (painel Admin — acento ciano, distinto do Master âmbar) */}
-        <details
-          className="px-1"
-          open={
-            pathname?.startsWith('/admin/estoque') ||
-            (!!isMasterAdminRole((session?.user as any)?.role) && pathname?.startsWith('/admin/master/equipe'))
-          }
-        >
-          <summary
-            className={cn(
-              'cursor-pointer flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors list-none border border-transparent',
-              pathname?.startsWith('/admin/estoque') ||
-                (!!isMasterAdminRole((session?.user as any)?.role) && pathname?.startsWith('/admin/master/equipe'))
-                ? 'border-cyan-600/40 bg-cyan-950/50 text-cyan-100'
-                : 'text-gray-300 hover:bg-gray-800'
-            )}
-          >
-            <Boxes className="h-5 w-5 shrink-0 text-cyan-400" />
-            <span>Estoque e equipe</span>
-          </summary>
-          <div className="pl-6 space-y-1 border-l border-cyan-800/40 ml-4 mt-1 pb-2">
-            <Link
-              href="/admin/estoque/alertas"
-              onClick={nav}
-              className={cn(
-                'block px-2 py-2 rounded-lg transition-colors text-sm',
-                pathname?.startsWith('/admin/estoque/alertas')
-                  ? 'bg-cyan-600 text-white'
-                  : 'text-gray-300 hover:bg-cyan-950/30'
-              )}
-            >
-              Alertas
-            </Link>
-            <Link
-              href="/admin/estoque/movimentacoes"
-              onClick={nav}
-              className={cn(
-                'block px-2 py-2 rounded-lg transition-colors text-sm',
-                pathname?.startsWith('/admin/estoque/movimentacoes')
-                  ? 'bg-cyan-600 text-white'
-                  : 'text-gray-300 hover:bg-cyan-950/30'
-              )}
-            >
-              Movimentações
-            </Link>
-            <Link
-              href="/admin/estoque/importacao"
-              onClick={nav}
-              className={cn(
-                'block px-2 py-2 rounded-lg transition-colors text-sm',
-                pathname?.startsWith('/admin/estoque/importacao')
-                  ? 'bg-cyan-600 text-white'
-                  : 'text-gray-300 hover:bg-cyan-950/30'
-              )}
-            >
-              Importação
-            </Link>
-            <Link
-              href="/admin/estoque/relatorios"
-              onClick={nav}
-              className={cn(
-                'block px-2 py-2 rounded-lg transition-colors text-sm',
-                pathname?.startsWith('/admin/estoque/relatorios')
-                  ? 'bg-cyan-600 text-white'
-                  : 'text-gray-300 hover:bg-cyan-950/30'
-              )}
-            >
-              Relatórios
-            </Link>
-            {isMasterAdminRole((session?.user as any)?.role) && (
-              <Link
-                href="/admin/master/equipe"
-                onClick={nav}
-                className={cn(
-                  'flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-sm',
-                  pathname?.startsWith('/admin/master/equipe')
-                    ? 'bg-cyan-600 text-white'
-                    : 'text-gray-300 hover:bg-cyan-950/30'
-                )}
-              >
-                <UserCog className="h-4 w-4 shrink-0" />
-                Equipe &amp; roles
-              </Link>
-            )}
-          </div>
-        </details>
 
         {/* Orçamento: montagem interna, histórico e pedidos dos clientes */}
         <details
