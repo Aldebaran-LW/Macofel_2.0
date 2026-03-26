@@ -80,6 +80,10 @@ export async function POST(req: NextRequest) {
     const sales = db.collection('pdv_sales');
     const products = db.collection('products');
     const siteTaxDefaultPercent = await getTaxDefaultPercent();
+    const movements = db.collection('inventory_movements');
+    const actorLabel = body.operador?.trim() || 'PDV';
+    const actorType = 'pdv_api_key';
+    const actorRole = 'PDV_OPERATOR';
 
     const existing = await sales.findOne({ pdvVendaId: body.id });
     if (existing) {
@@ -105,10 +109,14 @@ export async function POST(req: NextRequest) {
       status: body.status,
       itens: body.itens,
       receivedAt: new Date(),
+      receivedBy: actorLabel,
+      actorType,
+      actorRole,
       /** Referência à taxa configurada no site no momento da sincronização (o total vem do PDV). */
       siteTaxDefaultPercent,
     });
 
+    const movementDocs: Array<Record<string, unknown>> = [];
     for (const item of body.itens) {
       try {
         const oid = new ObjectId(item.produto_id);
@@ -118,11 +126,30 @@ export async function POST(req: NextRequest) {
           { _id: oid },
           { $inc: { stock: -q } }
         );
+        movementDocs.push({
+          productId: item.produto_id,
+          productName: item.produto_nome ?? 'Produto',
+          type: 'saida',
+          quantity: q,
+          note: `Venda PDV #${body.numero ?? ''} (${body.id})`,
+          source: 'pdv_sale',
+          createdAt: new Date(),
+          createdBy: actorLabel,
+          actorId: null,
+          actorEmail: null,
+          actorRole,
+          actorType,
+          pdvVendaId: body.id,
+          pdvItemId: item.id ?? null,
+        });
       } catch (e) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('[PDV] Estoque não atualizado para', item.produto_id, e);
         }
       }
+    }
+    if (movementDocs.length > 0) {
+      await movements.insertMany(movementDocs, { ordered: false });
     }
 
     if (process.env.NODE_ENV === 'development') {

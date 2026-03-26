@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
     const db = await connectToDatabase();
     const sales = db.collection('pdv_sales');
     const products = db.collection('products');
+    const movements = db.collection('inventory_movements');
+    const actorLabel = body.operador?.trim() || 'PDV';
+    const actorType = 'pdv_api_key';
+    const actorRole = 'PDV_OPERATOR';
 
     const doc = await sales.findOne({ pdvVendaId: vendaId });
 
@@ -83,17 +87,36 @@ export async function POST(req: NextRequest) {
     }
 
     const itens = (doc.itens as PdvItem[] | undefined) ?? [];
+    const movementDocs: Array<Record<string, unknown>> = [];
     for (const item of itens) {
       try {
         const oid = new ObjectId(item.produto_id);
         const q = Math.abs(Number(item.quantidade)) || 0;
         if (q <= 0) continue;
         await products.updateOne({ _id: oid }, { $inc: { stock: q } });
+        movementDocs.push({
+          productId: item.produto_id,
+          productName: 'Produto',
+          type: 'entrada',
+          quantity: q,
+          note: `Estorno PDV (${vendaId})`,
+          source: 'pdv_void',
+          createdAt: new Date(),
+          createdBy: actorLabel,
+          actorId: null,
+          actorEmail: null,
+          actorRole,
+          actorType,
+          pdvVendaId: vendaId,
+        });
       } catch (e) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('[PDV void] Stock não reposto para', item.produto_id, e);
         }
       }
+    }
+    if (movementDocs.length > 0) {
+      await movements.insertMany(movementDocs, { ordered: false });
     }
 
     await sales.updateOne(
@@ -105,6 +128,8 @@ export async function POST(req: NextRequest) {
           voidReason: body.motivo?.trim() ?? null,
           voidOperador: body.operador ?? null,
           voidRequestAt: body.data_hora ?? null,
+          voidActorType: actorType,
+          voidActorRole: actorRole,
         },
       }
     );

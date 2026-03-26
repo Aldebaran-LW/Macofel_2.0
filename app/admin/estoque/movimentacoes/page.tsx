@@ -19,6 +19,9 @@ type Movement = {
   note?: string | null;
   createdAt: string;
   createdBy?: string | null;
+  actorRole?: string | null;
+  actorType?: string | null;
+  source?: string | null;
 };
 
 export default function AdminEstoqueMovimentacoesPage() {
@@ -184,6 +187,19 @@ export default function AdminEstoqueMovimentacoesPage() {
                     <div className="text-sm text-gray-600">
                       {m.type === 'entrada' ? 'Entrada' : 'Saída'} · <span className="font-semibold">{m.quantity}</span>
                       {m.note ? ` · ${m.note}` : ''}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                        Usuário: {m.createdBy || 'não identificado'}
+                      </span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                        Origem: {m.source || 'n/a'}
+                      </span>
+                      {m.actorRole ? (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                          Perfil: {m.actorRole}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 shrink-0">{new Date(m.createdAt).toLocaleString('pt-BR')}</div>

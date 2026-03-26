@@ -43,6 +43,11 @@ export async function GET(req: NextRequest) {
       note: m.note ?? null,
       createdAt: (m.createdAt ? new Date(m.createdAt) : new Date()).toISOString(),
       createdBy: m.createdBy ?? null,
+      actorId: m.actorId ?? null,
+      actorEmail: m.actorEmail ?? null,
+      actorRole: m.actorRole ?? null,
+      actorType: m.actorType ?? null,
+      source: m.source ?? null,
     })),
   });
 }
@@ -94,7 +99,10 @@ export async function POST(req: NextRequest) {
   const productName = (p as any)?.name ?? 'Produto';
 
   const createdAt = new Date();
-  const createdBy = (session.user as any)?.email ?? (session.user as any)?.id ?? null;
+  const actorId = (session.user as any)?.id ?? null;
+  const actorEmail = (session.user as any)?.email ?? null;
+  const actorRole = (session.user as any)?.role ?? null;
+  const createdBy = actorEmail ?? actorId ?? null;
 
   const insert = await movements.insertOne({
     productId,
@@ -104,6 +112,10 @@ export async function POST(req: NextRequest) {
     note: note || null,
     createdAt,
     createdBy,
+    actorId,
+    actorEmail,
+    actorRole,
+    actorType: 'admin_session',
     source: 'admin_manual',
   });
 

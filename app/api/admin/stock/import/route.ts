@@ -119,7 +119,10 @@ export async function POST(req: NextRequest) {
   }
 
   const createdAt = new Date();
-  const createdBy = (session.user as any)?.email ?? (session.user as any)?.id ?? null;
+  const actorId = (session.user as any)?.id ?? null;
+  const actorEmail = (session.user as any)?.email ?? null;
+  const actorRole = (session.user as any)?.role ?? null;
+  const createdBy = actorEmail ?? actorId ?? null;
 
   // Salva documento (dedupe/registro) se tiver hash
   if (documentHash) {
@@ -131,6 +134,10 @@ export async function POST(req: NextRequest) {
           source,
           createdAt,
           createdBy,
+          actorId,
+          actorEmail,
+          actorRole,
+          actorType: 'admin_session',
         },
       },
       { upsert: true }
@@ -164,6 +171,10 @@ export async function POST(req: NextRequest) {
               $setOnInsert: {
                 createdAt,
                 createdBy,
+                actorId,
+                actorEmail,
+                actorRole,
+                actorType: 'admin_session',
               },
             },
             upsert: true,
@@ -192,6 +203,10 @@ export async function POST(req: NextRequest) {
     errors,
     createdAt,
     createdBy,
+    actorId,
+    actorEmail,
+    actorRole,
+    actorType: 'admin_session',
   });
 
   return NextResponse.json({
