@@ -23,6 +23,5 @@ export async function GET(request: Request) {
     );
   }
 
-  cache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, payload: finalResult });
   return NextResponse.json(finalResult);
 }
