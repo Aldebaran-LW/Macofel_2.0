@@ -12,7 +12,7 @@ export default function MasterPdvDesktopPage() {
   const version = process.env.PDV_DESKTOP_INSTALLER_VERSION?.trim() || '0.1.0';
   const fileName =
     process.env.PDV_DESKTOP_INSTALLER_FILENAME?.trim() ||
-    'pdv-macofel-setup.exe';
+    'PDV.Macofel_0.1.0_x64_en-US.msi';
 
   return (
     <div className="max-w-3xl">
@@ -65,12 +65,19 @@ export default function MasterPdvDesktopPage() {
             <p className="font-medium">Download ainda não configurado no servidor</p>
             <p className="mt-2 text-amber-900/90">
               Defina na Vercel (ou <code className="rounded bg-white/80 px-1">.env</code>){' '}
-              <strong>PDV_DESKTOP_INSTALLER_URL</strong> com o link completo do ficheiro
-              (ex.: GitHub Release ou CDN), ou coloque o <code>.exe</code> em{' '}
-              <code className="rounded bg-white/80 px-1">public/downloads/</code> e use{' '}
-              <strong>PDV_DESKTOP_INSTALLER_PATH</strong>
-              <code className="ml-1 rounded bg-white/80 px-1">/downloads/pdv-macofel-setup.exe</code>{' '}
-              juntamente com <strong>NEXTAUTH_URL</strong> correto.
+              <strong>PDV_DESKTOP_INSTALLER_URL</strong> com o link direto do instalador (ex.: asset
+              de um GitHub Release). Release <strong>PDV Macofel 0.1.0</strong> (tag{' '}
+              <code className="rounded bg-white/80 px-1">pdv-v0.1.0</code>):
+            </p>
+            <p className="mt-2 break-all rounded bg-white/90 px-2 py-1.5 font-mono text-[11px] text-amber-950">
+              https://github.com/Aldebaran-LW/PDV-Macofel/releases/download/pdv-v0.1.0/PDV.Macofel_0.1.0_x64_en-US.msi
+            </p>
+            <p className="mt-2 text-amber-900/90">
+              Opcional: <strong>PDV_DESKTOP_INSTALLER_FILENAME</strong> para o atributo{' '}
+              <code className="rounded bg-white/80 px-1">download</code>. Alternativa: ficheiro em{' '}
+              <code className="rounded bg-white/80 px-1">public/downloads/</code> +{' '}
+              <strong>PDV_DESKTOP_INSTALLER_PATH</strong> (ex.{' '}
+              <code className="rounded bg-white/80 px-1">/downloads/instalador.msi</code>).
             </p>
             <p className="mt-2 text-xs text-amber-800/80">
               Ver <code>public/downloads/README.md</code> no repositório Macofel e o README do
