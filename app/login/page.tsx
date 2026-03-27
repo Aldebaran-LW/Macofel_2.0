@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { getSession, signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,21 @@ import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import { isAdminDashboardRole } from '@/lib/permissions';
 
+/** Evita open redirect: só caminhos relativos internos. */
+function safeCallbackPath(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const decoded = decodeURIComponent(raw.trim());
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -42,6 +55,13 @@ export default function LoginPage() {
         });
         const sessionData = await res.json();
         const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
+        const callbackTarget = safeCallbackPath(searchParams.get('callbackUrl'));
+
+        if (callbackTarget && typeof window !== 'undefined') {
+          toast.success('Login realizado com sucesso!');
+          window.location.assign(callbackTarget);
+          return;
+        }
 
         if (isAdminDashboardRole(userRole)) {
           toast.success('Login realizado com sucesso! Redirecionando para área administrativa...');
