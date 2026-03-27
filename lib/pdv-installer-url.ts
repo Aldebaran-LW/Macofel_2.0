@@ -13,10 +13,7 @@ export function resolvePdvInstallerDownloadUrl(): string | null {
   if (rel.startsWith('http://') || rel.startsWith('https://')) return rel;
   if (!rel.startsWith('/')) return null;
 
-  const base =
-    process.env.NEXTAUTH_URL?.replace(/\/$/, '') ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-
-  // Sem base (ex.: dev sem NEXTAUTH_URL): href relativo funciona no mesmo site.
-  return base ? `${base}${rel}` : rel;
+  // Para downloads servidos pelo próprio Next (`public/downloads/...`), manter caminho relativo
+  // evita problemas quando NEXTAUTH_URL está como localhost mas o site é acessado por IP/domínio.
+  return rel;
 }
