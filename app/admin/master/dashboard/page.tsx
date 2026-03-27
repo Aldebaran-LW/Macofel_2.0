@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   Users,
   Settings,
+  Warehouse,
   ScrollText,
   Download,
   KeyRound,
@@ -23,6 +24,12 @@ const cards = [
     title: 'Configurações globais',
     desc: 'Taxas, integrações DevNota, parâmetros do PDV e do site.',
     icon: Settings,
+  },
+  {
+    href: '/admin/estoque',
+    title: 'Controle de Estoque',
+    desc: 'Alertas, movimentações, importação em lote e relatórios do armazém (mesmo módulo Admin Estoque).',
+    icon: Warehouse,
   },
   {
     href: '/admin/master/auditoria',
