@@ -28,7 +28,7 @@ const cards = [
   {
     href: '/admin/estoque',
     title: 'Controle de Estoque',
-    desc: 'Alertas, movimentações, importação em lote e relatórios do armazém (mesmo módulo Admin Estoque).',
+    desc: 'Alertas, movimentações, importação e relatórios. Com Master: o menu laranja mantém-se nestas páginas.',
     icon: Warehouse,
   },
   {

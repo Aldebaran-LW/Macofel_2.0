@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth-options';
 import { hasPdvFullWebAccess, isMasterAdminRole } from '@/lib/permissions';
 import { resolvePdvInstallerDownloadUrl } from '@/lib/pdv-installer-url';
+import { getPdvLojaAssetVersion } from '@/lib/pdv-loja-asset-version';
 import { PdvLojaShell } from './pdv-loja-shell';
 
 export const metadata = {
@@ -19,10 +20,7 @@ export default async function LojaPdvPage() {
 
   const apiKey = process.env.PDV_API_KEY;
   const desktopInstallerUrl = resolvePdvInstallerDownloadUrl();
-  const lojaAssetVersion =
-    process.env.VERCEL_DEPLOYMENT_ID?.trim() ||
-    process.env.VERCEL_GIT_COMMIT_SHA?.trim()?.slice(0, 12) ||
-    '';
+  const lojaAssetVersion = getPdvLojaAssetVersion();
   const masterInstallerDocsHref = isMasterAdminRole(role)
     ? '/admin/master/pdv-desktop'
     : null;

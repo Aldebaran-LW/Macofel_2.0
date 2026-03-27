@@ -87,6 +87,34 @@ export default function MasterPdvDesktopPage() {
         )}
       </div>
 
+      <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-gray-900">PDV Web no site (/loja)</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          O caixa no browser usa ficheiros estáticos em{' '}
+          <code className="rounded bg-gray-100 px-1">public/loja</code>, gerados pelo projeto{' '}
+          <strong>PDV-Macofel</strong> — <strong>não</strong> pela build do Next.js. Se o /loja parecer antigo,
+          falta atualizar esse embed e fazer deploy.
+        </p>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-gray-600">
+          <li>
+            Coloque o código do <strong>PDV-Macofel</strong> ao lado deste repositório (pasta irmã{' '}
+            <code className="rounded bg-gray-100 px-1">PDV-Macofel</code>) ou defina a variável de ambiente{' '}
+            <code className="rounded bg-gray-100 px-1">PDV_MACOFEL_ROOT</code> com o caminho absoluto.
+          </li>
+          <li>
+            Na raiz do site Macofel: <code className="rounded bg-gray-100 px-1">npm run pdv:embed</code> (executa{' '}
+            <code className="rounded bg-gray-100 px-1">build:embed</code> no PDV-Macofel e copia para{' '}
+            <code className="rounded bg-gray-100 px-1">public/loja</code>).
+          </li>
+          <li>
+            Commit de <code className="rounded bg-gray-100 px-1">public/loja/</code> (inclui{' '}
+            <code className="rounded bg-gray-100 px-1">embed-version.txt</code>) e push. Na Vercel pode usar{' '}
+            <code className="rounded bg-gray-100 px-1">PDV_WEB_EMBED_VERSION</code> para invalidar cache sem
+            mexer em ficheiros.
+          </li>
+        </ol>
+      </div>
+
       <div className="mt-8 space-y-4 text-sm text-gray-600">
         <h2 className="text-base font-semibold text-gray-900">No PC do cliente</h2>
         <ol className="list-decimal space-y-2 pl-5">
