@@ -7,7 +7,8 @@
  *   auditoria, reset de senhas, exportação total.
  * - ADMIN: produtos/categorias, pedidos, clientes, relatórios, criar vendedor/funcionário/logística, PDV terminais/impressoras.
  * - STORE_MANAGER: tudo do vendedor + relatórios da loja, trocas/devoluções, estoque físico, caixas PDV.
- * - SELLER: PDV completo, estoque em tempo real, NFC-e, cliente rápido, histórico do caixa.
+ * - SELLER: PDV completo, estoque em tempo real, NFC-e, cliente rápido, histórico do caixa;
+ *   no painel da loja: orçamentos e solicitações de orçamento dos clientes.
  * - EMPLOYEE: consulta estoque, entrada/saída mercadoria, status preparo — sem fechar venda/NFC-e.
  * - LOGISTICS: fila envio, status entrega, retirada balcão, dados de entrega — PDV só leitura quando existir UI.
  * - CLIENT: apenas portal (pedidos, perfil, carrinho).

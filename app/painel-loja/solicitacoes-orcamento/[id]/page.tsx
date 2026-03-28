@@ -1,1 +1,1 @@
-export { default } from '../../admin/solicitacoes-orcamento/[id]/page';
+export { default } from '@/app/admin/solicitacoes-orcamento/[id]/page';
