@@ -11,8 +11,7 @@ export default function MasterPdvDesktopPage() {
   const downloadUrl = resolvePdvInstallerDownloadUrl();
   const version = process.env.PDV_DESKTOP_INSTALLER_VERSION?.trim() || '0.1.0';
   const fileName =
-    process.env.PDV_DESKTOP_INSTALLER_FILENAME?.trim() ||
-    'PDV.Macofel_0.1.0_x64_en-US.msi';
+    process.env.PDV_DESKTOP_INSTALLER_FILENAME?.trim() || 'PDV.Macofel.msi';
 
   return (
     <div className="max-w-3xl">
@@ -70,14 +69,13 @@ export default function MasterPdvDesktopPage() {
               <code className="rounded bg-white/80 px-1">pdv-v0.1.0</code>):
             </p>
             <p className="mt-2 break-all rounded bg-white/90 px-2 py-1.5 font-mono text-[11px] text-amber-950">
-              https://github.com/Aldebaran-LW/PDV-Macofel/releases/download/pdv-v0.1.0/PDV.Macofel_0.1.0_x64_en-US.msi
+              https://github.com/Aldebaran-LW/PDV-Macofel/releases/download/pdv-v0.1.0/PDV.Macofel.msi
             </p>
             <p className="mt-2 text-amber-900/90">
               Opcional: <strong>PDV_DESKTOP_INSTALLER_FILENAME</strong> para o atributo{' '}
-              <code className="rounded bg-white/80 px-1">download</code>. Alternativa: ficheiro em{' '}
-              <code className="rounded bg-white/80 px-1">public/downloads/</code> +{' '}
-              <strong>PDV_DESKTOP_INSTALLER_PATH</strong> (ex.{' '}
-              <code className="rounded bg-white/80 px-1">/downloads/instalador.msi</code>).
+              <code className="rounded bg-white/80 px-1">download</code>. Por defeito o site usa{' '}
+              <code className="rounded bg-white/80 px-1">public/downloads/PDV.Macofel.msi</code> (
+              <strong>PDV_DESKTOP_INSTALLER_PATH</strong> opcional).
             </p>
             <p className="mt-2 text-xs text-amber-800/80">
               Ver <code>public/downloads/README.md</code> no repositório Macofel e o README do
