@@ -8,6 +8,10 @@ const GEMINI_URL =
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const cache = new Map<string, { expires: number; payload: BuscarProdutoResponse }>();
 
+function hasApiAccessConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID && process.env.GEMINI_API_KEY);
+}
+
 type MlAttribute = {
   id?: string;
   value_name?: string | null;
@@ -121,7 +125,13 @@ function toResponseFromGemini(
 async function fetchMercadoLivre(query: string): Promise<BuscarProdutoResponse | null> {
   const mlRes = await fetch(
     `${MLB_SEARCH}?q=${encodeURIComponent(query)}&limit=6`,
-    { next: { revalidate: 0 } }
+    {
+      next: { revalidate: 0 },
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MacofelBot/1.0 (+https://macofel.local)',
+      },
+    }
   );
   if (!mlRes.ok) return null;
   const mlData = (await mlRes.json()) as { results?: { id: string }[] };
@@ -130,6 +140,10 @@ async function fetchMercadoLivre(query: string): Promise<BuscarProdutoResponse |
 
   const detailRes = await fetch(`https://api.mercadolibre.com/items/${first.id}`, {
     next: { revalidate: 0 },
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'MacofelBot/1.0 (+https://macofel.local)',
+    },
   });
   if (!detailRes.ok) return null;
   const detail = (await detailRes.json()) as {
@@ -213,7 +227,10 @@ Formato:
   const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const parsed = normalizeGeminiJson(text);
   if (!parsed) return null;
-  return toResponseFromGemini(parsed, 'google_gemini');
+  const converted = toResponseFromGemini(parsed, 'google_gemini');
+  if (!converted) return null;
+  if (!converted.title?.trim()) converted.title = query;
+  return converted;
 }
 
 function needsEnrichment(r: BuscarProdutoResponse | null): boolean {
@@ -245,6 +262,25 @@ function mergePreferMl(
   };
 }
 
+function pickBestSingle(
+  query: string,
+  primary: BuscarProdutoResponse | null,
+  secondary: BuscarProdutoResponse | null
+): BuscarProdutoResponse | null {
+  if (!primary && !secondary) return null;
+  if (!primary) return secondary;
+  if (!secondary) return primary;
+
+  const score = (r: BuscarProdutoResponse) =>
+    (r.photos.length ? 1 : 0) +
+    (r.weight_grams != null ? 1 : 0) +
+    (r.dimensions_cm ? 1 : 0) +
+    (r.price_reference != null ? 1 : 0);
+
+  const best = score(primary) >= score(secondary) ? primary : secondary;
+  return { ...best, title: best.title || query };
+}
+
 export async function getBuscarProdutoInfo(query: string): Promise<BuscarProdutoResponse | null> {
   const term = query.trim();
   if (!term) return null;
@@ -255,6 +291,8 @@ export async function getBuscarProdutoInfo(query: string): Promise<BuscarProduto
     return hit.payload;
   }
 
+  const shouldUseGoogleGemini = hasApiAccessConfigured();
+
   let mlResult: BuscarProdutoResponse | null = null;
   try {
     mlResult = await fetchMercadoLivre(term);
@@ -262,14 +300,24 @@ export async function getBuscarProdutoInfo(query: string): Promise<BuscarProduto
     mlResult = null;
   }
 
-  let finalResult: BuscarProdutoResponse | null = mlResult;
-  if (needsEnrichment(mlResult)) {
+  let gemResult: BuscarProdutoResponse | null = null;
+  if (shouldUseGoogleGemini) {
     try {
-      const gem = await fetchGoogleGeminiEnrichment(term, mlResult);
-      finalResult = mergePreferMl(mlResult, gem);
+      gemResult = await fetchGoogleGeminiEnrichment(term, mlResult);
     } catch {
-      finalResult = mlResult;
+      gemResult = null;
     }
+  }
+
+  let finalResult: BuscarProdutoResponse | null = null;
+  if (mlResult && gemResult) {
+    finalResult = mergePreferMl(mlResult, gemResult);
+  } else {
+    finalResult = pickBestSingle(term, mlResult, gemResult);
+  }
+
+  if (mlResult && needsEnrichment(mlResult) && gemResult) {
+    finalResult = mergePreferMl(mlResult, gemResult);
   }
 
   if (!finalResult) return null;
