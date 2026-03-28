@@ -13,9 +13,9 @@ Serviço **opcional** para importar Excel (`.xlsx` / `.xls`) no mesmo MongoDB do
 
 ## Deploy (Render)
 
-Na raiz do repo Macofel existe `render.import.yaml` (renomeia para `render.yaml` se quiseres blueprint automático).
+Na **raiz** do repositório Macofel, o ficheiro `render.yaml` define **dois** serviços: o site Next (`materiais-de-construcao`) e este importador (`macofel-catalog-import`). Na dashboard da Render podes criar/atualizar a partir do blueprint ou criar só o serviço Python manualmente:
 
-1. Criar **Web Service** a partir deste repositório, **Root Directory**: `render-catalog-import`.
+1. **Web Service** com **Root Directory**: `render-catalog-import`.
 2. Comando: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 3. Build: `pip install -r requirements.txt`
 4. Copiar a URL pública (ex.: `https://macofel-catalog-import.onrender.com`).
