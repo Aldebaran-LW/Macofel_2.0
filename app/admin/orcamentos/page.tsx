@@ -7,6 +7,7 @@ import { FileText, Pencil, Search as SearchIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { useQuotesPortalBase } from '@/hooks/use-quotes-portal-base';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ type OrcamentoListItem = {
 
 export default function OrcamentosSavedPage() {
   const router = useRouter();
+  const quotesBase = useQuotesPortalBase();
   const [loading, setLoading] = useState(true);
   const [orcamentos, setOrcamentos] = useState<OrcamentoListItem[]>([]);
   const [search, setSearch] = useState('');
@@ -127,7 +129,11 @@ export default function OrcamentosSavedPage() {
           <FileText className="h-14 w-14 text-gray-300 mb-3" />
           <div className="font-semibold mb-1">Nenhum orçamento salvo</div>
           <div className="text-sm text-gray-500">
-            Salve um orçamento em <button className="underline" onClick={() => router.push('/admin/orcamento')}>Orçamento</button>.
+            Salve um orçamento em{' '}
+            <button className="underline" onClick={() => router.push(`${quotesBase}/orcamento`)}>
+              Orçamento
+            </button>
+            .
           </div>
         </div>
       ) : (
@@ -180,10 +186,10 @@ export default function OrcamentosSavedPage() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-wrap items-center justify-center gap-2">
-                          <Link href={`/admin/orcamentos/${o.id}`}>
+                          <Link href={`${quotesBase}/orcamentos/${o.id}`}>
                             <Button size="sm" variant="outline">Abrir</Button>
                           </Link>
-                          <Link href={`/admin/orcamentos/${o.id}?edit=1`}>
+                          <Link href={`${quotesBase}/orcamentos/${o.id}?edit=1`}>
                             <Button size="sm" variant="secondary">
                               <Pencil className="h-3.5 w-3.5 mr-1" />
                               Editar

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useQuotesPortalBase } from '@/hooks/use-quotes-portal-base';
 
 type Item = {
   productId: string;
@@ -46,6 +47,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function AdminSolicitacoesOrcamentoPage() {
+  const quotesBase = useQuotesPortalBase();
   const [loading, setLoading] = useState(true);
   const [list, setList] = useState<Solicitacao[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -243,7 +245,7 @@ export default function AdminSolicitacoesOrcamentoPage() {
               </div>
               <div className="mt-4">
                 <Link
-                  href={`/admin/solicitacoes-orcamento/${s.id}`}
+                  href={`${quotesBase}/solicitacoes-orcamento/${s.id}`}
                   className="inline-flex text-sm font-semibold text-red-600 hover:underline"
                 >
                   Montar proposta (frete, PIX, parcelas) →

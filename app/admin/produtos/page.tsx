@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Plus, Edit, Trash2, Save, X, Upload, Image as ImageIcon } from 'lucide-react';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  Upload,
+  Image as ImageIcon,
+  FileSpreadsheet,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,6 +70,32 @@ export default function AdminProdutosPage() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importUpsert, setImportUpsert] = useState(true);
+  const [importPreviewLoading, setImportPreviewLoading] = useState(false);
+  const [importRunLoading, setImportRunLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<{
+    totalRows: number;
+    sample: Array<{
+      code: string;
+      name: string;
+      grupo: string;
+      marca: string;
+      stock: number;
+      price: number;
+      slug: string;
+    }>;
+    warnings: string[];
+  } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{ name: string; message: string }>;
+    warnings: string[];
+  } | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -226,6 +261,85 @@ export default function AdminProdutosPage() {
     }
   };
 
+  const resetImportState = () => {
+    setImportFile(null);
+    setImportPreview(null);
+    setImportResult(null);
+    setImportUpsert(true);
+  };
+
+  const handleImportPreview = async () => {
+    if (!importFile) {
+      toast.error('Selecione um ficheiro .xls ou .xlsx');
+      return;
+    }
+    setImportPreviewLoading(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      const res = await fetch('/api/admin/products/import/preview', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Erro na prévia');
+        return;
+      }
+      setImportPreview({
+        totalRows: data.totalRows,
+        sample: data.sample ?? [],
+        warnings: data.warnings ?? [],
+      });
+      toast.success(`Prévia: ${data.totalRows} linha(s) reconhecida(s).`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao gerar prévia');
+    } finally {
+      setImportPreviewLoading(false);
+    }
+  };
+
+  const handleImportRun = async () => {
+    if (!importFile) {
+      toast.error('Selecione um ficheiro .xls ou .xlsx');
+      return;
+    }
+    setImportRunLoading(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('upsert', importUpsert ? 'true' : 'false');
+      const res = await fetch('/api/admin/products/import', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Erro na importação');
+        return;
+      }
+      setImportResult({
+        created: data.created,
+        updated: data.updated,
+        skipped: data.skipped,
+        errors: data.errors ?? [],
+        warnings: data.warnings ?? [],
+      });
+      toast.success(
+        `Importação concluída: ${data.created} novos, ${data.updated} atualizados, ${data.skipped} ignorados.`
+      );
+      fetchProducts();
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro na importação');
+    } finally {
+      setImportRunLoading(false);
+    }
+  };
+
   const handleDelete = async (productId: string, productName: string) => {
     if (!confirm(`Tem certeza que deseja deletar "${productName}"?`)) {
       return;
@@ -258,12 +372,24 @@ export default function AdminProdutosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-3xl font-bold">Gerenciar Produtos</h1>
-        <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Produto
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              resetImportState();
+              setImportOpen(true);
+            }}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Importar relatório (.xls)
+          </Button>
+          <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Produto
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -379,6 +505,128 @@ export default function AdminProdutosPage() {
           </table>
         </div>
       </div>
+
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open) resetImportState();
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar relatório de produtos / estoque</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-gray-600">
+            <p>
+              Use o ficheiro no formato <strong>Relação de estoque</strong> (colunas: código, nome do
+              produto, grupo, marca, estoque, valor estoque custo e venda). São lidas todas as folhas
+              do Excel (.xls ou .xlsx).
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Ficheiro</label>
+              <Input
+                type="file"
+                accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  setImportFile(f ?? null);
+                  setImportPreview(null);
+                  setImportResult(null);
+                }}
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={importUpsert}
+                onChange={(e) => setImportUpsert(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+              />
+              <span>
+                Atualizar produtos já existentes (mesmo código + nome → mesmo identificador interno)
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!importFile || importPreviewLoading}
+                onClick={() => void handleImportPreview()}
+              >
+                {importPreviewLoading ? 'A gerar prévia…' : 'Prévia'}
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-600 hover:bg-red-700"
+                disabled={!importFile || importRunLoading}
+                onClick={() => void handleImportRun()}
+              >
+                {importRunLoading ? 'A importar…' : 'Importar'}
+              </Button>
+            </div>
+            {importPreview && (
+              <div className="space-y-2">
+                <p className="font-medium text-gray-900">
+                  Prévia: {importPreview.totalRows} produto(s) — primeiras {importPreview.sample.length}{' '}
+                  linhas
+                </p>
+                {importPreview.warnings.length > 0 && (
+                  <ul className="list-disc pl-5 text-amber-800 text-xs">
+                    {importPreview.warnings.slice(0, 8).map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="border rounded-md overflow-x-auto max-h-56 overflow-y-auto text-xs">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-1 text-left">Cód.</th>
+                        <th className="px-2 py-1 text-left">Nome</th>
+                        <th className="px-2 py-1 text-left">Grupo</th>
+                        <th className="px-2 py-1 text-left">Qtd</th>
+                        <th className="px-2 py-1 text-left">Preço unit. (calc.)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {importPreview.sample.map((r, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-1 whitespace-nowrap">{r.code}</td>
+                          <td className="px-2 py-1">{r.name}</td>
+                          <td className="px-2 py-1 whitespace-nowrap">{r.grupo}</td>
+                          <td className="px-2 py-1">{r.stock}</td>
+                          <td className="px-2 py-1">R$ {r.price.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {importResult && (
+              <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
+                <p>
+                  <strong>Criados:</strong> {importResult.created} · <strong>Atualizados:</strong>{' '}
+                  {importResult.updated} · <strong>Ignorados:</strong> {importResult.skipped}
+                </p>
+                {importResult.errors.length > 0 && (
+                  <p className="text-red-700 text-xs">
+                    Erros: {importResult.errors.length} (ver consola / detalhe no servidor)
+                  </p>
+                )}
+                {importResult.warnings.length > 0 && (
+                  <ul className="list-disc pl-5 text-xs text-amber-900">
+                    {importResult.warnings.slice(0, 6).map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para Criar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

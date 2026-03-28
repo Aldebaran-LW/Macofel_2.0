@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useQuotesPortalBase } from '@/hooks/use-quotes-portal-base';
 
 interface OrcamentoItem {
   id: string;
@@ -43,6 +44,7 @@ export default function AdminOrcamentoPage() {
   const [produtoAtual, setProdutoAtual] = useState({ nome: '', quantidade: '1', preco: '' });
 
   const router = useRouter();
+  const quotesBase = useQuotesPortalBase();
   const [savingOrcamento, setSavingOrcamento] = useState(false);
   const [savedOrcamentoId, setSavedOrcamentoId] = useState<string | null>(null);
 
@@ -426,7 +428,7 @@ export default function AdminOrcamentoPage() {
           {savedOrcamentoId && (
             <Button
               variant="outline"
-              onClick={() => router.push(`/admin/orcamentos/${savedOrcamentoId}`)}
+              onClick={() => router.push(`${quotesBase}/orcamentos/${savedOrcamentoId}`)}
               className="border-gray-200"
             >
               Consultar/Exportar depois

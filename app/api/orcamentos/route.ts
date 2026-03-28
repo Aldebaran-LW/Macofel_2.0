@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
 import { createOrcamento, getOrcamentos, OrcamentoDoc } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

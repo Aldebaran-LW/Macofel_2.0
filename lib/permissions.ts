@@ -172,6 +172,11 @@ export function isPainelLojaRole(role: string | undefined | null): boolean {
   return role === 'STORE_MANAGER' || role === 'SELLER';
 }
 
+/** Orçamentos internos (Mongo) + solicitações de clientes (`quote_requests`). Admin ou painel da loja. */
+export function canManageQuotesAndOrcamentos(role: string | undefined | null): boolean {
+  return isAdminDashboardRole(role) || isPainelLojaRole(role);
+}
+
 export function isCustomerRole(role: string | undefined | null): boolean {
   return role === 'CLIENT' || !role;
 }

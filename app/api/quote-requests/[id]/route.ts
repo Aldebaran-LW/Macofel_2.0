@@ -15,7 +15,7 @@ import {
   notifyAdminsProposalRejected,
 } from '@/lib/email-notifications';
 import { createOrderFromAcceptedQuote } from '@/lib/create-order-from-accepted-quote';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,7 @@ export async function GET(
 
     const role = auth.role;
     const userId = auth.userId;
-    if (isAdminDashboardRole(role)) {
+    if (canManageQuotesAndOrcamentos(role)) {
       return NextResponse.json(doc);
     }
     if (role === 'CLIENT' && doc.userId === userId) {
@@ -108,7 +108,7 @@ export async function PATCH(
       return NextResponse.json({ ok: true });
     }
 
-    if (!isAdminDashboardRole(auth.role)) {
+    if (!canManageQuotesAndOrcamentos(auth.role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

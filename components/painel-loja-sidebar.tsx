@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Monitor,
@@ -14,6 +15,9 @@ import {
   Cpu,
   Lock,
   History,
+  FileText,
+  FolderOpen,
+  ClipboardList,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -34,6 +38,12 @@ const baseItems: Item[] = [
   { href: '/loja', label: 'PDV no navegador', icon: Monitor },
   { href: '/painel-loja/historico-caixa', label: 'Histórico do caixa', icon: History },
   { href: '/painel-loja/instalador', label: 'PDV Desktop (Windows)', icon: Download },
+];
+
+const orcamentoItems: Item[] = [
+  { href: '/painel-loja/orcamento', label: 'Montar orçamento', icon: FileText },
+  { href: '/painel-loja/orcamentos', label: 'Orçamentos salvos', icon: FolderOpen },
+  { href: '/painel-loja/solicitacoes-orcamento', label: 'Solicitações de clientes', icon: ClipboardList },
 ];
 
 const gerenteItems: Item[] = [
@@ -78,6 +88,29 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
   const router = useRouter();
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
+  const [pendingQuoteRequests, setPendingQuoteRequests] = useState(0);
+
+  useEffect(() => {
+    if (!isPainelLojaRole(role)) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/quote-requests?page=1&limit=1&status=pending');
+        if (!res.ok) return;
+        const data = await res.json();
+        const total = data?.pagination?.total;
+        if (!cancelled && typeof total === 'number') setPendingQuoteRequests(total);
+      } catch {
+        /* ignore */
+      }
+    };
+    void load();
+    const interval = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [role]);
 
   const nav = () => onNavigate?.();
 
@@ -123,6 +156,52 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
             </Link>
           );
         })}
+
+        {isPainelLojaRole(role) && (
+          <div className="pt-4">
+            <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-emerald-500/90">
+              Orçamentos
+            </p>
+            <div className="space-y-1">
+              {orcamentoItems.map(({ href, label, icon: Icon }) => {
+                const active =
+                  href === '/painel-loja/orcamentos'
+                    ? pathname === href || pathname?.startsWith('/painel-loja/orcamentos/')
+                    : href === '/painel-loja/solicitacoes-orcamento'
+                      ? pathname === href ||
+                        pathname?.startsWith('/painel-loja/solicitacoes-orcamento/')
+                      : pathname === href;
+                const showPendingBadge =
+                  href === '/painel-loja/solicitacoes-orcamento' && pendingQuoteRequests > 0;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={nav}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
+                      active ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    {showPendingBadge ? (
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold',
+                          active ? 'bg-white/20 text-white' : 'bg-amber-500 text-slate-950'
+                        )}
+                        title="Solicitações pendentes de análise"
+                      >
+                        {pendingQuoteRequests > 99 ? '99+' : pendingQuoteRequests}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {isPainelLojaRole(role) && role === 'STORE_MANAGER' && visibleGerente.length > 0 && (
           <div className="pt-4">

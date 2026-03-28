@@ -16,6 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
+import { useQuotesPortalBase } from '@/hooks/use-quotes-portal-base';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import {
   computeQuoteProposalTotals,
   type QuoteProposalStored,
@@ -60,6 +63,10 @@ const emptyProposal = (): QuoteProposalStored => ({
 export default function AdminSolicitacaoDetailPage() {
   const params = useParams();
   const id = String(params?.id ?? '');
+  const quotesBase = useQuotesPortalBase();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const canOpenOrdersAdmin = isAdminDashboardRole(role);
 
   const [loading, setLoading] = useState(true);
   const [doc, setDoc] = useState<Doc | null>(null);
@@ -163,7 +170,7 @@ export default function AdminSolicitacaoDetailPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href="/admin/solicitacoes-orcamento"
+          href={`${quotesBase}/solicitacoes-orcamento`}
           className="inline-flex items-center text-sm text-gray-600 hover:text-red-600"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
@@ -183,12 +190,18 @@ export default function AdminSolicitacaoDetailPage() {
         {doc.linkedOrderId ? (
           <p className="text-sm mt-3">
             <span className="text-gray-600">Pedido gerado: </span>
-            <Link
-              href="/admin/pedidos"
-              className="font-semibold text-red-600 hover:underline"
-            >
-              #{doc.linkedOrderId.slice(0, 8)}… — ver em Pedidos
-            </Link>
+            {canOpenOrdersAdmin ? (
+              <Link
+                href="/admin/pedidos"
+                className="font-semibold text-red-600 hover:underline"
+              >
+                #{doc.linkedOrderId.slice(0, 8)}… — ver em Pedidos
+              </Link>
+            ) : (
+              <span className="font-mono text-gray-800">
+                #{doc.linkedOrderId.slice(0, 8)}… (consulta no painel administrativo)
+              </span>
+            )}
           </p>
         ) : null}
       </div>

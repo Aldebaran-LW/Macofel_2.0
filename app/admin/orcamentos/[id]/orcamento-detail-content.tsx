@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Download, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useQuotesPortalBase } from '@/hooks/use-quotes-portal-base';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +61,7 @@ export default function OrcamentoDetailContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const quotesBase = useQuotesPortalBase();
   const id = params?.id;
 
   const [loading, setLoading] = useState(true);
@@ -248,7 +250,7 @@ export default function OrcamentoDetailContent() {
         throw new Error(err?.error ?? 'Erro ao excluir');
       }
       toast.success('Orçamento excluído');
-      router.push('/admin/orcamentos');
+      router.push(`${quotesBase}/orcamentos`);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? 'Erro ao excluir');
@@ -399,7 +401,7 @@ export default function OrcamentoDetailContent() {
     return (
       <div className="space-y-4 p-6">
         <div className="text-red-600 font-semibold">Erro: {error}</div>
-        <Link href="/admin/orcamentos" className="underline text-sm">
+        <Link href={`${quotesBase}/orcamentos`} className="underline text-sm">
           Voltar para orçamentos salvos
         </Link>
       </div>
@@ -410,7 +412,7 @@ export default function OrcamentoDetailContent() {
     return (
       <div className="space-y-4 p-6">
         <div className="text-gray-600 font-semibold">Orçamento não encontrado</div>
-        <Link href="/admin/orcamentos" className="underline text-sm">
+        <Link href={`${quotesBase}/orcamentos`} className="underline text-sm">
           Voltar para orçamentos salvos
         </Link>
       </div>
@@ -422,7 +424,7 @@ export default function OrcamentoDetailContent() {
       <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-3xl font-bold">Orçamento</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/admin/orcamentos">
+          <Link href={`${quotesBase}/orcamentos`}>
             <Button variant="outline" className="border-gray-200">
               Voltar
             </Button>
