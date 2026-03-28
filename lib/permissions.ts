@@ -12,7 +12,8 @@
  * - LOGISTICS: fila envio, status entrega, retirada balcão, dados de entrega — PDV só leitura quando existir UI.
  * - CLIENT: apenas portal (pedidos, perfil, carrinho).
  *
- * Uso: `hasPermission(role, '…')` para gates finos; `isAdminDashboardRole` / `hasPdvFullWebAccess` para rotas atuais.
+ * Uso: `hasPermission(role, '…')` para gates finos; `isAdminDashboardRole` / `hasPdvFullWebAccess` /
+ * `isPainelLojaRole` para rotas (`/admin`, `/loja`, `/painel-loja`).
  */
 
 export type UserRole =
@@ -164,6 +165,11 @@ export function hasPdvFullWebAccess(role: string | undefined | null): boolean {
     role === 'STORE_MANAGER' ||
     role === 'SELLER'
   );
+}
+
+/** Área `/painel-loja` — vendedor e gerente de loja (sem backoffice Admin completo). */
+export function isPainelLojaRole(role: string | undefined | null): boolean {
+  return role === 'STORE_MANAGER' || role === 'SELLER';
 }
 
 export function isCustomerRole(role: string | undefined | null): boolean {

@@ -7,7 +7,7 @@ import { ShoppingCart, User, LogOut, Menu, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 export default function Header() {
   const [mounted, setMounted] = useState(false);
@@ -17,6 +17,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
+  const isPainelLoja = isPainelLojaRole((session?.user as any)?.role);
 
   useEffect(() => {
     setMounted(true);
@@ -99,6 +100,11 @@ export default function Header() {
             {isAdmin && (
               <Link href="/admin/dashboard" className="hover:text-red-600 transition-colors">Admin</Link>
             )}
+            {isPainelLoja && (
+              <Link href="/painel-loja" className="hover:text-red-600 transition-colors">
+                Painel loja
+              </Link>
+            )}
           </div>
 
           {/* Actions */}
@@ -111,7 +117,7 @@ export default function Header() {
               <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
             ) : session?.user ? (
               <>
-                {!isAdmin && (
+                {!isAdmin && !isPainelLoja && (
                   <Link href="/carrinho" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
                     <ShoppingCart className="w-5 h-5" />
                     {cartCount > 0 && (
@@ -205,6 +211,15 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Admin
+              </Link>
+            )}
+            {isPainelLoja && (
+              <Link
+                href="/painel-loja"
+                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Painel loja
               </Link>
             )}
             {!session?.user && (

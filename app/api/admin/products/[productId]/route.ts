@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ObjectId } from 'mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
 import mongoPrisma from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/mongodb-native';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 
 export const dynamic = 'force-dynamic';
@@ -22,11 +24,25 @@ export async function PATCH(
     const body = await req.json();
     const { name, description, price, stock, minStock, weight, imageUrl, categoryId, featured } = body;
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     const current = await mongoPrisma.product.findUnique({
       where: { id: params?.productId },
-      select: { name: true, weight: true, imageUrl: true, dimensionsCm: true, imageUrls: true },
+      select: { name: true, weight: true, imageUrl: true },
     });
+
+    let dimensionsCm: string | null = null;
+    let imageUrls: string[] = [];
+    try {
+      const db = await connectToDatabase();
+      const raw = await db.collection('products').findOne(
+        { _id: new ObjectId(params?.productId) },
+        { projection: { dimensionsCm: 1, imageUrls: 1 } }
+      );
+      dimensionsCm = raw?.dimensionsCm != null ? String(raw.dimensionsCm) : null;
+      imageUrls = raw && Array.isArray(raw.imageUrls) ? raw.imageUrls.map(String) : [];
+    } catch {
+      // ignora — enriquecimento continua só com campos Prisma
+    }
 
     if (name !== undefined) {
       updateData.name = name;
@@ -42,7 +58,7 @@ export async function PATCH(
     if (price !== undefined) updateData.price = parseFloat(price);
     if (stock !== undefined) updateData.stock = parseInt(stock);
     if (minStock !== undefined) updateData.minStock = parseInt(minStock) || 0;
-    if (weight !== undefined) updateData.weight = weight ? parseFloat(weight) : null;
+    if (weight !== undefined) updateData.weight = weight ? parseFloat(String(weight)) : null;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';
@@ -50,11 +66,12 @@ export async function PATCH(
     const lookupName = typeof name === 'string' && name.trim() ? name.trim() : current?.name;
     const needsAutoFill =
       !!lookupName &&
-      (
-        (updateData.weight ?? current?.weight ?? null) == null ||
+      ((updateData.weight ?? current?.weight ?? null) == null ||
         !(updateData.imageUrl ?? current?.imageUrl) ||
-        !(updateData.dimensionsCm ?? current?.dimensionsCm)
-      );
+        !dimensionsCm?.trim() ||
+        imageUrls.length === 0);
+
+    const extraMongo: Record<string, unknown> = {};
     if (needsAutoFill && lookupName) {
       try {
         const enriched = await getBuscarProdutoInfo(lookupName);
@@ -65,11 +82,11 @@ export async function PATCH(
           if (!(updateData.imageUrl ?? current?.imageUrl) && enriched.photos?.[0]) {
             updateData.imageUrl = enriched.photos[0];
           }
-          if (!(updateData.dimensionsCm ?? current?.dimensionsCm) && enriched.dimensions_cm) {
-            updateData.dimensionsCm = enriched.dimensions_cm;
+          if (!dimensionsCm?.trim() && enriched.dimensions_cm) {
+            extraMongo.dimensionsCm = enriched.dimensions_cm;
           }
-          if ((!Array.isArray(current?.imageUrls) || current?.imageUrls.length === 0) && enriched.photos?.length) {
-            updateData.imageUrls = enriched.photos;
+          if (imageUrls.length === 0 && enriched.photos?.length) {
+            extraMongo.imageUrls = enriched.photos;
           }
         }
       } catch {
@@ -79,9 +96,20 @@ export async function PATCH(
 
     const product = await mongoPrisma.product.update({
       where: { id: params?.productId },
-      data: updateData,
+      data: updateData as any,
       include: { category: true },
     });
+
+    if (Object.keys(extraMongo).length > 0) {
+      try {
+        const db = await connectToDatabase();
+        await db
+          .collection('products')
+          .updateOne({ _id: new ObjectId(params?.productId) }, { $set: extraMongo });
+      } catch {
+        // não falha o PATCH
+      }
+    }
 
     return NextResponse.json(product);
   } catch (error: any) {

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { ShoppingCart, Menu, X, User, LogOut } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 interface NavCategory {
   name: string;
@@ -28,6 +28,7 @@ export default function HeaderMobile() {
   const currentCategory = pathname === '/catalogo' ? (searchParams?.get('category') ?? '') : '';
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
+  const isPainelLoja = isPainelLojaRole((session?.user as any)?.role);
   const isLoggedIn = status === 'authenticated' && !!session?.user;
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function HeaderMobile() {
   }, []);
 
   useEffect(() => {
-    if (status !== 'authenticated' || isAdmin) {
+    if (status !== 'authenticated' || isAdmin || isPainelLoja) {
       setCartCount(0);
       return;
     }
@@ -61,7 +62,7 @@ export default function HeaderMobile() {
     return () => {
       cancelled = true;
     };
-  }, [status, isAdmin, pathname]);
+  }, [status, isAdmin, isPainelLoja, pathname]);
 
   const categories: NavCategory[] = [
     ...rawCategories.map((c) => ({
@@ -134,13 +135,17 @@ export default function HeaderMobile() {
                   <Link href="/admin/dashboard" className="text-gray-600 hover:text-emerald-600 font-semibold">
                     Painel admin
                   </Link>
+                ) : isPainelLoja ? (
+                  <Link href="/painel-loja" className="text-gray-600 hover:text-emerald-600 font-semibold">
+                    Painel da loja
+                  </Link>
                 ) : (
                   <Link href="/minha-conta" className="text-gray-600 hover:text-emerald-600 font-semibold inline-flex items-center gap-1">
                     <User className="h-4 w-4" />
                     Minha conta
                   </Link>
                 )}
-                {!isAdmin && (
+                {!isAdmin && !isPainelLoja && (
                   <Link href="/carrinho" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600">
                     <ShoppingCart className="w-6 h-6" />
                     <span className="font-bold">{cartBadge(cartCount)}</span>
@@ -171,7 +176,7 @@ export default function HeaderMobile() {
 
           {/* Mobile: carrinho + hambúrguer */}
           <div className="flex md:hidden items-center gap-1">
-            {!isAdmin && (
+            {!isAdmin && !isPainelLoja && (
               <Link
                 href="/carrinho"
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-700 relative"
@@ -249,6 +254,30 @@ export default function HeaderMobile() {
                     >
                       Painel administrativo
                     </Link>
+                  ) : isPainelLoja ? (
+                    <>
+                      <Link
+                        href="/painel-loja"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full text-center py-3 px-4 bg-emerald-600 text-white font-bold rounded-lg"
+                      >
+                        Painel da loja
+                      </Link>
+                      <Link
+                        href="/loja"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full text-center py-3 px-4 border-2 border-emerald-600 text-emerald-700 font-bold rounded-lg"
+                      >
+                        Abrir PDV
+                      </Link>
+                      <Link
+                        href="/minha-conta"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full text-center py-2 text-sm text-gray-600 hover:text-emerald-600"
+                      >
+                        Minha conta
+                      </Link>
+                    </>
                   ) : (
                     <>
                       <Link
@@ -273,7 +302,7 @@ export default function HeaderMobile() {
                     className="flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-bold rounded-lg"
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    Carrinho ({isAdmin ? 0 : cartBadge(cartCount)})
+                    Carrinho ({isAdmin || isPainelLoja ? 0 : cartBadge(cartCount)})
                   </Link>
                   <button
                     type="button"

@@ -24,6 +24,15 @@ export const authOptions: NextAuthOptions = {
 
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
+            select: {
+              id: true,
+              email: true,
+              password: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              pdvUserName: true,
+            },
           });
 
           if (!user) {
@@ -52,6 +61,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: `${user.firstName} ${user.lastName}`,
             role: user.role,
+            pdvUserName: user.pdvUserName ?? null,
           };
         } catch (error: any) {
           console.error('[AUTH] Erro no authorize:', error);
@@ -69,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as any).role;
         token.email = (user as any).email;
         token.name = (user as any).name;
+        token.pdvUserName = (user as any).pdvUserName ?? null;
       }
       return token;
     },
@@ -77,6 +88,7 @@ export const authOptions: NextAuthOptions = {
         const uid = ((token.id as string) || (token.sub as string)) ?? '';
         (session.user as any).id = uid;
         (session.user as any).role = token.role;
+        (session.user as any).pdvUserName = token.pdvUserName ?? null;
       }
       return session;
     },

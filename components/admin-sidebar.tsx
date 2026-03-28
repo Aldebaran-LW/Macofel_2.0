@@ -19,6 +19,7 @@ import {
   UserCog,
   Shield,
   Monitor,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
@@ -155,6 +156,20 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
             <span className="font-semibold">PDV (/loja)</span>
           </Link>
         )}
+
+        <Link
+          href="/admin/pdv-desktop"
+          onClick={nav}
+          className={cn(
+            'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-emerald-700/35 bg-emerald-950/30',
+            pathname === '/admin/pdv-desktop'
+              ? 'bg-emerald-600 text-white border-emerald-500'
+              : 'text-emerald-100 hover:bg-emerald-950/60'
+          )}
+        >
+          <Download className="h-5 w-5 shrink-0" />
+          <span className="font-semibold">PDV Desktop</span>
+        </Link>
 
         {menuItems.map((item) => {
           const Icon = item.icon;

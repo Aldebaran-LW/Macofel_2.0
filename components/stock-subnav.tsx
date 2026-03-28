@@ -5,8 +5,6 @@ import { usePathname } from 'next/navigation';
 import { AlertTriangle, ArrowLeftRight, FileUp, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const baseHref = '/admin/estoque' as const;
-
 const items = [
   { slug: 'alertas', label: 'Alertas', icon: AlertTriangle },
   { slug: 'movimentacoes', label: 'Movimentações', icon: ArrowLeftRight },
@@ -20,6 +18,9 @@ type StockSubnavProps = {
 
 export default function StockSubnav({ className }: StockSubnavProps) {
   const pathname = usePathname();
+  const baseHref =
+    pathname?.startsWith('/painel-loja/estoque') ? '/painel-loja/estoque' : '/admin/estoque';
+  const badgeLabel = baseHref.startsWith('/painel-loja') ? 'Loja • Estoque' : 'Admin • Estoque';
 
   return (
     <div
@@ -30,7 +31,7 @@ export default function StockSubnav({ className }: StockSubnavProps) {
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-200">
-          Admin • Estoque
+          {badgeLabel}
         </span>
         <p className="text-sm text-slate-400">
           Módulo de estoque — não substitui a sincronização do PDV.

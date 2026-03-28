@@ -10,11 +10,14 @@ declare module 'next-auth' {
       name?: string | null;
       image?: string | null;
       role?: UserRole;
+      /** Login curto PDV — usado para filtrar vendas do vendedor no histórico web. */
+      pdvUserName?: string | null;
     };
   }
 
   interface User {
     role?: UserRole;
+    pdvUserName?: string | null;
   }
 }
 
@@ -22,5 +25,6 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id?: string;
     role?: UserRole;
+    pdvUserName?: string | null;
   }
 }

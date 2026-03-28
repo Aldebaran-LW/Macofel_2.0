@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { ObjectId } from 'mongodb';
 import crypto from 'crypto';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessPhysicalStockApi } from '@/lib/store-stock-access';
 import { connectToDatabase } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +42,7 @@ function computeHash(text: string) {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+  if (!session?.user || !canAccessPhysicalStockApi((session.user as any).role)) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 

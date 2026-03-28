@@ -8,6 +8,7 @@ import {
   isAdminDashboardRole,
   isMasterAdminPathname,
   isMasterAdminRole,
+  isPainelLojaRole,
 } from '@/lib/permissions';
 
 function isLojaRoute(pathname: string) {
@@ -37,12 +38,20 @@ const authMiddleware = withAuth(
         return NextResponse.redirect(new URL('/admin/dashboard?master=forbidden', req.url));
       }
       if (!isMasterArea && !isAdmin) {
+        if (isPainelLojaRole(role)) {
+          return NextResponse.redirect(new URL('/painel-loja', req.url));
+        }
         return NextResponse.redirect(new URL('/admin/login', req.url));
       }
     }
 
-    if (isAdminLoginRoute && token && isAdmin) {
-      return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+    if (isAdminLoginRoute && token) {
+      if (isAdmin) {
+        return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+      }
+      if (isPainelLojaRole(role)) {
+        return NextResponse.redirect(new URL('/painel-loja', req.url));
+      }
     }
 
     return NextResponse.next();
@@ -63,7 +72,10 @@ const authMiddleware = withAuth(
           if (isMasterAdminPathname(path)) {
             return isMasterAdminRole(token.role as string | undefined);
           }
-          return isAdminDashboardRole(token.role as string | undefined);
+          const r = token.role as string | undefined;
+          if (isAdminDashboardRole(r)) return true;
+          if (isPainelLojaRole(r)) return true;
+          return false;
         }
 
         return !!token;
@@ -74,6 +86,23 @@ const authMiddleware = withAuth(
 
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const pathname = req.nextUrl.pathname;
+
+  if (pathname.startsWith('/painel-loja')) {
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+    const token = await getToken({ req, secret });
+    if (!token) {
+      const u = new URL('/login', req.url);
+      u.searchParams.set('callbackUrl', `${pathname}${req.nextUrl.search}`);
+      return NextResponse.redirect(u);
+    }
+    if (!isPainelLojaRole(token.role as string | undefined)) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+    return NextResponse.next();
+  }
 
   if (isLojaRoute(pathname)) {
     const secret = process.env.NEXTAUTH_SECRET;
@@ -97,6 +126,8 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
 
 export const config = {
   matcher: [
+    '/painel-loja',
+    '/painel-loja/:path*',
     '/admin/:path*',
     '/perfil/:path*',
     '/meus-pedidos/:path*',

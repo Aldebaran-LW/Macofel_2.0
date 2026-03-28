@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -16,6 +16,8 @@ export default function AdminPage() {
       router.push('/admin/login');
     } else if (isAdminDashboardRole((session.user as any)?.role)) {
       router.push('/admin/dashboard');
+    } else if (isPainelLojaRole((session.user as any)?.role)) {
+      router.push('/painel-loja');
     } else {
       router.push('/admin/login');
     }

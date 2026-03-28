@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 /** Evita open redirect: só caminhos relativos internos. */
 function safeCallbackPath(raw: string | null): string | null {
@@ -67,6 +67,12 @@ export default function LoginPage() {
           toast.success('Login realizado com sucesso! Redirecionando para área administrativa...');
           router.replace('/admin/dashboard');
           router.refresh();
+          return;
+        }
+
+        if (isPainelLojaRole(userRole)) {
+          toast.success('Login realizado! A abrir o painel da loja…');
+          window.location.assign('/painel-loja');
           return;
         }
 

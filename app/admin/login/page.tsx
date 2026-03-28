@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Shield, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -23,8 +23,9 @@ export default function AdminLoginPage() {
       const role = (session.user as any)?.role;
       if (isAdminDashboardRole(role)) {
         router.push('/admin/dashboard');
+      } else if (isPainelLojaRole(role)) {
+        router.push('/painel-loja');
       } else if (role && !isAdminDashboardRole(role)) {
-        // Se logado mas não é admin, fazer logout
         signOut({ redirect: false });
       }
     }
@@ -57,11 +58,13 @@ export default function AdminLoginPage() {
           toast.success('Acesso autorizado');
           router.push('/admin/dashboard');
           router.refresh();
+        } else if (isPainelLojaRole(userRole)) {
+          toast.success('Redirecionando para o painel da loja…');
+          router.push('/painel-loja');
+          router.refresh();
         } else {
           toast.error('Acesso negado. Apenas administradores podem acessar esta área.');
-          // Fazer logout usando signOut do next-auth
           await signOut({ redirect: false });
-          // Limpar formulário
           setFormData({ email: '', password: '' });
         }
       }

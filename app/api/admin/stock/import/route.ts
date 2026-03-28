@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { ObjectId } from 'mongodb';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessPhysicalStockApi } from '@/lib/store-stock-access';
 import { connectToDatabase } from '@/lib/mongodb-native';
+import { enrichExistingProductIfSparse } from '@/lib/product-web-enrichment';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ function isValidMode(v: unknown): v is ImportMode {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+  if (!session?.user || !canAccessPhysicalStockApi((session.user as any).role)) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   const mode: ImportMode = isValidMode(body?.mode) ? body.mode : 'add';
   const source = typeof body?.source === 'string' ? body.source : 'unknown';
   const documentHash = typeof body?.documentHash === 'string' ? body.documentHash : null;
+  const enrichProducts = body?.enrichProducts !== false;
   const items: ImportItem[] = Array.isArray(body?.items) ? body.items : [];
   const mappingsToUpsert: Array<{ externalCode: string; productId: string; source?: string }> = Array.isArray(
     body?.mappingsToUpsert
@@ -192,6 +194,47 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const enrichment: {
+    enabled: boolean;
+    processed: number;
+    updated: number;
+    skipped: number;
+    cappedAt: number;
+    errors: string[];
+  } = {
+    enabled: enrichProducts,
+    processed: 0,
+    updated: 0,
+    skipped: 0,
+    cappedAt: 40,
+    errors: [],
+  };
+
+  if (enrichProducts && perProduct.size > 0) {
+    const MAX = enrichment.cappedAt;
+    const ids = Array.from(perProduct.keys()).slice(0, MAX);
+    try {
+      const db = await connectToDatabase();
+      const oids = ids.map((id) => new ObjectId(id));
+      const prods = await db
+        .collection('products')
+        .find({ _id: { $in: oids } }, { projection: { name: 1 } })
+        .toArray();
+      for (const p of prods) {
+        enrichment.processed += 1;
+        try {
+          const r = await enrichExistingProductIfSparse(String(p._id), String((p as { name?: string }).name ?? ''));
+          if (r.updated) enrichment.updated += 1;
+          else enrichment.skipped += 1;
+        } catch (e: unknown) {
+          enrichment.errors.push(e instanceof Error ? e.message : String(e));
+        }
+      }
+    } catch (e: unknown) {
+      enrichment.errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   await imports.insertOne({
     mode,
     source,
@@ -217,6 +260,7 @@ export async function POST(req: NextRequest) {
     applied,
     errorsCount: errors.length,
     errors,
+    enrichment,
   });
 }
 

@@ -4,8 +4,21 @@ import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
 import mongoPrisma from '@/lib/mongodb';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
+import { applyExtraFieldsFromEnrichment } from '@/lib/product-web-enrichment';
 
 export const dynamic = 'force-dynamic';
+
+function parsePriceInput(v: unknown): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v ?? '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/[^\d,.-]/g, '');
+  if (!s) return NaN;
+  const normalized = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? n : NaN;
+}
 
 // Criar novo produto
 export async function POST(req: NextRequest) {
@@ -19,7 +32,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, description, price, stock, minStock, weight, imageUrl, categoryId, featured } = body;
 
-    if (!name || !description || !price || !categoryId) {
+    const priceNum = parsePriceInput(price);
+    if (!name || !description || !categoryId || !Number.isFinite(priceNum)) {
       return NextResponse.json(
         { error: 'Campos obrigatórios: name, description, price, categoryId' },
         { status: 400 }
@@ -58,18 +72,18 @@ export async function POST(req: NextRequest) {
         name,
         slug,
         description,
-        price: parseFloat(price),
+        price: priceNum,
         stock: parseInt(stock) || 0,
         minStock: parseInt(minStock) || 0,
         weight: resolvedWeightKg,
-        dimensionsCm: enriched?.dimensions_cm ?? null,
         imageUrl: resolvedImageUrl,
-        imageUrls: enriched?.photos ?? [],
         categoryId,
         featured: featured === true || featured === 'true',
       },
       include: { category: true },
     });
+
+    await applyExtraFieldsFromEnrichment(product.id, enriched);
 
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {

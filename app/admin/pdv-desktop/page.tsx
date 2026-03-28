@@ -1,16 +1,16 @@
 import { PdvDesktopInstallerPageContent } from '@/components/pdv-desktop-installer-page-content';
 
 export const metadata = {
-  title: 'PDV Desktop — Download | Master',
+  title: 'PDV Desktop — Download | Admin',
   description: 'Instalador Windows do PDV Macofel para lojas',
 };
 
-export default function MasterPdvDesktopPage() {
+export default function AdminPdvDesktopPage() {
   return (
     <PdvDesktopInstallerPageContent
-      backHref="/admin/master/dashboard"
-      backLabel="Voltar ao Painel Master"
-      audience="master"
+      backHref="/admin/dashboard"
+      backLabel="Voltar ao painel"
+      audience="admin"
     />
   );
 }
