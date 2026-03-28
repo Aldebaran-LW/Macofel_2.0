@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
 
 type Source = 'csv' | 'xlsx' | 'xml' | 'pdf';
 
@@ -121,30 +122,19 @@ type StockImporterProps = {
   showSubnav?: boolean;
 };
 
-async function extractPdfText(file: File): Promise<string> {
-  // pdfjs-dist é pesado; importamos só quando o usuário realmente envia PDF
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = undefined;
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await (pdfjsLib as any).getDocument({ data: arrayBuffer }).promise;
-  let text = '';
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    // eslint-disable-next-line no-await-in-loop
-    const page = await pdf.getPage(pageNum);
-    // eslint-disable-next-line no-await-in-loop
-    const content = await page.getTextContent();
-    const pageText = (content.items ?? [])
-      .map((i: any) => (typeof i?.str === 'string' ? i.str : ''))
-      .filter(Boolean)
-      .join(' ');
-    text += '\n' + pageText;
-    // Limite de segurança: evita travar o browser em PDFs enormes
-    if (text.length > 2_500_000) break;
+/** Evita pdfjs no cliente (incompatível com Webpack dev do Next 14 + pdfjs 5.x). */
+async function extractPdfTextViaApi(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/admin/stock/extract-pdf-text', {
+    method: 'POST',
+    body: fd,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error || data?.details || 'Erro ao extrair texto do PDF');
   }
-  return text;
+  return String(data?.text ?? '');
 }
 
 function parsePdfDanfeText(text: string): ParsedItem[] {
@@ -388,6 +378,9 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
     const preventDuplicateForThisRun = onlySingleXml;
 
     for (const file of files) {
+      if (importFileTooLarge(file)) {
+        throw new Error(`"${file.name}" demasiado grande (máx. ${MAX_IMPORT_FILE_DESC})`);
+      }
       const ext = file.name.split('.').pop()?.toLowerCase();
       if (ext === 'xml') {
         const text = await file.text();
@@ -417,9 +410,9 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
           allItems.push({ externalCode, name, quantity });
         }
       } else {
-        // PDF: parser baseado em heurísticas (requer pdfjs-dist)
+        // PDF: texto extraído no servidor (pdfjs fora do bundle do cliente)
         if (ext === 'pdf') {
-          const text = await extractPdfText(file);
+          const text = await extractPdfTextViaApi(file);
           const parsed = parsePdfDanfeText(text);
           allItems.push(...parsed);
         }

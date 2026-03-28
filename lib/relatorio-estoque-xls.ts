@@ -57,23 +57,83 @@ function rowAsArray(row: unknown): string[] {
 function findHeaderRowIndex(rows: string[][]): number {
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    if (r.length < 5) continue;
-    if (r[0] === 'Produto' && r[4] === 'Grupo') return i;
+    if (r.length < 6) continue;
+    const c0 = String(r[0] ?? '').trim();
+    if (c0 !== 'Produto') continue;
+    const hasGrupo = r.some((c) => String(c ?? '').trim() === 'Grupo');
+    const hasMarca = r.some((c) => String(c ?? '').trim() === 'Marca');
+    const hasEstoque = r.some((c) => {
+      const t = String(c ?? '').trim();
+      return t === 'Estoque' || t.includes('Estoque');
+    });
+    if (hasGrupo && hasMarca && hasEstoque) return i;
   }
   return -1;
 }
 
-function buildColMap(header: string[]): RelatorioEstoqueColMap | null {
-  const produtoIdxs = header
-    .map((v, idx) => (v === 'Produto' ? idx : -1))
-    .filter((idx) => idx >= 0);
-  if (produtoIdxs.length < 2) return null;
+/** Código numérico de produto (pode incluir separador de milhares). */
+function looksLikeProductCode(s: string): boolean {
+  const t = s.replace(/\s/g, '');
+  if (!t) return false;
+  return /^[\d][\d.,-]*$/u.test(t);
+}
 
-  const grupoCol = header.indexOf('Grupo');
-  const marcaCol = header.indexOf('Marca');
+/**
+ * Folha "larga" (Grupo em F): nome na coluna do 2.º "Produto".
+ * Folha "com código duplicado" (A=código, B=código, C=nome): 2 "Produto" seguidos mas o nome está em C.
+ */
+function resolveNameCol(
+  produtoIdxs: number[],
+  sampleRow: string[] | undefined,
+  grupoCol: number
+): number {
+  if (produtoIdxs.length < 2) {
+    const first = produtoIdxs[0] ?? 0;
+    const next = first + 1;
+    if (grupoCol > next && next >= 0) return next;
+    return Math.max(0, first);
+  }
+
+  const a = produtoIdxs[0];
+  const b = produtoIdxs[1];
+
+  if (b !== a + 1) {
+    return b;
+  }
+
+  if (sampleRow && sampleRow.length > b + 1) {
+    const cellA = String(sampleRow[a] ?? '').trim();
+    const cellB = String(sampleRow[b] ?? '').trim();
+    const cellC = String(sampleRow[b + 1] ?? '').trim();
+    const duplicateCode = cellA !== '' && cellB === cellA && looksLikeProductCode(cellB);
+    if (duplicateCode && cellC.length >= 3) {
+      return b + 1;
+    }
+    if (cellB.length > 0 && !looksLikeProductCode(cellB)) {
+      return b;
+    }
+    if (cellC.length > cellB.length && cellC.length >= 8 && looksLikeProductCode(cellB)) {
+      return b + 1;
+    }
+  }
+
+  return b;
+}
+
+function buildColMap(header: string[], sampleRow?: string[]): RelatorioEstoqueColMap | null {
+  const produtoIdxs = header
+    .map((v, idx) => (String(v ?? '').trim() === 'Produto' ? idx : -1))
+    .filter((idx) => idx >= 0);
+  if (produtoIdxs.length < 1) return null;
+
+  const grupoCol = header.findIndex((c) => String(c ?? '').trim() === 'Grupo');
+  const marcaCol = header.findIndex((c) => String(c ?? '').trim() === 'Marca');
   if (grupoCol < 0 || marcaCol < 0) return null;
 
-  const estoqueCol = header.findIndex((v) => v === 'Estoque' || v.includes('Estoque'));
+  const estoqueCol = header.findIndex((v) => {
+    const t = String(v ?? '').trim();
+    return t === 'Estoque' || t.includes('Estoque');
+  });
   const vlCustoCol = header.findIndex(
     (v) => v.includes('Vl.Est.Custo') || v.toLowerCase().includes('vl.est.custo')
   );
@@ -83,9 +143,12 @@ function buildColMap(header: string[]): RelatorioEstoqueColMap | null {
 
   if (estoqueCol < 0) return null;
 
+  const codeCol = produtoIdxs[0];
+  const nameCol = resolveNameCol(produtoIdxs, sampleRow, grupoCol);
+
   return {
-    codeCol: produtoIdxs[0],
-    nameCol: produtoIdxs[1],
+    codeCol,
+    nameCol,
     grupoCol,
     marcaCol,
     estoqueCol,
@@ -94,9 +157,21 @@ function buildColMap(header: string[]): RelatorioEstoqueColMap | null {
   };
 }
 
-function isFooterOrNoise(row: string[], nameCol: number): boolean {
+function firstSampleDataRow(rows: string[][], headerIdx: number): string[] | undefined {
+  for (let r = headerIdx + 1; r < Math.min(headerIdx + 15, rows.length); r++) {
+    const row = rows[r];
+    if (!row?.length) continue;
+    const c0 = String(row[0] ?? '').trim();
+    const c1 = String(row[1] ?? '').trim();
+    const c2 = String(row[2] ?? '').trim();
+    if (c0 && (c1 || c2)) return row;
+  }
+  return undefined;
+}
+
+function isFooterOrNoise(row: string[], nameCol: number, codeCol: number): boolean {
   const name = String(row[nameCol] ?? '').trim();
-  const code = String(row[0] ?? '').trim();
+  const code = String(row[codeCol] ?? '').trim();
   if (!name && !code) return true;
   if (/^pag\.?\s*\d*$/i.test(name)) return true;
   const joined = row.join(' ').toLowerCase();
@@ -141,7 +216,8 @@ export function parseRelatorioEstoqueWorkbook(buffer: ArrayBuffer): {
       warnings.push(`Folha ignorada (sem cabeçalho esperado): ${sheetName}`);
       continue;
     }
-    const colMap = buildColMap(rows[hi]);
+    const sample = firstSampleDataRow(rows, hi);
+    const colMap = buildColMap(rows[hi], sample);
     if (!colMap) {
       warnings.push(`Folha ignorada (colunas incompletas): ${sheetName}`);
       continue;
@@ -150,7 +226,7 @@ export function parseRelatorioEstoqueWorkbook(buffer: ArrayBuffer): {
     for (let r = hi + 1; r < rows.length; r++) {
       const cells = rows[r];
       if (!cells.length) continue;
-      if (isFooterOrNoise(cells, colMap.nameCol)) continue;
+      if (isFooterOrNoise(cells, colMap.nameCol, colMap.codeCol)) continue;
 
       const name = String(cells[colMap.nameCol] ?? '').trim();
       if (!name) continue;

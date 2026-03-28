@@ -2,66 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
-import mongoPrisma from '@/lib/mongodb';
 import {
-  buildImportDescription,
-  importRowSlug,
-  parseRelatorioEstoqueWorkbook,
-  slugifyProductKey,
-} from '@/lib/relatorio-estoque-xls';
+  runPdfRelatorioProductImport,
+  runRelatorioProductImport,
+} from '@/lib/product-relatorio-import';
+import { parseRelatorioEstoqueWorkbook } from '@/lib/relatorio-estoque-xls';
+import { parseRelatorioProdutosPdf } from '@/lib/relatorio-produtos-pdf';
+import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
 
 export const dynamic = 'force-dynamic';
 
-async function uniqueCategorySlug(base: string): Promise<string> {
-  let s = base.slice(0, 80) || 'categoria';
-  let i = 0;
-  for (;;) {
-    const ex = await mongoPrisma.category.findUnique({ where: { slug: s } });
-    if (!ex) return s;
-    i += 1;
-    s = `${base}-${i}`.slice(0, 80);
-  }
-}
-
-async function resolveCategoryId(
-  grupo: string,
-  cache: Map<string, string>,
-  existingCategories: { id: string; name: string }[]
-): Promise<string> {
-  const g = grupo.trim() || 'Sem grupo';
-  const key = g.toLowerCase();
-  const hitCache = cache.get(key);
-  if (hitCache) return hitCache;
-
-  const hit = existingCategories.find((c) => c.name.trim().toLowerCase() === key);
-  if (hit) {
-    cache.set(key, hit.id);
-    return hit.id;
-  }
-
-  const slugBase = slugifyProductKey(g) || 'sem-grupo';
-  const slug = await uniqueCategorySlug(slugBase);
-  const created = await mongoPrisma.category.create({
-    data: {
-      name: g,
-      slug,
-      description: 'Categoria criada na importação do relatório de estoque.',
-    },
-  });
-  existingCategories.push({ id: created.id, name: created.name });
-  cache.set(key, created.id);
-  return created.id;
-}
-
-async function uniqueProductSlug(base: string): Promise<string> {
-  let s = base.slice(0, 120);
-  let i = 0;
-  for (;;) {
-    const ex = await mongoPrisma.product.findUnique({ where: { slug: s } });
-    if (!ex) return s;
-    i += 1;
-    s = `${base}-${i}`.slice(0, 120);
-  }
+function isPdfFile(file: Blob, name: string): boolean {
+  const n = name.toLowerCase();
+  return file.type === 'application/pdf' || n.endsWith('.pdf');
 }
 
 export async function POST(req: NextRequest) {
@@ -80,9 +33,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Envie o ficheiro no campo file' }, { status: 400 });
     }
 
+    const fname = file instanceof File ? file.name : 'upload';
+    if (importFileTooLarge(file)) {
+      return NextResponse.json(
+        { error: `Ficheiro demasiado grande (máx. ${MAX_IMPORT_FILE_DESC})` },
+        { status: 400 }
+      );
+    }
     const buf = await file.arrayBuffer();
-    const { rows, warnings } = parseRelatorioEstoqueWorkbook(buf);
 
+    if (isPdfFile(file, fname)) {
+      const { rows, warnings } = await parseRelatorioProdutosPdf(buf);
+      if (rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Nenhuma linha de produto encontrada no PDF', warnings },
+          { status: 400 }
+        );
+      }
+      const { created, updated, skipped, errors } = await runPdfRelatorioProductImport(rows, {
+        upsert,
+      });
+      return NextResponse.json({
+        source: 'pdf',
+        created,
+        updated,
+        skipped,
+        errors,
+        warnings,
+        totalParsed: rows.length,
+      });
+    }
+
+    const { rows, warnings } = parseRelatorioEstoqueWorkbook(buf);
     if (rows.length === 0) {
       return NextResponse.json(
         { error: 'Nenhuma linha de produto encontrada', warnings },
@@ -90,66 +72,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const catCache = new Map<string, string>();
-    const existingCategories = await mongoPrisma.category.findMany({
-      select: { id: true, name: true },
+    const { created, updated, skipped, errors } = await runRelatorioProductImport(rows, {
+      upsert,
     });
-    let created = 0;
-    let updated = 0;
-    let skipped = 0;
-    const errors: { name: string; message: string }[] = [];
-
-    for (const row of rows) {
-      const baseSlug = importRowSlug(row.code, row.name);
-      const description = buildImportDescription(row);
-      const categoryId = await resolveCategoryId(row.grupo, catCache, existingCategories);
-      const price = row.price;
-
-      try {
-        const existing = await mongoPrisma.product.findUnique({
-          where: { slug: baseSlug },
-        });
-
-        if (existing) {
-          if (!upsert) {
-            skipped += 1;
-            continue;
-          }
-          await mongoPrisma.product.update({
-            where: { id: existing.id },
-            data: {
-              name: row.name,
-              description,
-              price,
-              stock: row.stock,
-              categoryId,
-            },
-          });
-          updated += 1;
-          continue;
-        }
-
-        const newSlug = await uniqueProductSlug(baseSlug);
-
-        await mongoPrisma.product.create({
-          data: {
-            name: row.name,
-            slug: newSlug,
-            description,
-            price,
-            stock: row.stock,
-            minStock: 0,
-            categoryId,
-            featured: false,
-          },
-        });
-        created += 1;
-      } catch (err: any) {
-        errors.push({ name: row.name, message: err?.message || String(err) });
-      }
-    }
 
     return NextResponse.json({
+      source: 'xls',
       created,
       updated,
       skipped,

@@ -10,7 +10,7 @@ import {
   X,
   Upload,
   Image as ImageIcon,
-  FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
 
 interface Product {
   id: string;
@@ -77,15 +78,23 @@ export default function AdminProdutosPage() {
   const [importPreviewLoading, setImportPreviewLoading] = useState(false);
   const [importRunLoading, setImportRunLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<{
+    source: 'xls' | 'pdf';
     totalRows: number;
     sample: Array<{
       code: string;
       name: string;
-      grupo: string;
-      marca: string;
       stock: number;
       price: number;
       slug: string;
+      source?: 'xls' | 'pdf';
+      grupo?: string;
+      barcode?: string;
+      status?: string;
+      vendaPrazo?: number;
+      custo?: number;
+      sheet?: string;
+      row?: number;
+      line?: number;
     }>;
     warnings: string[];
   } | null>(null);
@@ -96,10 +105,29 @@ export default function AdminProdutosPage() {
     errors: Array<{ name: string; message: string }>;
     warnings: string[];
   } | null>(null);
+  const [importRemoteAvailable, setImportRemoteAvailable] = useState<boolean | null>(null);
+  const [importRemoteLoading, setImportRemoteLoading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/products/import/remote-available');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setImportRemoteAvailable(Boolean(data?.available));
+      } catch {
+        if (!cancelled) setImportRemoteAvailable(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const fetchProducts = async () => {
@@ -270,7 +298,7 @@ export default function AdminProdutosPage() {
 
   const handleImportPreview = async () => {
     if (!importFile) {
-      toast.error('Selecione um ficheiro .xls ou .xlsx');
+      toast.error('Selecione um ficheiro .xls, .xlsx ou .pdf');
       return;
     }
     setImportPreviewLoading(true);
@@ -288,6 +316,7 @@ export default function AdminProdutosPage() {
         return;
       }
       setImportPreview({
+        source: data.source === 'pdf' ? 'pdf' : 'xls',
         totalRows: data.totalRows,
         sample: data.sample ?? [],
         warnings: data.warnings ?? [],
@@ -303,7 +332,7 @@ export default function AdminProdutosPage() {
 
   const handleImportRun = async () => {
     if (!importFile) {
-      toast.error('Selecione um ficheiro .xls ou .xlsx');
+      toast.error('Selecione um ficheiro .xls, .xlsx ou .pdf');
       return;
     }
     setImportRunLoading(true);
@@ -337,6 +366,66 @@ export default function AdminProdutosPage() {
       toast.error('Erro na importação');
     } finally {
       setImportRunLoading(false);
+    }
+  };
+
+  const handleImportRemoteRun = async () => {
+    if (!importFile) {
+      toast.error('Selecione um ficheiro .xls ou .xlsx');
+      return;
+    }
+    const n = importFile.name.toLowerCase();
+    if (n.endsWith('.pdf')) {
+      toast.error('O servidor dedicado só aceita Excel. Para PDF use a importação normal.');
+      return;
+    }
+    if (!n.endsWith('.xls') && !n.endsWith('.xlsx')) {
+      toast.error('Use .xls ou .xlsx para o servidor dedicado.');
+      return;
+    }
+    setImportRemoteLoading(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('upsert', importUpsert ? 'true' : 'false');
+      const res = await fetch('/api/admin/products/import/remote', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const detail = data?.detail;
+        const detailStr =
+          typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map((x: { msg?: string }) => x?.msg).filter(Boolean).join('; ')
+              : '';
+        toast.error(data?.error || detailStr || 'Erro na importação remota');
+        return;
+      }
+      const rawErrs = Array.isArray(data.errors) ? data.errors : [];
+      const normErrors = rawErrs.map((e: { name?: string; message?: string; msg?: string }) => ({
+        name: String(e?.name ?? '—'),
+        message: String(e?.message ?? e?.msg ?? ''),
+      }));
+      setImportResult({
+        created: data.created ?? 0,
+        updated: data.updated ?? 0,
+        skipped: data.skipped ?? 0,
+        errors: normErrors,
+        warnings: Array.isArray(data.warnings) ? data.warnings : [],
+      });
+      toast.success(
+        `Importação (servidor dedicado): ${data.created ?? 0} novos, ${data.updated ?? 0} atualizados, ${data.skipped ?? 0} ignorados.`
+      );
+      fetchProducts();
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro na importação remota');
+    } finally {
+      setImportRemoteLoading(false);
     }
   };
 
@@ -382,8 +471,8 @@ export default function AdminProdutosPage() {
               setImportOpen(true);
             }}
           >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Importar relatório (.xls)
+            <FileText className="h-4 w-4 mr-2" />
+            Importar (.xls / .pdf)
           </Button>
           <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
             <Plus className="h-4 w-4 mr-2" />
@@ -515,21 +604,50 @@ export default function AdminProdutosPage() {
       >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Importar relatório de produtos / estoque</DialogTitle>
+            <DialogTitle>Importar catálogo (Excel ou PDF)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm text-gray-600">
             <p>
-              Use o ficheiro no formato <strong>Relação de estoque</strong> (colunas: código, nome do
-              produto, grupo, marca, estoque, valor estoque custo e venda). São lidas todas as folhas
-              do Excel (.xls ou .xlsx).
+              <strong>Excel (.xls / .xlsx):</strong> relatório tipo <em>Relação de estoque</em>{' '}
+              (código, nome, grupo, marca, estoque, valores).
             </p>
+            <p>
+              <strong>PDF:</strong> relatório <em>Produtos / Código de barras</em> com texto
+              selecionável. Colunas esperadas: Código, Produto, Unid., Cod.Barra, Peso, Custo, Venda
+              Vista, Venda Prazo, Estoque, Status. O preço no site usa <strong>Venda Vista</strong>{' '}
+              (se zero, usa Venda Prazo). Categoria: <strong>Importado PDF</strong>.
+            </p>
+            <p className="text-xs text-gray-500">
+              Tamanho máximo do ficheiro: {MAX_IMPORT_FILE_DESC} (em Vercel Hobby o limite da plataforma
+              pode ser menor).
+            </p>
+            {importRemoteAvailable ? (
+              <p className="text-xs text-blue-800 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
+                <strong>Servidor dedicado (Render):</strong> disponível. Aceita o mesmo Excel que o fluxo
+                local; o pedido é reencaminhado pelo Macofel com token seguro (útil para ficheiros
+                grandes ou timeouts longos). PDF continua só na importação normal.
+              </p>
+            ) : importRemoteAvailable === false ? (
+              <p className="text-xs text-gray-400">
+                Servidor dedicado: não configurado (<code className="text-[10px]">RENDER_CATALOG_IMPORT_URL</code>{' '}
+                + <code className="text-[10px]">RENDER_CATALOG_IMPORT_SECRET</code> no .env).
+              </p>
+            ) : null}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">Ficheiro</label>
               <Input
                 type="file"
-                accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".xls,.xlsx,.pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
+                  if (f && importFileTooLarge(f)) {
+                    toast.error(`Ficheiro demasiado grande (máx. ${MAX_IMPORT_FILE_DESC})`);
+                    e.target.value = '';
+                    setImportFile(null);
+                    setImportPreview(null);
+                    setImportResult(null);
+                    return;
+                  }
                   setImportFile(f ?? null);
                   setImportPreview(null);
                   setImportResult(null);
@@ -564,6 +682,18 @@ export default function AdminProdutosPage() {
               >
                 {importRunLoading ? 'A importar…' : 'Importar'}
               </Button>
+              {importRemoteAvailable ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={
+                    !importFile || importRemoteLoading || importRunLoading || importPreviewLoading
+                  }
+                  onClick={() => void handleImportRemoteRun()}
+                >
+                  {importRemoteLoading ? 'Servidor dedicado…' : 'Importar (servidor dedicado)'}
+                </Button>
+              ) : null}
             </div>
             {importPreview && (
               <div className="space-y-2">
@@ -584,19 +714,45 @@ export default function AdminProdutosPage() {
                       <tr>
                         <th className="px-2 py-1 text-left">Cód.</th>
                         <th className="px-2 py-1 text-left">Nome</th>
-                        <th className="px-2 py-1 text-left">Grupo</th>
-                        <th className="px-2 py-1 text-left">Qtd</th>
-                        <th className="px-2 py-1 text-left">Preço unit. (calc.)</th>
+                        {importPreview.source === 'pdf' ? (
+                          <>
+                            <th className="px-2 py-1 text-left">EAN</th>
+                            <th className="px-2 py-1 text-left">St.</th>
+                            <th className="px-2 py-1 text-left">Qtd</th>
+                            <th className="px-2 py-1 text-left">Vista</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="px-2 py-1 text-left">Grupo</th>
+                            <th className="px-2 py-1 text-left">Qtd</th>
+                            <th className="px-2 py-1 text-left">Preço</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {importPreview.sample.map((r, i) => (
                         <tr key={i}>
                           <td className="px-2 py-1 whitespace-nowrap">{r.code}</td>
-                          <td className="px-2 py-1">{r.name}</td>
-                          <td className="px-2 py-1 whitespace-nowrap">{r.grupo}</td>
-                          <td className="px-2 py-1">{r.stock}</td>
-                          <td className="px-2 py-1">R$ {r.price.toFixed(2)}</td>
+                          <td className="px-2 py-1 max-w-[200px] truncate" title={r.name}>
+                            {r.name}
+                          </td>
+                          {importPreview.source === 'pdf' ? (
+                            <>
+                              <td className="px-2 py-1 whitespace-nowrap text-[10px]">
+                                {r.barcode || '—'}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap">{r.status}</td>
+                              <td className="px-2 py-1">{r.stock}</td>
+                              <td className="px-2 py-1">R$ {r.price.toFixed(2)}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-2 py-1 whitespace-nowrap">{r.grupo}</td>
+                              <td className="px-2 py-1">{r.stock}</td>
+                              <td className="px-2 py-1">R$ {r.price.toFixed(2)}</td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -611,9 +767,19 @@ export default function AdminProdutosPage() {
                   {importResult.updated} · <strong>Ignorados:</strong> {importResult.skipped}
                 </p>
                 {importResult.errors.length > 0 && (
-                  <p className="text-red-700 text-xs">
-                    Erros: {importResult.errors.length} (ver consola / detalhe no servidor)
-                  </p>
+                  <div className="text-red-700 text-xs space-y-0.5 max-h-32 overflow-y-auto">
+                    <p className="font-medium">Erros por linha ({importResult.errors.length}):</p>
+                    <ul className="list-disc pl-4">
+                      {importResult.errors.slice(0, 12).map((e, i) => (
+                        <li key={i}>
+                          <span className="font-medium">{e.name}</span>: {e.message}
+                        </li>
+                      ))}
+                    </ul>
+                    {importResult.errors.length > 12 && (
+                      <p className="text-gray-600">… e mais {importResult.errors.length - 12}</p>
+                    )}
+                  </div>
                 )}
                 {importResult.warnings.length > 0 && (
                   <ul className="list-disc pl-5 text-xs text-amber-900">
