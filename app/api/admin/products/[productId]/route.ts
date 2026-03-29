@@ -22,7 +22,23 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, description, price, stock, minStock, weight, imageUrl, categoryId, featured } = body;
+    const {
+      name,
+      description,
+      price,
+      stock,
+      minStock,
+      weight,
+      imageUrl,
+      categoryId,
+      featured,
+      codigo,
+      cost,
+      pricePrazo,
+      unidade,
+      codBarra,
+      status,
+    } = body;
 
     const updateData: Record<string, unknown> = {};
     const current = await mongoPrisma.product.findUnique({
@@ -62,6 +78,30 @@ export async function PATCH(
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';
+    if (codigo !== undefined) {
+      updateData.codigo = codigo != null && String(codigo).trim() !== '' ? String(codigo).trim() : null;
+    }
+    if (cost !== undefined) {
+      const c = cost === '' || cost == null ? null : parseFloat(String(cost));
+      updateData.cost = c != null && Number.isFinite(c) ? c : null;
+    }
+    if (pricePrazo !== undefined) {
+      const pp = pricePrazo === '' || pricePrazo == null ? null : parseFloat(String(pricePrazo));
+      updateData.pricePrazo = pp != null && Number.isFinite(pp) ? pp : null;
+    }
+    if (unidade !== undefined) {
+      updateData.unidade =
+        unidade != null && String(unidade).trim() !== '' ? String(unidade).trim() : null;
+    }
+    if (codBarra !== undefined) {
+      updateData.codBarra =
+        codBarra != null && String(codBarra).replace(/\D/g, '') !== ''
+          ? String(codBarra).replace(/\D/g, '')
+          : null;
+    }
+    if (status !== undefined) {
+      updateData.status = status === false || status === 'false' ? false : true;
+    }
 
     const lookupName = typeof name === 'string' && name.trim() ? name.trim() : current?.name;
     const needsAutoFill =

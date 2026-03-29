@@ -1,7 +1,7 @@
 // Schema Prisma para MongoDB - Produtos e Categorias
 generator client {
-  provider = "prisma-client-js"
-  output   = "../.prisma/mongodb-client"
+  provider      = "prisma-client-js"
+  output        = "../.prisma/mongodb-client"
   binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
@@ -23,21 +23,34 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  slug        String   @unique
-  description String
-  price       Float
-  stock       Int      @default(0)
-  minStock    Int      @default(0)
-  weight      Float?   // Peso em kg
-  dimensionsCm String? // Altura × largura × comprimento em cm
-  imageUrl    String?
-  imageUrls   String[] @default([])
-  categoryId  String   @db.ObjectId
-  featured    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  /// Código do fornecedor / relatório LW (ex.: 16503). Único quando preenchido.
+  codigo       String?  @unique
+  name         String
+  slug         String   @unique
+  description  String
+  /// Custo unitário ou de referência (interno)
+  cost         Float?
+  /// Preço de venda à vista (usado no site)
+  price        Float
+  /// Venda a prazo (quando existir no relatório)
+  pricePrazo   Float?
+  stock        Int      @default(0)
+  minStock     Int      @default(0)
+  unidade      String?
+  /// Peso em kg (PDF “peso” / ERP)
+  weight       Float?
+  codBarra     String?
+  /// true = ATIVO, false = INATIVO
+  status       Boolean  @default(true)
+  featured     Boolean  @default(false)
+  imageUrl     String?
+  imageUrls    String[] @default([])
+  categoryId   String   @db.ObjectId
+  /// Mantido para enriquecimento / envio (formato texto livre)
+  dimensionsCm String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 

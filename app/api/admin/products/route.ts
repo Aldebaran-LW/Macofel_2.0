@@ -30,7 +30,23 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, description, price, stock, minStock, weight, imageUrl, categoryId, featured } = body;
+    const {
+      name,
+      description,
+      price,
+      stock,
+      minStock,
+      weight,
+      imageUrl,
+      categoryId,
+      featured,
+      codigo,
+      cost,
+      pricePrazo,
+      unidade,
+      codBarra,
+      status,
+    } = body;
 
     const priceNum = parsePriceInput(price);
     if (!name || !description || !categoryId || !Number.isFinite(priceNum)) {
@@ -67,6 +83,19 @@ export async function POST(req: NextRequest) {
         ? String(imageUrl).trim()
         : enriched?.photos?.[0] || null;
 
+    const codigoStr =
+      codigo != null && String(codigo).trim() !== '' ? String(codigo).trim() : null;
+    const costNum = cost != null && String(cost).trim() !== '' ? parsePriceInput(cost) : null;
+    const pricePrazoNum =
+      pricePrazo != null && String(pricePrazo).trim() !== '' ? parsePriceInput(pricePrazo) : null;
+    const unidadeStr =
+      unidade != null && String(unidade).trim() !== '' ? String(unidade).trim() : null;
+    const codBarraStr =
+      codBarra != null && String(codBarra).replace(/\D/g, '') !== ''
+        ? String(codBarra).replace(/\D/g, '')
+        : null;
+    const statusBool = status === false || status === 'false' ? false : true;
+
     const product = await mongoPrisma.product.create({
       data: {
         name,
@@ -79,6 +108,15 @@ export async function POST(req: NextRequest) {
         imageUrl: resolvedImageUrl,
         categoryId,
         featured: featured === true || featured === 'true',
+        codigo: codigoStr,
+        cost: costNum != null && Number.isFinite(costNum) ? costNum : null,
+        pricePrazo:
+          pricePrazoNum != null && Number.isFinite(pricePrazoNum) && pricePrazoNum > 0
+            ? pricePrazoNum
+            : null,
+        unidade: unidadeStr,
+        codBarra: codBarraStr,
+        status: statusBool,
       },
       include: { category: true },
     });

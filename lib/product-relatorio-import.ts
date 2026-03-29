@@ -28,7 +28,27 @@ export type ProductCatalogImportRow = {
   stock: number;
   categoryName: string;
   weight?: number | null;
+  cost?: number | null;
+  pricePrazo?: number | null;
+  unidade?: string | null;
+  codBarra?: string | null;
+  /** true = ATIVO */
+  status?: boolean;
 };
+
+function normCodigo(code: string): string | null {
+  const c = String(code ?? '').trim();
+  return c.length ? c : null;
+}
+
+/** Custo unitário a partir de valores totais do relatório Excel (Vl.Est.Custo / estoque). */
+function unitCostFromEstoqueRow(row: RelatorioEstoqueRow): number | null {
+  const { stock, vlCusto } = row;
+  if (!Number.isFinite(vlCusto) || vlCusto === 0) return null;
+  if (!stock || Math.abs(stock) < 1e-6) return null;
+  const u = Math.abs(vlCusto) / Math.abs(stock);
+  return Number.isFinite(u) && u >= 0 ? Math.round(u * 10000) / 10000 : null;
+}
 
 async function uniqueCategorySlug(base: string): Promise<string> {
   let s = base.slice(0, 80) || 'categoria';
@@ -101,14 +121,29 @@ export async function runProductCatalogImport(
   for (const row of rows) {
     const baseSlug = importRowSlug(row.code, row.name);
     const categoryId = await resolveCategoryId(row.categoryName, catCache, existingCategories);
-    const price = row.price;
     const weightVal =
       row.weight != null && Number.isFinite(row.weight) && row.weight > 0 ? row.weight : null;
+    const codigo = normCodigo(row.code);
+    const cost = row.cost != null && Number.isFinite(row.cost) ? row.cost : null;
+    const pricePrazo =
+      row.pricePrazo != null && Number.isFinite(row.pricePrazo) && row.pricePrazo > 0
+        ? row.pricePrazo
+        : null;
+    const unidade = row.unidade?.trim() || null;
+    const codBarra = row.codBarra?.replace(/\D/g, '') || null;
+    const status = row.status !== false;
 
     try {
-      const existing = await mongoPrisma.product.findUnique({
-        where: { slug: baseSlug },
-      });
+      let existing =
+        (await mongoPrisma.product.findUnique({ where: { slug: baseSlug } })) ?? null;
+      if (!existing && codigo) {
+        existing =
+          (await mongoPrisma.product.findUnique({
+            where: { codigo },
+          })) ?? null;
+      }
+
+      const price = row.price;
 
       if (existing) {
         if (!options.upsert) {
@@ -124,6 +159,12 @@ export async function runProductCatalogImport(
             stock: row.stock,
             categoryId,
             weight: weightVal,
+            codigo,
+            cost,
+            pricePrazo,
+            unidade,
+            codBarra,
+            status,
           },
         });
         updated += 1;
@@ -143,6 +184,12 @@ export async function runProductCatalogImport(
           categoryId,
           featured: false,
           weight: weightVal,
+          codigo,
+          cost,
+          pricePrazo,
+          unidade,
+          codBarra,
+          status,
         },
       });
       created += 1;
@@ -173,6 +220,11 @@ export async function runRelatorioProductImport(
     stock: r.stock,
     categoryName: r.grupo,
     weight: null,
+    cost: unitCostFromEstoqueRow(r),
+    pricePrazo: null,
+    unidade: null,
+    codBarra: null,
+    status: true,
   }));
   return runProductCatalogImport(mapped, options);
 }
@@ -189,6 +241,11 @@ export async function runPdfRelatorioProductImport(
     stock: r.estoque,
     categoryName: PDF_CATEGORY,
     weight: r.peso > 0 ? r.peso : null,
+    cost: r.custo > 0 && Number.isFinite(r.custo) ? r.custo : null,
+    pricePrazo: r.vendaPrazo > 0 && Number.isFinite(r.vendaPrazo) ? r.vendaPrazo : null,
+    unidade: r.unid?.trim() || null,
+    codBarra: r.codBarra ? String(r.codBarra).replace(/\D/g, '') || null : null,
+    status: r.status?.toUpperCase() !== 'INATIVO',
   }));
   return runProductCatalogImport(mapped, options);
 }

@@ -11,6 +11,7 @@ Env:
 from __future__ import annotations
 
 import io
+import math
 import os
 import re
 from datetime import datetime, timezone
@@ -162,6 +163,7 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
         if not name:
             continue
         code = str(row.get("code") or "").strip()
+        codigo = code or None
         base_slug = import_row_slug(code, name)
         try:
             cat_id = resolve_category_id(
@@ -170,8 +172,20 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
             price = float(row.get("price") or 0)
             stock = int(row.get("stock") or 0)
             description = str(row.get("description") or "Importado.")
+            raw = row.get("cost")
+            if raw is not None and raw != "":
+                try:
+                    cost_val = float(raw)
+                    if not math.isfinite(cost_val):
+                        cost_val = None
+                except (TypeError, ValueError):
+                    cost_val = None
+            else:
+                cost_val = None
 
             existing = db["products"].find_one({"slug": base_slug})
+            if not existing and codigo:
+                existing = db["products"].find_one({"codigo": codigo})
 
             if existing:
                 if not upsert:
@@ -186,6 +200,12 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
                             "price": price,
                             "stock": stock,
                             "categoryId": cat_id,
+                            "codigo": codigo,
+                            "cost": cost_val,
+                            "pricePrazo": None,
+                            "unidade": None,
+                            "codBarra": None,
+                            "status": True,
                             "updatedAt": datetime.now(timezone.utc),
                         }
                     },
@@ -209,6 +229,12 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
                     "imageUrls": [],
                     "categoryId": cat_id,
                     "featured": False,
+                    "codigo": codigo,
+                    "cost": cost_val,
+                    "pricePrazo": None,
+                    "unidade": None,
+                    "codBarra": None,
+                    "status": True,
                     "createdAt": now,
                     "updatedAt": now,
                 }

@@ -267,6 +267,13 @@ def parse_relatorio_sheet(sheet_name: str, matrix: list[list[Any]]) -> tuple[lis
         vv = vl_venda if math.isfinite(vl_venda) else 0.0
         price = catalog_unit_price(stock, vv, vc)
 
+        cost_unit = None
+        if stock and abs(stock) > 1e-6 and math.isfinite(vc) and vc != 0.0:
+            try:
+                cost_unit = round(abs(vc) / abs(stock), 6)
+            except (ZeroDivisionError, ValueError, OverflowError):
+                cost_unit = None
+
         parts = [f"Grupo: {grupo}.", f"Marca: {marca}."]
         if code:
             parts.insert(0, f"Código: {code}.")
@@ -283,6 +290,7 @@ def parse_relatorio_sheet(sheet_name: str, matrix: list[list[Any]]) -> tuple[lis
                 "stock": stock,
                 "price": price,
                 "description": description,
+                "cost": cost_unit,
             }
         )
 

@@ -87,6 +87,9 @@ export async function getProducts(filters?: {
     query.featured = true;
   }
 
+  // Catálogo: não listar produtos marcados como inativos (status === false)
+  query.status = { $ne: false };
+
   // Paginação
   const page = filters?.page || 1;
   const limit = filters?.limit || 12;
@@ -166,6 +169,10 @@ export async function getProductBySlug(slug: string) {
   const product = await productsCollection.findOne({ slug });
 
   if (!product) {
+    return null;
+  }
+
+  if (product.status === false) {
     return null;
   }
 
