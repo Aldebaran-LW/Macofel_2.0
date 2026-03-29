@@ -153,11 +153,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!productId) {
+      const hex24 = code ? /^[a-fA-F0-9]{24}$/.test(code) : false;
+      const reason: 'no_match' | 'invalid_objectid' =
+        hex24 && !ObjectId.isValid(code!) ? 'invalid_objectid' : 'no_match';
       conflicts.push({
         externalCode: code,
         name: it.name,
         quantity: q,
-        reason: code ? 'invalid_objectid' : 'no_match',
+        reason,
       });
       continue;
     }

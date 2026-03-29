@@ -38,6 +38,17 @@ type PreviewConflict = {
 
 type ProductLite = { id: string; name: string };
 
+function conflictReasonLabel(reason: PreviewConflict['reason']): string {
+  switch (reason) {
+    case 'invalid_objectid':
+      return 'ID interno inválido (formato MongoDB)';
+    case 'mapped_product_missing':
+      return 'Mapeamento aponta para produto que já não existe';
+    default:
+      return 'Código não encontrado — escolha o produto para mapear';
+  }
+}
+
 function norm(v: unknown) {
   const s = String(v ?? '').trim().replace(/\s+/g, ' ');
   return s.length ? s : null;
@@ -137,9 +148,62 @@ async function extractPdfTextViaApi(file: File): Promise<string> {
   return String(data?.text ?? '');
 }
 
+/** Cabeçalhos de relatório LW / NF-e que não são códigos de produto. */
+const PDF_STOCK_BOGUS_CODES = new Set(
+  [
+    'DATA',
+    'HORA',
+    'PAG',
+    'PAGINA',
+    'PÁGINA',
+    'TOTAL',
+    'SUBTOTAL',
+    'CNPJ',
+    'CPF',
+    'IE',
+    'NFE',
+    'NF-E',
+    'DANFE',
+    'CHAVE',
+    'PROTOCOLO',
+    'EMISSAO',
+    'EMISSÃO',
+    'DESTINATARIO',
+    'DESTINATÁRIO',
+    'REMETENTE',
+    'FRETE',
+    'ICMS',
+    'IPI',
+    'PRODUTOS',
+    'CODIGO',
+    'CÓDIGO',
+    'BARRAS',
+    'STATUS',
+    'ATIVO',
+    'INATIVO',
+    'RELATORIO',
+    'RELATÓRIO',
+  ].map((s) => s.toUpperCase()),
+);
+
+function isPdfStockNoiseLine(line: string): boolean {
+  const t = line.trim();
+  if (/^DATA\s*:/i.test(t)) return true;
+  if (/^HORA\s*:/i.test(t)) return true;
+  if (/^RELAT[OÓ]RIO\b/i.test(t) && !/^\d/.test(t)) return true;
+  if (/^P[ÁA]G\.?\s*\d/i.test(t)) return true;
+  if (/--\s*\d+\s+of\s+\d+\s*--/i.test(t)) return true;
+  if (/relat[óo]rio.*produtos/i.test(t) && !/^\d/.test(t)) return true;
+  return false;
+}
+
+function isBogusPdfStockCode(code: string): boolean {
+  return PDF_STOCK_BOGUS_CODES.has(code.trim().toUpperCase());
+}
+
 function parsePdfDanfeText(text: string): ParsedItem[] {
-  // Heurística: tenta identificar linhas com (1) código (token alfanumérico) e (2) quantidade numérica.
-  // Observação: PDF de DANFE varia bastante; esse parser pode precisar de ajuste fino com exemplos reais.
+  // Heurística para NF-e/DANFE em texto. Não usar com o PDF "Relatório de Produtos / Código de barras" LW
+  // (esse ficheiro é para Admin → Produtos → Importar). Aqui filtramos linhas tipo DATA: dd/mm/aaaa.
   const normalized = String(text ?? '')
     .replace(/\u00A0/g, ' ')
     .replace(/\s+/g, ' ')
@@ -155,17 +219,16 @@ function parsePdfDanfeText(text: string): ParsedItem[] {
   for (const line of lines) {
     if (out.length > 5000) break;
 
-    // Pula linhas muito pequenas
     if (line.length < 6) continue;
+    if (isPdfStockNoiseLine(line)) continue;
 
     const qtyMatches = Array.from(line.matchAll(qtyRegex)).slice(0, 6).map((m) => m[1]);
     if (!qtyMatches.length) continue;
 
     const codeMatches = Array.from(line.matchAll(codeRegex)).slice(0, 10).map((m) => m[1]);
-    if (!codeMatches.length) continue;
+    const externalCode = codeMatches.find((c) => !isBogusPdfStockCode(c));
+    if (!externalCode) continue;
 
-    // Primeiro código "plausível" e primeira quantidade numérica
-    const externalCode = codeMatches[0];
     const qtyRaw = qtyMatches[0];
     const qtyStr = String(qtyRaw).replace(/\./g, '').replace(',', '.');
     const quantity = Number(qtyStr);
@@ -605,7 +668,9 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
           </div>
         ) : source === 'pdf' ? (
           <div className="text-sm text-gray-600">
-            Para PDF, use o upload acima. A extração de itens é heurística (pode precisar ajuste dependendo do DANFE).
+            PDF aqui é para texto tipo <strong>NF-e / DANFE</strong>. O relatório{' '}
+            <em>Relatório de Produtos / Código de barras LW</em> não deve ser usado neste módulo — importe-o
+            em <strong>Admin → Produtos → Importar</strong> para atualizar o catálogo.
           </div>
         ) : (
           <div className="text-sm text-gray-600">
@@ -646,7 +711,7 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
                         <span className="font-semibold">Código:</span> {c.externalCode || '—'} ·{' '}
                         <span className="font-semibold">Nome:</span> {c.name || '—'} ·{' '}
                         <span className="font-semibold">Qtd:</span> {c.quantity} ·{' '}
-                        <span className="font-semibold">Motivo:</span> {c.reason}
+                        <span className="font-semibold">Motivo:</span> {conflictReasonLabel(c.reason)}
                       </div>
                       <div className="mt-2 grid gap-2 md:grid-cols-2">
                         <Select
