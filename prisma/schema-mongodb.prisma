@@ -1,4 +1,5 @@
-// Schema Prisma para MongoDB - Produtos e Categorias
+// Schema Prisma para MongoDB — catálogo da loja (produtos + categorias + hero).
+// Após alterar: `npx prisma db push --schema=./prisma/schema-mongodb.prisma` e `npm run prisma:generate`.
 generator client {
   provider      = "prisma-client-js"
   output        = "../.prisma/mongodb-client"
@@ -22,32 +23,38 @@ model Category {
   @@map("categories")
 }
 
+// Documento na coleção `products`. Campos novos alinham ao relatório LW (Excel/PDF).
+// `slug` continua a ser o identificador de URL; `codigo` é o código comercial (único quando existe).
 model Product {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  /// Código do fornecedor / relatório LW (ex.: 16503). Único quando preenchido.
+  /// Código do fornecedor / relatório LW (ex.: 16503). Único quando preenchido; importações fazem match aqui se o slug mudar.
   codigo       String?  @unique
   name         String
+  /// Slug URL-friendly; derivado de código+nome nas importações (ver importRowSlug).
   slug         String   @unique
   description  String
-  /// Custo unitário ou de referência (interno)
+  /// Custo (interno). No Excel calcula-se como Vl.Est.Custo / estoque quando faz sentido.
   cost         Float?
-  /// Preço de venda à vista (usado no site)
+  /// Preço unitário à vista — é o que o catálogo usa como `price`.
   price        Float
-  /// Venda a prazo (quando existir no relatório)
+  /// Preço a prazo (coluna do PDF LW); opcional no Excel de estoque.
   pricePrazo   Float?
   stock        Int      @default(0)
   minStock     Int      @default(0)
+  /// Unidade de venda (ex.: UN, KG) quando vem no PDF.
   unidade      String?
-  /// Peso em kg (PDF “peso” / ERP)
+  /// Peso em kg; no PDF o campo “peso” grava aqui (mantém o nome `weight` no Prisma por compatibilidade com o código antigo).
   weight       Float?
+  /// EAN / código de barras numérico (apenas dígitos no import).
   codBarra     String?
-  /// true = ATIVO, false = INATIVO
+  /// true = ATIVO, false = INATIVO. O catálogo público filtra `status !== false`.
   status       Boolean  @default(true)
   featured     Boolean  @default(false)
   imageUrl     String?
   imageUrls    String[] @default([])
+  /// Obrigatório: todo produto pertence a uma Category (relação em cascade).
   categoryId   String   @db.ObjectId
-  /// Mantido para enriquecimento / envio (formato texto livre)
+  /// Texto livre (ex.: dimensões para envio); enriquecimento ML/Gemini pode preencher.
   dimensionsCm String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

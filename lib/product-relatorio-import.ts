@@ -1,3 +1,14 @@
+/**
+ * Importação de catálogo → MongoDB (Prisma `Product`).
+ *
+ * Fluxos:
+ * - Excel “relação de estoque” → `runRelatorioProductImport` (grupo, marca, custo unitário estimado).
+ * - PDF “Produtos / código de barras” LW → `runPdfRelatorioProductImport` (preço vista/prazo, EAN, status ATIVO/INATIVO).
+ * - Serviço Python Render → escreve o mesmo shape de documento via driver nativo (`render-catalog-import/main.py`).
+ *
+ * Regra de atualização (upsert): procura produto existente por `slug` (derivado de código+nome);
+ * se não achar e existir `codigo`, tenta `findUnique({ codigo })` para não duplicar quando o slug mudou.
+ */
 import mongoPrisma from './mongodb';
 import type { RelatorioProdutoPdfRow } from './relatorio-produtos-pdf';
 import {
@@ -20,19 +31,25 @@ export type RelatorioProductImportResult = {
   totalProcessed: number;
 };
 
+/** Linha já normalizada antes de Gravar com Prisma (um produto por linha). */
 export type ProductCatalogImportRow = {
+  /** Mesmo valor que vai para `Product.codigo` (código da grelha LW). */
   code: string;
   name: string;
+  /** Texto longo: importações juntam grupo/marca ou bloco PDF (unid, preços, EAN…). */
   description: string;
+  /** Sempre preço à vista unitário (site usa este campo). */
   price: number;
   stock: number;
+  /** Nome da categoria: Excel usa “grupo”; PDF usa categoria fixa “Importado PDF”. */
   categoryName: string;
+  /** Kg → campo Prisma `weight`. */
   weight?: number | null;
   cost?: number | null;
   pricePrazo?: number | null;
   unidade?: string | null;
   codBarra?: string | null;
-  /** true = ATIVO */
+  /** Omitir ou true = ATIVO; false = INATIVO (PDF). */
   status?: boolean;
 };
 
@@ -103,7 +120,8 @@ async function uniqueProductSlug(base: string): Promise<string> {
 }
 
 /**
- * Importa linhas normalizadas (Excel, PDF, etc.).
+ * Percorre `rows` e faz create ou update em `Product`.
+ * @param options.upsert — se false, produto que já existe (slug ou codigo) é contado como skipped.
  */
 export async function runProductCatalogImport(
   rows: ProductCatalogImportRow[],
@@ -134,6 +152,7 @@ export async function runProductCatalogImport(
     const status = row.status !== false;
 
     try {
+      // 1º pelo slug esperado desta importação; 2º pelo codigo único (evita duplicado se o nome/slug mudou).
       let existing =
         (await mongoPrisma.product.findUnique({ where: { slug: baseSlug } })) ?? null;
       if (!existing && codigo) {
@@ -229,6 +248,7 @@ export async function runRelatorioProductImport(
   return runProductCatalogImport(mapped, options);
 }
 
+/** PDF LW parseado em `relatorio-produtos-pdf.ts` (texto + linhas ATIVO/INATIVO). */
 export async function runPdfRelatorioProductImport(
   rows: RelatorioProdutoPdfRow[],
   options: { upsert: boolean }

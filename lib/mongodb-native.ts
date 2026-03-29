@@ -87,7 +87,7 @@ export async function getProducts(filters?: {
     query.featured = true;
   }
 
-  // Catálogo: não listar produtos marcados como inativos (status === false)
+  // Catálogo público: esconder INATIVO. Em Mongo, doc sem campo `status` ainda entra ($ne false).
   query.status = { $ne: false };
 
   // Paginação
@@ -172,6 +172,7 @@ export async function getProductBySlug(slug: string) {
     return null;
   }
 
+  // Ficha do produto: tratar como inexistente se importação marcou INATIVO.
   if (product.status === false) {
     return null;
   }

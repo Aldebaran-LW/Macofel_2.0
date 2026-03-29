@@ -150,6 +150,11 @@ def resolve_category_id(
 
 
 def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[str, Any]:
+    """Grava produtos no Mongo com as mesmas chaves camelCase que o Prisma (codigo, cost, …).
+
+    Cada `row` vem do Excel parseado em relatorio_xlsx (code, name, grupo, price, stock, cost, …).
+    Match de produto existente: primeiro `slug` derivado de código+nome, depois campo único `codigo`.
+    """
     cat_cache: dict[str, ObjectId] = {}
     existing_cats = list(db["categories"].find({}, {"name": 1}))
     for c in existing_cats:

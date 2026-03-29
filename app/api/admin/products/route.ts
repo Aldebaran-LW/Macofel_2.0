@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    // Campos opcionais alinhados ao relatório LW: codigo, custo, preço prazo, unidade, EAN, ativo.
     const {
       name,
       description,

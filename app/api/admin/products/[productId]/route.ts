@@ -78,6 +78,7 @@ export async function PATCH(
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';
+    // Mesmos campos extra do model Product (import LW / painel).
     if (codigo !== undefined) {
       updateData.codigo = codigo != null && String(codigo).trim() !== '' ? String(codigo).trim() : null;
     }
