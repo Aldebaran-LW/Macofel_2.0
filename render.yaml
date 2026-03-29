@@ -1,39 +1,7 @@
-# Blueprint Render: (1) Next.js Macofel  (2) API Python importação catálogo — ver render-catalog-import/README.md
+# Blueprint Render: apenas API Python de importação de catálogo.
+# O site Next.js (Macofel) deve estar na Vercel — não fazer build Next neste blueprint.
+# Ver render-catalog-import/README.md
 services:
-  - type: web
-    name: materiais-de-construcao
-    env: node
-    plan: starter
-    buildCommand: npm install && npm run prisma:generate && npm run build
-    startCommand: npm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-      
-      # MongoDB (Produtos e Categorias)
-      - key: MONGODB_URI
-        value: mongodb+srv://Vercel-Admin-materiais_de_construcao:O8ooXYIy89sb5cfR@materiais-de-construcao.zhnnw7g.mongodb.net/?retryWrites=true&w=majority
-      
-      # Supabase PostgreSQL (Dados Burocráticos)
-      - key: DATABASE_URL
-        value: postgresql://postgres.vedrmtowoosqxzqxgxpb:LW_Digital_Forge%2F123@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
-      
-      # NextAuth
-      # IMPORTANTE: Atualize NEXTAUTH_URL após o deploy com a URL do Render
-      - key: NEXTAUTH_URL
-        value: https://materiais-de-construcao.onrender.com
-      - key: NEXTAUTH_SECRET
-        value: HED6F6715Emf+xOoK+JVpChsa0WaodxP0tlNmn5/G+Y=
-      
-      # Supabase
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        value: https://vedrmtowoosqxzqxgxpb.supabase.co
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlZHJtdG93b29zcXh6cXhneHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzMzM0MjAsImV4cCI6MjA3NjkwOTQyMH0.RGJPOOJE2Vk9k6dyy19rE_PJhWyT94OIT8B1LkRPspk
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlZHJtdG93b29zcXh6cXhneHBiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTMzMzQyMCwiZXhwIjoyMDc2OTA5NDIwfQ.TMCwtHPH6opxModb5Lx3vIesGcX5gKS8CVJP8s6IOEU
-
-  # Importação de catálogo (Excel) — mesmo repositório, pasta render-catalog-import
   - type: web
     name: macofel-catalog-import
     env: python
