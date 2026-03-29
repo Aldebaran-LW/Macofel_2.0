@@ -10,6 +10,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 const REMOTE_TIMEOUT_MS = 15 * 60 * 1000;
+/** Importação com enriquecimento Gemini (vários lotes) pode exceder o timeout normal. */
+const REMOTE_TIMEOUT_ENRICH_MS = 28 * 60 * 1000;
 
 /** Proxy seguro: o browser fala só com o Next; o Next reenvia o ficheiro ao serviço na Render com o segredo. */
 export async function POST(req: NextRequest) {
@@ -36,14 +38,18 @@ export async function POST(req: NextRequest) {
 
     const upsertRaw = incoming.get('upsert');
     const upsert = upsertRaw === 'true' || upsertRaw === '1';
+    const enrichAi =
+      incoming.get('enrich_ai') === 'true' || incoming.get('enrich_ai') === '1';
 
     const fd = new FormData();
     const fname = file instanceof File ? file.name : 'upload';
     fd.append('file', file, fname);
     fd.append('upsert', upsert ? 'true' : 'false');
+    fd.append('enrich_ai', enrichAi ? 'true' : 'false');
 
+    const timeoutMs = enrichAi ? REMOTE_TIMEOUT_ENRICH_MS : REMOTE_TIMEOUT_MS;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), REMOTE_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
     let upstream: Response;
     try {

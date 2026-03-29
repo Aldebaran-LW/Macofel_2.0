@@ -10,6 +10,7 @@ Serviço **opcional** para importar Excel (`.xlsx` / `.xls`) no mesmo MongoDB do
 | `MONGODB_DB_NAME` | Opcional, se o URI não incluir base |
 | `RENDER_CATALOG_IMPORT_SECRET` | Token longo; o mesmo valor vai em `RENDER_CATALOG_IMPORT_SECRET` no Next |
 | `CORS_ORIGINS` | Opcional; origens permitidas se chamares este API a partir do browser (o fluxo recomendado é só via proxy Next) |
+| `GEMINI_API_KEY` ou `GOOGLE_API_KEY` | Opcional; chave da [Google AI Studio](https://aistudio.google.com/apikey) para enriquecer nomes/descrições com Gemini quando o painel envia `enrich_ai=true` (**nunca** commits nem partilhes a chave em chat) |
 
 ## Deploy (Render)
 
@@ -37,6 +38,8 @@ O mesmo **relatório de estoque** esperado pela importação local (`Produto`, `
 
 ## Endpoint
 
-`POST /import/catalog` — `multipart/form-data`: `file`, `upsert` (`true`/`false`); header `Authorization: Bearer <secret>`.
+`POST /import/catalog` — `multipart/form-data`: `file`, `upsert` (`true`/`false`), `enrich_ai` (`true`/`false`, opcional — melhora texto com Gemini se a chave estiver definida); header `Authorization: Bearer <secret>`.
 
-O painel Macofel usa o proxy `/api/admin/products/import/remote` (não exponhas o segredo no browser).
+`GET /` — health check; inclui `geminiEnrich: true/false` se a chave Gemini está configurada.
+
+O painel Macofel usa o proxy `/api/admin/products/import/remote` (não exponhas o segredo no browser). Com a opção **Enriquecer com IA** ativa, o proxy usa timeout mais longo (vários lotes ao Gemini).

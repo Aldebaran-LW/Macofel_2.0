@@ -6,6 +6,7 @@ Env:
   MONGODB_URI — obrigatório
   RENDER_CATALOG_IMPORT_SECRET ou IMPORT_SERVICE_SECRET — Bearer token (igual ao Next)
   CORS_ORIGINS — opcional, lista separada por vírgula (ex.: https://loja.exemplo.com)
+  GEMINI_API_KEY ou GOOGLE_API_KEY — opcional; com enrich_ai=true melhora nome/descrição (Gemini)
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from pymongo.database import Database
 
+from gemini_enrich import enrich_catalog_rows, gemini_configured
 from relatorio_xlsx import import_row_slug, parse_relatorio_sheet, slugify_product_key
 
 app = FastAPI(title="Macofel catalog import", version="1.0.0")
@@ -227,7 +229,11 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
 
 @app.get("/")
 def health():
-    return {"ok": True, "service": "macofel-catalog-import"}
+    return {
+        "ok": True,
+        "service": "macofel-catalog-import",
+        "geminiEnrich": gemini_configured(),
+    }
 
 
 @app.post("/import/catalog")
@@ -235,6 +241,7 @@ async def import_catalog(
     _auth: None = Depends(verify_bearer),
     file: UploadFile = File(...),
     upsert: str = Form("true"),
+    enrich_ai: str = Form("false"),
 ):
     fname = (file.filename or "").lower()
     if not re.search(r"\.(xlsx|xls)$", fname):
@@ -252,6 +259,16 @@ async def import_catalog(
         rows, warnings = parse_excel_bytes(content)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(400, f"Erro ao ler Excel: {e}") from e
+
+    want_ai = enrich_ai.lower() in ("1", "true", "yes", "on")
+    if want_ai:
+        if gemini_configured():
+            rows, ai_warnings = enrich_catalog_rows(rows)
+            warnings.extend(ai_warnings)
+        else:
+            warnings.append(
+                "Enriquecimento IA pedido mas GEMINI_API_KEY ou GOOGLE_API_KEY não está definida no servidor."
+            )
 
     if not rows:
         return {

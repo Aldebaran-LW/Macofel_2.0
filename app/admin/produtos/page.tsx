@@ -107,6 +107,7 @@ export default function AdminProdutosPage() {
   } | null>(null);
   const [importRemoteAvailable, setImportRemoteAvailable] = useState<boolean | null>(null);
   const [importRemoteLoading, setImportRemoteLoading] = useState(false);
+  const [importRemoteEnrichAi, setImportRemoteEnrichAi] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -294,6 +295,7 @@ export default function AdminProdutosPage() {
     setImportPreview(null);
     setImportResult(null);
     setImportUpsert(true);
+    setImportRemoteEnrichAi(false);
   };
 
   const handleImportPreview = async () => {
@@ -389,6 +391,7 @@ export default function AdminProdutosPage() {
       const fd = new FormData();
       fd.append('file', importFile);
       fd.append('upsert', importUpsert ? 'true' : 'false');
+      fd.append('enrich_ai', importRemoteEnrichAi ? 'true' : 'false');
       const res = await fetch('/api/admin/products/import/remote', {
         method: 'POST',
         body: fd,
@@ -665,6 +668,21 @@ export default function AdminProdutosPage() {
                 Atualizar produtos já existentes (mesmo código + nome → mesmo identificador interno)
               </span>
             </label>
+            {importRemoteAvailable ? (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={importRemoteEnrichAi}
+                  onChange={(e) => setImportRemoteEnrichAi(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                />
+                <span>
+                  Enriquecer com IA (Google Gemini) no servidor dedicado — nomes e descrições em
+                  pt-PT; requer <code className="text-[10px]">GEMINI_API_KEY</code> na Render; pode
+                  demorar em catálogos grandes.
+                </span>
+              </label>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
