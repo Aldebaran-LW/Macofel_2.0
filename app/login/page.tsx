@@ -13,8 +13,8 @@ import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 /** Evita open redirect: só caminhos relativos internos. */
-function safeCallbackPath(raw: string | null): string | null {
-  if (!raw) return null;
+function safeCallbackPath(raw: string | null | undefined): string | null {
+  if (raw == null || raw === '') return null;
   try {
     const decoded = decodeURIComponent(raw.trim());
     if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
@@ -55,9 +55,7 @@ export default function LoginPage() {
         });
         const sessionData = await res.json();
         const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
-        const callbackTarget = safeCallbackPath(
-          searchParams?.get('callbackUrl') ?? null,
-        );
+        const callbackTarget = safeCallbackPath(searchParams?.get('callbackUrl'));
 
         if (callbackTarget && typeof window !== 'undefined') {
           toast.success('Login realizado com sucesso!');
