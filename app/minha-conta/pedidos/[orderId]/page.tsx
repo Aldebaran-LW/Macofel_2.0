@@ -64,6 +64,8 @@ const statusConfig: Record<string, { label: string; icon: any; color: string; de
 export default function OrderDetailsPage() {
   const router = useRouter();
   const params = useParams();
+  const rawOrderId = params?.orderId;
+  const orderId = Array.isArray(rawOrderId) ? rawOrderId[0] : rawOrderId;
   const { data: session, status } = useSession() ?? {};
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,14 +74,15 @@ export default function OrderDetailsPage() {
     if (status === 'unauthenticated') {
       toast.error('Faça login para ver os detalhes do pedido');
       router.push('/login');
-    } else if (status === 'authenticated' && params.orderId) {
+    } else if (status === 'authenticated' && orderId) {
       fetchOrder();
     }
-  }, [status, params]);
+  }, [status, orderId]);
 
   const fetchOrder = async () => {
+    if (!orderId) return;
     try {
-      const res = await fetch(`/api/orders/${params.orderId}`);
+      const res = await fetch(`/api/orders/${orderId}`);
       if (res.ok) {
         const data = await res.json();
         setOrder(data);
