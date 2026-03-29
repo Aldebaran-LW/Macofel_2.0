@@ -8,6 +8,57 @@ import { applyExtraFieldsFromEnrichment } from '@/lib/product-web-enrichment';
 
 export const dynamic = 'force-dynamic';
 
+/** Lista produtos para o painel (sem passar pelo guard do catálogo público). Inclui inativos. */
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') ?? '200', 10)));
+
+    const products = await mongoPrisma.product.findMany({
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+      include: { category: true },
+    });
+
+    const mapped = products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      description: p.description,
+      price: p.price,
+      stock: p.stock,
+      minStock: p.minStock,
+      weight: p.weight,
+      imageUrl: p.imageUrl,
+      categoryId: p.categoryId,
+      featured: p.featured,
+      codigo: p.codigo ?? null,
+      cost: p.cost ?? null,
+      pricePrazo: p.pricePrazo ?? null,
+      unidade: p.unidade ?? null,
+      codBarra: p.codBarra ?? null,
+      status: p.status,
+      category: p.category
+        ? { id: p.category.id, name: p.category.name }
+        : { id: p.categoryId, name: '—' },
+    }));
+
+    return NextResponse.json({ products: mapped });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('GET /api/admin/products:', error);
+    return NextResponse.json(
+      { error: 'Erro ao listar produtos', details: message },
+      { status: 500 }
+    );
+  }
+}
+
 function parsePriceInput(v: unknown): number {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   const s = String(v ?? '')
@@ -133,3 +184,10 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
+
+
+
+
+

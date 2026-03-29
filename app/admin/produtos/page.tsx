@@ -133,14 +133,21 @@ export default function AdminProdutosPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products?limit=100');
+      // API de admin: não depende do guard do catálogo público e lista também inativos.
+      const res = await fetch('/api/admin/products?limit=300', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setProducts(data?.products ?? []);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('fetchProducts admin:', res.status, err);
+        toast.error(err?.error || `Erro ${res.status} ao carregar produtos`);
+        setProducts([]);
       }
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao carregar produtos');
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -349,7 +356,9 @@ export default function AdminProdutosPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || 'Erro na importação');
+        toast.error(
+          [data.error, data.details].filter(Boolean).join(' — ') || 'Erro na importação'
+        );
         return;
       }
       setImportResult({
@@ -359,10 +368,22 @@ export default function AdminProdutosPage() {
         errors: data.errors ?? [],
         warnings: data.warnings ?? [],
       });
-      toast.success(
-        `Importação concluída: ${data.created} novos, ${data.updated} atualizados, ${data.skipped} ignorados.`
-      );
+      const c = data.created ?? 0;
+      const u = data.updated ?? 0;
+      const s = data.skipped ?? 0;
+      if (c + u === 0) {
+        toast.warning(
+          s > 0
+            ? `Nenhum produto novo ou atualizado (${s} ignorados). Ative «Atualizar produtos já existentes» ou use Prévia.`
+            : 'Importação terminou sem alterações (0 criados, 0 atualizados). Veja avisos abaixo no modal.'
+        );
+      } else {
+        toast.success(`Importação: ${c} novos, ${u} atualizados, ${s} ignorados.`);
+      }
       fetchProducts();
+      setTimeout(() => {
+        document.getElementById('importacao-resultado')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
     } catch (e) {
       console.error(e);
       toast.error('Erro na importação');
@@ -782,7 +803,10 @@ export default function AdminProdutosPage() {
               </div>
             )}
             {importResult && (
-              <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
+              <div
+                id="importacao-resultado"
+                className="rounded-md border border-green-200 bg-green-50/80 p-3 text-sm space-y-1 scroll-mt-4"
+              >
                 <p>
                   <strong>Criados:</strong> {importResult.created} · <strong>Atualizados:</strong>{' '}
                   {importResult.updated} · <strong>Ignorados:</strong> {importResult.skipped}
