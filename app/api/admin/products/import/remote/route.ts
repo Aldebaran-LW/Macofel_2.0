@@ -40,12 +40,16 @@ export async function POST(req: NextRequest) {
     const upsert = upsertRaw === 'true' || upsertRaw === '1';
     const enrichAi =
       incoming.get('enrich_ai') === 'true' || incoming.get('enrich_ai') === '1';
+    const preserveRaw = incoming.get('preserve_stock_db');
+    const preserveStockDb =
+      preserveRaw === 'true' || preserveRaw === '1';
 
     const fd = new FormData();
     const fname = file instanceof File ? file.name : 'upload';
     fd.append('file', file, fname);
     fd.append('upsert', upsert ? 'true' : 'false');
     fd.append('enrich_ai', enrichAi ? 'true' : 'false');
+    fd.append('preserve_stock_db', preserveStockDb ? 'true' : 'false');
 
     const timeoutMs = enrichAi ? REMOTE_TIMEOUT_ENRICH_MS : REMOTE_TIMEOUT_MS;
     const ctrl = new AbortController();

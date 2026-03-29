@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
     const file = form.get('file');
     const upsertRaw = form.get('upsert');
     const upsert = upsertRaw === 'true' || upsertRaw === '1';
+    const preserveRaw = form.get('preserve_stock_db');
+    const preserveStockForExisting =
+      preserveRaw === 'true' || preserveRaw === '1';
 
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: 'Envie o ficheiro no campo file' }, { status: 400 });
@@ -52,6 +55,7 @@ export async function POST(req: NextRequest) {
       }
       const { created, updated, skipped, errors } = await runPdfRelatorioProductImport(rows, {
         upsert,
+        preserveStockForExisting,
       });
       return NextResponse.json({
         source: 'pdf',
@@ -74,6 +78,7 @@ export async function POST(req: NextRequest) {
 
     const { created, updated, skipped, errors } = await runRelatorioProductImport(rows, {
       upsert,
+      preserveStockForExisting,
     });
 
     return NextResponse.json({

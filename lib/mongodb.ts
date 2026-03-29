@@ -23,7 +23,7 @@ if (mongoUriWithDb !== originalMongoUri) {
 }
 
 // @ts-ignore - Cliente gerado dinamicamente
-import { PrismaClient as MongoPrismaClient } from '../.prisma/mongodb-client';
+import { PrismaClient as MongoPrismaClient } from '../node_modules/.prisma-mongodb';
 
 const globalForMongo = globalThis as unknown as {
   mongoPrisma: MongoPrismaClient | undefined;

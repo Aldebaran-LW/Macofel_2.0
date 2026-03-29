@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import {
   Plus,
@@ -9,8 +9,8 @@ import {
   Save,
   X,
   Upload,
-  Image as ImageIcon,
   FileText,
+  Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,14 @@ interface Product {
   imageUrl?: string | null;
   categoryId: string;
   featured: boolean;
+  codigo?: string | null;
+  cost?: number | null;
+  pricePrazo?: number | null;
+  unidade?: string | null;
+  codBarra?: string | null;
+  marca?: string | null;
+  /** false = inativo no catálogo público */
+  status?: boolean;
   category: { name: string; id: string };
 }
 
@@ -68,6 +76,13 @@ export default function AdminProdutosPage() {
     imageUrl: '',
     categoryId: '',
     featured: false,
+    codigo: '',
+    cost: '',
+    pricePrazo: '',
+    unidade: '',
+    codBarra: '',
+    marca: '',
+    statusActive: true,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -88,6 +103,7 @@ export default function AdminProdutosPage() {
       slug: string;
       source?: 'xls' | 'pdf';
       grupo?: string;
+      marca?: string;
       barcode?: string;
       status?: string;
       vendaPrazo?: number;
@@ -108,9 +124,116 @@ export default function AdminProdutosPage() {
   const [importRemoteAvailable, setImportRemoteAvailable] = useState<boolean | null>(null);
   const [importRemoteLoading, setImportRemoteLoading] = useState(false);
   const [importRemoteEnrichAi, setImportRemoteEnrichAi] = useState(false);
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false);
+  const [importConfirmKind, setImportConfirmKind] = useState<'local' | 'remote' | null>(null);
+  /** Manter estoque da base na importação de catálogo (upsert). Somar estoque: Estoque → Importação. */
+  const [importPreserveStockDb, setImportPreserveStockDb] = useState(false);
+
+  const [filterSearch, setFilterSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterCategoryId, setFilterCategoryId] = useState<string>('all');
+  const [filterCatalog, setFilterCatalog] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterStock, setFilterStock] = useState<'all' | 'in_stock' | 'out'>('all');
+  const [filterFeatured, setFilterFeatured] = useState<'all' | 'yes' | 'no'>('all');
+
+  const [listPage, setListPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  /** Força novo GET quando importámos/alterámos sem mudar página (ex.: já na página 1). */
+  const [listNonce, setListNonce] = useState(0);
 
   useEffect(() => {
-    fetchProducts();
+    const t = setTimeout(() => setDebouncedSearch(filterSearch.trim()), 400);
+    return () => clearTimeout(t);
+  }, [filterSearch]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [debouncedSearch, filterCategoryId, filterCatalog, filterStock, filterFeatured, pageSize]);
+
+  const filtersActive =
+    filterSearch.trim() !== '' ||
+    filterCategoryId !== 'all' ||
+    filterCatalog !== 'all' ||
+    filterStock !== 'all' ||
+    filterFeatured !== 'all';
+
+  const clearFilters = () => {
+    setFilterSearch('');
+    setFilterCategoryId('all');
+    setFilterCatalog('all');
+    setFilterStock('all');
+    setFilterFeatured('all');
+  };
+
+  const listQuery = useMemo(() => {
+    const p = new URLSearchParams();
+    p.set('page', String(listPage));
+    p.set('limit', String(pageSize));
+    if (debouncedSearch) p.set('q', debouncedSearch);
+    if (filterCategoryId !== 'all') p.set('categoryId', filterCategoryId);
+    if (filterCatalog !== 'all') p.set('catalog', filterCatalog);
+    if (filterStock !== 'all') p.set('stock', filterStock);
+    if (filterFeatured !== 'all') p.set('featured', filterFeatured);
+    return p.toString();
+  }, [
+    listPage,
+    pageSize,
+    debouncedSearch,
+    filterCategoryId,
+    filterCatalog,
+    filterStock,
+    filterFeatured,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/products?${listQuery}`, { credentials: 'include' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          if (!cancelled) {
+            console.error('fetchProducts admin:', res.status, err);
+            toast.error(err?.error || `Erro ${res.status} ao carregar produtos`);
+            setProducts([]);
+            setTotalCount(0);
+            setTotalPages(1);
+          }
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        const pag = data?.pagination;
+        const rows = data?.products ?? [];
+        if (
+          rows.length === 0 &&
+          (pag?.total ?? 0) > 0 &&
+          listPage > 1
+        ) {
+          setListPage((lp) => Math.max(1, lp - 1));
+          return;
+        }
+        setProducts(rows);
+        setTotalCount(typeof pag?.total === 'number' ? pag.total : rows.length);
+        setTotalPages(Math.max(1, typeof pag?.totalPages === 'number' ? pag.totalPages : 1));
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Erro:', error);
+          toast.error('Erro ao carregar produtos');
+          setProducts([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listQuery, listNonce]);
+
+  useEffect(() => {
     fetchCategories();
   }, []);
 
@@ -131,27 +254,7 @@ export default function AdminProdutosPage() {
     };
   }, []);
 
-  const fetchProducts = async () => {
-    try {
-      // API de admin: não depende do guard do catálogo público e lista também inativos.
-      const res = await fetch('/api/admin/products?limit=300', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data?.products ?? []);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error('fetchProducts admin:', res.status, err);
-        toast.error(err?.error || `Erro ${res.status} ao carregar produtos`);
-        setProducts([]);
-      }
-    } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao carregar produtos');
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const bumpProductList = () => setListNonce((n) => n + 1);
 
   const fetchCategories = async () => {
     try {
@@ -177,6 +280,13 @@ export default function AdminProdutosPage() {
       imageUrl: '',
       categoryId: '',
       featured: false,
+      codigo: '',
+      cost: '',
+      pricePrazo: '',
+      unidade: '',
+      codBarra: '',
+      marca: '',
+      statusActive: true,
     });
     setEditingProduct(null);
     setImagePreview(null);
@@ -239,6 +349,13 @@ export default function AdminProdutosPage() {
         imageUrl: product.imageUrl || '',
         categoryId: product.categoryId,
         featured: product.featured,
+        codigo: product.codigo ?? '',
+        cost: product.cost != null ? String(product.cost) : '',
+        pricePrazo: product.pricePrazo != null ? String(product.pricePrazo) : '',
+        unidade: product.unidade ?? '',
+        codBarra: product.codBarra ?? '',
+        marca: product.marca ?? '',
+        statusActive: product.status !== false,
       });
       setImagePreview(product.imageUrl || null);
     } else {
@@ -280,13 +397,20 @@ export default function AdminProdutosPage() {
           imageUrl: formData.imageUrl || null,
           categoryId: formData.categoryId,
           featured: formData.featured,
+          codigo: formData.codigo.trim() || null,
+          cost: formData.cost.trim() || null,
+          pricePrazo: formData.pricePrazo.trim() || null,
+          unidade: formData.unidade.trim() || null,
+          codBarra: formData.codBarra.trim() || null,
+          marca: formData.marca.trim() || null,
+          status: formData.statusActive,
         }),
       });
 
       if (res.ok) {
         toast.success(editingProduct ? 'Produto atualizado!' : 'Produto criado!');
         handleCloseDialog();
-        fetchProducts();
+        bumpProductList();
       } else {
         const error = await res.json();
         toast.error(error.error || 'Erro ao salvar produto');
@@ -312,6 +436,7 @@ export default function AdminProdutosPage() {
     }
     setImportPreviewLoading(true);
     setImportResult(null);
+    const loadingToast = toast.loading('A gerar prévia do ficheiro…', { duration: Infinity });
     try {
       const fd = new FormData();
       fd.append('file', importFile);
@@ -335,21 +460,46 @@ export default function AdminProdutosPage() {
       console.error(e);
       toast.error('Erro ao gerar prévia');
     } finally {
+      toast.dismiss(loadingToast);
       setImportPreviewLoading(false);
     }
   };
 
-  const handleImportRun = async () => {
+  const openImportConfirm = (kind: 'local' | 'remote') => {
     if (!importFile) {
-      toast.error('Selecione um ficheiro .xls, .xlsx ou .pdf');
+      toast.error(
+        kind === 'remote'
+          ? 'Selecione um ficheiro .xls ou .xlsx'
+          : 'Selecione um ficheiro .xls, .xlsx ou .pdf'
+      );
       return;
     }
+    if (kind === 'remote') {
+      const n = importFile.name.toLowerCase();
+      if (n.endsWith('.pdf')) {
+        toast.error('O servidor dedicado só aceita Excel. Para PDF use a importação normal.');
+        return;
+      }
+      if (!n.endsWith('.xls') && !n.endsWith('.xlsx')) {
+        toast.error('Use .xls ou .xlsx para o servidor dedicado.');
+        return;
+      }
+    }
+    setImportPreserveStockDb(false);
+    setImportConfirmKind(kind);
+    setImportConfirmOpen(true);
+  };
+
+  const runCatalogImportLocal = async (preserveStockDb: boolean) => {
+    if (!importFile) return;
     setImportRunLoading(true);
     setImportResult(null);
+    const loadingToast = toast.loading('A importar o catálogo (servidor local)…', { duration: Infinity });
     try {
       const fd = new FormData();
       fd.append('file', importFile);
       fd.append('upsert', importUpsert ? 'true' : 'false');
+      fd.append('preserve_stock_db', preserveStockDb ? 'true' : 'false');
       const res = await fetch('/api/admin/products/import', {
         method: 'POST',
         body: fd,
@@ -380,7 +530,8 @@ export default function AdminProdutosPage() {
       } else {
         toast.success(`Importação: ${c} novos, ${u} atualizados, ${s} ignorados.`);
       }
-      fetchProducts();
+      setListPage(1);
+      bumpProductList();
       setTimeout(() => {
         document.getElementById('importacao-resultado')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 100);
@@ -388,31 +539,24 @@ export default function AdminProdutosPage() {
       console.error(e);
       toast.error('Erro na importação');
     } finally {
+      toast.dismiss(loadingToast);
       setImportRunLoading(false);
     }
   };
 
-  const handleImportRemoteRun = async () => {
-    if (!importFile) {
-      toast.error('Selecione um ficheiro .xls ou .xlsx');
-      return;
-    }
-    const n = importFile.name.toLowerCase();
-    if (n.endsWith('.pdf')) {
-      toast.error('O servidor dedicado só aceita Excel. Para PDF use a importação normal.');
-      return;
-    }
-    if (!n.endsWith('.xls') && !n.endsWith('.xlsx')) {
-      toast.error('Use .xls ou .xlsx para o servidor dedicado.');
-      return;
-    }
+  const runCatalogImportRemote = async (preserveStockDb: boolean) => {
+    if (!importFile) return;
     setImportRemoteLoading(true);
     setImportResult(null);
+    const loadingToast = toast.loading('A importar no servidor dedicado (pode demorar)…', {
+      duration: Infinity,
+    });
     try {
       const fd = new FormData();
       fd.append('file', importFile);
       fd.append('upsert', importUpsert ? 'true' : 'false');
       fd.append('enrich_ai', importRemoteEnrichAi ? 'true' : 'false');
+      fd.append('preserve_stock_db', preserveStockDb ? 'true' : 'false');
       const res = await fetch('/api/admin/products/import/remote', {
         method: 'POST',
         body: fd,
@@ -444,13 +588,25 @@ export default function AdminProdutosPage() {
       toast.success(
         `Importação (servidor dedicado): ${data.created ?? 0} novos, ${data.updated ?? 0} atualizados, ${data.skipped ?? 0} ignorados.`
       );
-      fetchProducts();
+      setListPage(1);
+      bumpProductList();
     } catch (e) {
       console.error(e);
       toast.error('Erro na importação remota');
     } finally {
+      toast.dismiss(loadingToast);
       setImportRemoteLoading(false);
     }
+  };
+
+  const executeImportConfirm = async () => {
+    if (!importConfirmKind) return;
+    const kind = importConfirmKind;
+    const preserve = importPreserveStockDb && importUpsert;
+    setImportConfirmOpen(false);
+    setImportConfirmKind(null);
+    if (kind === 'local') await runCatalogImportLocal(preserve);
+    else await runCatalogImportRemote(preserve);
   };
 
   const handleDelete = async (productId: string, productName: string) => {
@@ -465,7 +621,7 @@ export default function AdminProdutosPage() {
 
       if (res.ok) {
         toast.success('Produto deletado!');
-        fetchProducts();
+        bumpProductList();
       } else {
         toast.error('Erro ao deletar produto');
       }
@@ -505,6 +661,99 @@ export default function AdminProdutosPage() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-4 w-4 text-gray-500 shrink-0" aria-hidden />
+          <span className="text-sm font-medium text-gray-900">Filtros</span>
+          <span className="text-xs text-gray-500">
+            (Página {listPage} de {totalPages} · {totalCount}{' '}
+            produto{totalCount !== 1 ? 's' : ''}
+            {filtersActive ? ' com estes filtros' : ''})
+          </span>
+          {filtersActive ? (
+            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}>
+              Limpar
+            </Button>
+          ) : null}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="sm:col-span-2 xl:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-gray-600">Pesquisar</label>
+            <Input
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              placeholder="Nome, código, EAN, slug, categoria…"
+              className="h-9"
+              aria-label="Pesquisar produtos"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Categoria</label>
+            <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Catálogo</label>
+            <Select
+              value={filterCatalog}
+              onValueChange={(v) => setFilterCatalog(v as 'all' | 'active' | 'inactive')}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Ativos e inativos</SelectItem>
+                <SelectItem value="active">Só ativos</SelectItem>
+                <SelectItem value="inactive">Só inativos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Estoque</label>
+            <Select
+              value={filterStock}
+              onValueChange={(v) => setFilterStock(v as 'all' | 'in_stock' | 'out')}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Qualquer</SelectItem>
+                <SelectItem value="in_stock">Com estoque (&gt; 0)</SelectItem>
+                <SelectItem value="out">Sem estoque (0)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Destaque</label>
+            <Select
+              value={filterFeatured}
+              onValueChange={(v) => setFilterFeatured(v as 'all' | 'yes' | 'no')}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="yes">Em destaque</SelectItem>
+                <SelectItem value="no">Fora de destaque</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -512,6 +761,12 @@ export default function AdminProdutosPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Produto
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Cód.
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Marca
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Categoria
@@ -523,6 +778,9 @@ export default function AdminProdutosPage() {
                   Estoque
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Catálogo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Destaque
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -531,10 +789,24 @@ export default function AdminProdutosPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {products.length === 0 ? (
+              {totalCount === 0 && !filtersActive ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     Nenhum produto encontrado. Clique em "Adicionar Produto" para começar.
+                  </td>
+                </tr>
+              ) : totalCount === 0 && filtersActive ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                    Nenhum produto corresponde aos filtros.{' '}
+                    <button
+                      type="button"
+                      className="text-red-600 underline font-medium"
+                      onClick={clearFilters}
+                    >
+                      Limpar filtros
+                    </button>
+                    .
                   </td>
                 </tr>
               ) : (
@@ -566,6 +838,12 @@ export default function AdminProdutosPage() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
+                      {product.codigo || '—'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-[140px] truncate" title={product.marca ?? ''}>
+                      {product.marca || '—'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {product.category.name}
                     </td>
@@ -580,6 +858,17 @@ export default function AdminProdutosPage() {
                       >
                         {product.stock}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {product.status === false ? (
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-700">
+                          Inativo
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          Ativo
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {product.featured ? (
@@ -617,6 +906,54 @@ export default function AdminProdutosPage() {
             </tbody>
           </table>
         </div>
+        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+            <span>
+              {totalCount === 0
+                ? '0 produtos'
+                : `${(listPage - 1) * pageSize + 1}–${(listPage - 1) * pageSize + products.length} de ${totalCount}`}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 whitespace-nowrap">Por página</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => setPageSize(Number(v))}
+              >
+                <SelectTrigger className="h-8 w-[4.5rem] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={listPage <= 1}
+              onClick={() => setListPage((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-gray-500 min-w-[7rem] text-center">
+              Página {listPage} de {totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={listPage >= totalPages}
+              onClick={() => setListPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Dialog
@@ -630,35 +967,25 @@ export default function AdminProdutosPage() {
           <DialogHeader>
             <DialogTitle>Importar catálogo (Excel ou PDF)</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 text-sm text-gray-600">
+          <div className="space-y-3 text-sm text-gray-600">
             <p>
-              <strong>Excel (.xls / .xlsx):</strong> relatório tipo <em>Relação de estoque</em>{' '}
-              (código, nome, grupo, marca, estoque, valores).
+              <strong>Excel:</strong> relatório de estoque (.xls / .xlsx) — código, nome, marca, quantidades e
+              valores.
             </p>
             <p>
-              <strong>PDF:</strong> o export LW <em>Relatório de Produtos / Código de barras</em>{' '}
-              (ficheiro típico: <code className="text-[10px]">Relatorio de Produtos Codigo de Barras LW.pdf</code>
-              ) com <strong>texto selecionável</strong> — PDF só de imagem (scan) não funciona. Colunas:
-              Código, Produto, Unid., Cod.Barra, Peso, Custo, Venda Vista, Venda Prazo, Estoque, Status.
-              Preço no site: <strong>Venda Vista</strong> (se zero, usa Venda Prazo). Categoria:{' '}
-              <strong>Importado PDF</strong>. Use <strong>Prévia</strong> ou <strong>Importar</strong> aqui; o
-              servidor dedicado (Render) só aceita Excel.
+              <strong>PDF:</strong> exportação <em>Produtos / código de barras</em> do seu software, com{' '}
+              <strong>texto que consiga copiar</strong> (PDF digitalizado não serve). Preço no site: coluna{' '}
+              <strong>Venda Vista</strong>; se estiver vazio, usa <strong>Venda Prazo</strong>. Categoria atribuída:{' '}
+              <strong>Importado PDF</strong>.
             </p>
-            <p className="text-xs text-gray-500">
-              Tamanho máximo do ficheiro: {MAX_IMPORT_FILE_DESC} (em Vercel Hobby o limite da plataforma
-              pode ser menor).
-            </p>
+            <p className="text-xs text-gray-500">Tamanho máximo: {MAX_IMPORT_FILE_DESC}.</p>
             {importRemoteAvailable ? (
               <p className="text-xs text-blue-800 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
-                <strong>Servidor dedicado (Render):</strong> disponível. Aceita o mesmo Excel que o fluxo
-                local; o pedido é reencaminhado pelo Macofel com token seguro (útil para ficheiros
-                grandes ou timeouts longos). PDF continua só na importação normal.
+                <strong>Importação no servidor dedicado:</strong> só Excel (útil para ficheiros grandes). PDF:
+                use Prévia / Importar nesta janela.
               </p>
             ) : importRemoteAvailable === false ? (
-              <p className="text-xs text-gray-400">
-                Servidor dedicado: não configurado (<code className="text-[10px]">RENDER_CATALOG_IMPORT_URL</code>{' '}
-                + <code className="text-[10px]">RENDER_CATALOG_IMPORT_SECRET</code> no .env).
-              </p>
+              <p className="text-xs text-gray-400">Servidor dedicado não configurado — importação local (Excel e PDF).</p>
             ) : null}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">Ficheiro</label>
@@ -689,7 +1016,9 @@ export default function AdminProdutosPage() {
                 className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
               />
               <span>
-                Atualizar produtos já existentes (mesmo código + nome → mesmo identificador interno)
+                Atualizar produtos já existentes — o programa <strong>não duplica</strong>: reconhece pelo
+                código/slug e <strong>atualiza o mesmo registo</strong>. Com esta opção desligada, linhas já
+                existentes são <strong>ignoradas</strong> (só entram produtos novos).
               </span>
             </label>
             {importRemoteAvailable ? (
@@ -720,7 +1049,7 @@ export default function AdminProdutosPage() {
                 type="button"
                 className="bg-red-600 hover:bg-red-700"
                 disabled={!importFile || importRunLoading}
-                onClick={() => void handleImportRun()}
+                onClick={() => openImportConfirm('local')}
               >
                 {importRunLoading ? 'A importar…' : 'Importar'}
               </Button>
@@ -731,7 +1060,7 @@ export default function AdminProdutosPage() {
                   disabled={
                     !importFile || importRemoteLoading || importRunLoading || importPreviewLoading
                   }
-                  onClick={() => void handleImportRemoteRun()}
+                  onClick={() => openImportConfirm('remote')}
                 >
                   {importRemoteLoading ? 'Servidor dedicado…' : 'Importar (servidor dedicado)'}
                 </Button>
@@ -766,6 +1095,7 @@ export default function AdminProdutosPage() {
                         ) : (
                           <>
                             <th className="px-2 py-1 text-left">Grupo</th>
+                            <th className="px-2 py-1 text-left">Marca</th>
                             <th className="px-2 py-1 text-left">Qtd</th>
                             <th className="px-2 py-1 text-left">Preço</th>
                           </>
@@ -791,6 +1121,9 @@ export default function AdminProdutosPage() {
                           ) : (
                             <>
                               <td className="px-2 py-1 whitespace-nowrap">{r.grupo}</td>
+                              <td className="px-2 py-1 whitespace-nowrap max-w-[100px] truncate" title={r.marca}>
+                                {r.marca ?? '—'}
+                              </td>
                               <td className="px-2 py-1">{r.stock}</td>
                               <td className="px-2 py-1">R$ {r.price.toFixed(2)}</td>
                             </>
@@ -839,6 +1172,63 @@ export default function AdminProdutosPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={importConfirmOpen}
+        onOpenChange={(open) => {
+          setImportConfirmOpen(open);
+          if (!open) setImportConfirmKind(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar importação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-gray-700">
+            <p>
+              O relatório <strong>substitui</strong> preço, nome, marca, grupo e restantes dados nos produtos
+              que já existem (não é «só preencher vazios»).
+            </p>
+            <p className="text-xs text-gray-600">
+              Para <strong>somar estoque</strong> (entradas, NF-e): <strong>Estoque → Importação</strong>.
+            </p>
+            <label
+              className={`flex items-start gap-2 cursor-pointer ${!importUpsert ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={importPreserveStockDb}
+                disabled={!importUpsert}
+                onChange={(e) => setImportPreserveStockDb(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 shrink-0"
+              />
+              <span>
+                <strong>Manter quantidades atuais</strong> nos produtos já existentes (com «Atualizar produtos…»
+                ligado): atualiza preços e dados do catálogo <strong>sem</strong> trocar as quantidades na base.{' '}
+                <strong>Produtos novos</strong> usam o estoque do ficheiro.
+                {!importUpsert ? (
+                  <span className="block text-xs text-amber-800 mt-1">
+                    Ligue «Atualizar produtos já existentes» para isto fazer efeito.
+                  </span>
+                ) : null}
+              </span>
+            </label>
+            <p className="text-xs text-gray-500">Continuar?</p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setImportConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => void executeImportConfirm()}
+            >
+              Sim, gravar importação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog para Criar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -858,6 +1248,13 @@ export default function AdminProdutosPage() {
                 placeholder="Ex: Cimento CP II 50kg"
                 required
               />
+              {editingProduct ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  Slug na loja:{' '}
+                  <code className="rounded bg-gray-100 px-1 py-px text-[11px]">{editingProduct.slug}</code>{' '}
+                  — ao guardar com nome novo, o slug é recalculado automaticamente.
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -922,6 +1319,84 @@ export default function AdminProdutosPage() {
                   placeholder="0.00"
                 />
               </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-3">
+              <p className="text-sm font-medium text-gray-900">Dados do relatório (importação)</p>
+              <p className="text-xs text-gray-600">
+                Estes campos vêm do Excel/PDF. Corrija aqui produtos errados e clique em{' '}
+                <strong>Salvar Alterações</strong> — isso grava na base (não precisa importar de
+                novo).
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Código no relatório (fornecedor)
+                  </label>
+                  <Input
+                    value={formData.codigo}
+                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                    placeholder="ex.: 16503"
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Unidade</label>
+                  <Input
+                    value={formData.unidade}
+                    onChange={(e) => setFormData({ ...formData, unidade: e.target.value })}
+                    placeholder="UN, KG…"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Cód. barras (EAN)</label>
+                  <Input
+                    value={formData.codBarra}
+                    onChange={(e) => setFormData({ ...formData, codBarra: e.target.value })}
+                    placeholder="só dígitos"
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Marca</label>
+                  <Input
+                    value={formData.marca}
+                    onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                    placeholder="Coluna Marca do Excel / edição manual"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Custo (R$)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.cost}
+                    onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                    placeholder="opcional"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Preço prazo (R$)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.pricePrazo}
+                    onChange={(e) => setFormData({ ...formData, pricePrazo: e.target.value })}
+                    placeholder="opcional"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.statusActive}
+                  onChange={(e) => setFormData({ ...formData, statusActive: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                />
+                <span className="text-sm">Produto ativo na loja (desmarque para esconder do catálogo público)</span>
+              </label>
             </div>
 
             <div>

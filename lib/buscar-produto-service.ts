@@ -8,6 +8,21 @@ const GEMINI_URL =
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const cache = new Map<string, { expires: number; payload: BuscarProdutoResponse }>();
 
+/** GTIN-8 / UPC-A / EAN-13 / GTIN-14 (alinhado ao importador PDF). */
+function isPlausibleGtinDigits(d: string): boolean {
+  const n = d.length;
+  return n === 8 || n === 12 || n === 13 || n === 14;
+}
+
+function digitsOnly(s: string): string {
+  return String(s ?? '').replace(/\D/g, '');
+}
+
+function textContainsEan(blob: string, eanDigits: string): boolean {
+  if (!eanDigits) return false;
+  return digitsOnly(blob).includes(eanDigits);
+}
+
 function hasApiAccessConfigured(): boolean {
   return Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID && process.env.GEMINI_API_KEY);
 }
@@ -111,6 +126,11 @@ function toResponseFromGemini(
   if (typeof obj.price_reference === 'number' && Number.isFinite(obj.price_reference)) {
     price_reference = obj.price_reference;
   }
+  let matched: string | null = null;
+  if (typeof obj.matched_ean === 'string' && obj.matched_ean.trim()) {
+    const d = digitsOnly(obj.matched_ean);
+    matched = d || null;
+  }
   return {
     title,
     photos,
@@ -119,6 +139,56 @@ function toResponseFromGemini(
     price_reference,
     source: sourceLabel,
     ml_url: typeof obj.ml_url === 'string' ? obj.ml_url : null,
+    matched_ean: matched || null,
+  };
+}
+
+type MlItemDetail = {
+  title?: string;
+  pictures?: { secure_url?: string }[];
+  price?: number;
+  permalink?: string;
+  shipping?: { dimensions?: string | null };
+  attributes?: MlAttribute[];
+};
+
+function mlItemMatchesEan(detail: MlItemDetail, eanDigits: string): boolean {
+  if (!eanDigits) return false;
+  if (textContainsEan(detail.title ?? '', eanDigits)) return true;
+  for (const attr of detail.attributes ?? []) {
+    const id = (attr.id || '').toUpperCase();
+    if (!/(GTIN|EAN|BARCODE|CODIGO|CÓDIGO)/i.test(id)) continue;
+    const v = digitsOnly(String(attr.value_name ?? ''));
+    if (!v) continue;
+    if (v === eanDigits || v.endsWith(eanDigits) || eanDigits.endsWith(v)) return true;
+  }
+  return false;
+}
+
+function mlDetailToResponse(
+  detail: MlItemDetail,
+  fallbackTitle: string,
+  source: string,
+  matchedEan: string | null
+): BuscarProdutoResponse {
+  const photos =
+    detail.pictures?.map((p) => p.secure_url).filter((u): u is string => !!u) ?? [];
+  const { dimensions_cm, weight_grams_hint } = parseMlShippingDimensions(
+    detail.shipping?.dimensions ?? undefined
+  );
+  const weightAttr = extractWeightGrams(detail);
+  const weight_grams = weightAttr ?? weight_grams_hint;
+
+  return {
+    title: detail.title || fallbackTitle,
+    photos,
+    weight_grams: weight_grams ?? null,
+    dimensions_cm,
+    price_reference:
+      typeof detail.price === 'number' && Number.isFinite(detail.price) ? detail.price : null,
+    source,
+    ml_url: detail.permalink ?? null,
+    matched_ean: matchedEan,
   };
 }
 
@@ -146,33 +216,44 @@ async function fetchMercadoLivre(query: string): Promise<BuscarProdutoResponse |
     },
   });
   if (!detailRes.ok) return null;
-  const detail = (await detailRes.json()) as {
-    title?: string;
-    pictures?: { secure_url?: string }[];
-    price?: number;
-    permalink?: string;
-    shipping?: { dimensions?: string | null };
-    attributes?: MlAttribute[];
-  };
+  const detail = (await detailRes.json()) as MlItemDetail;
 
-  const photos =
-    detail.pictures?.map((p) => p.secure_url).filter((u): u is string => !!u) ?? [];
-  const { dimensions_cm, weight_grams_hint } = parseMlShippingDimensions(
-    detail.shipping?.dimensions ?? undefined
+  return mlDetailToResponse(detail, query, 'mercadolivre', null);
+}
+
+/** Só devolve anúncio ML em que o EAN aparece no título ou em atributo GTIN/EAN/código de barras. */
+async function fetchMercadoLivreByValidatedBarcode(eanDigits: string): Promise<BuscarProdutoResponse | null> {
+  if (!isPlausibleGtinDigits(eanDigits)) return null;
+  const mlRes = await fetch(
+    `${MLB_SEARCH}?q=${encodeURIComponent(eanDigits)}&limit=15`,
+    {
+      next: { revalidate: 0 },
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MacofelBot/1.0 (+https://macofel.local)',
+      },
+    }
   );
-  const weightAttr = extractWeightGrams(detail);
-  const weight_grams = weightAttr ?? weight_grams_hint;
-
-  return {
-    title: detail.title || query,
-    photos,
-    weight_grams: weight_grams ?? null,
-    dimensions_cm,
-    price_reference:
-      typeof detail.price === 'number' && Number.isFinite(detail.price) ? detail.price : null,
-    source: 'mercadolivre',
-    ml_url: detail.permalink ?? null,
-  };
+  if (!mlRes.ok) return null;
+  const mlData = (await mlRes.json()) as { results?: { id: string }[] };
+  const rows = mlData.results ?? [];
+  for (const row of rows) {
+    if (!row.id) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const detailRes = await fetch(`https://api.mercadolibre.com/items/${row.id}`, {
+      next: { revalidate: 0 },
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MacofelBot/1.0 (+https://macofel.local)',
+      },
+    });
+    if (!detailRes.ok) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const detail = (await detailRes.json()) as MlItemDetail;
+    if (!mlItemMatchesEan(detail, eanDigits)) continue;
+    return mlDetailToResponse(detail, eanDigits, 'mercadolivre_ean', eanDigits);
+  }
+  return null;
 }
 
 async function fetchGoogleGeminiEnrichment(
@@ -233,6 +314,83 @@ Formato:
   return converted;
 }
 
+/** Google CSE com o próprio EAN; só passa ao Gemini resultados em que o EAN aparece no título ou snippet. */
+async function fetchGoogleGeminiEnrichmentByBarcode(
+  eanDigits: string,
+  productNameHint: string | null,
+  mlContext: BuscarProdutoResponse | null
+): Promise<BuscarProdutoResponse | null> {
+  const googleKey = process.env.GOOGLE_API_KEY;
+  const cx = process.env.GOOGLE_CSE_ID;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!googleKey || !cx || !geminiKey) return null;
+  if (!isPlausibleGtinDigits(eanDigits)) return null;
+
+  const googleRes = await fetch(
+    `${GOOGLE_CSE}?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(eanDigits)}&num=10`,
+    { next: { revalidate: 0 } }
+  );
+  if (!googleRes.ok) return null;
+  const googleData = (await googleRes.json()) as { items?: Record<string, unknown>[] };
+  const items = Array.isArray(googleData.items) ? googleData.items : [];
+  const filtered = items.filter((it) => {
+    const title = typeof it.title === 'string' ? it.title : '';
+    const snippet = typeof it.snippet === 'string' ? it.snippet : '';
+    const link = typeof it.link === 'string' ? it.link : '';
+    return textContainsEan(`${title} ${snippet} ${link}`, eanDigits);
+  });
+  if (filtered.length === 0 && !mlContext) return null;
+
+  const hint = (productNameHint ?? '').trim() || 'não indicado';
+  const geminiPrompt = `És um assistente que extrai dados de produto para catálogo (Brasil, materiais de construção).
+
+EAN/GTIN confirmado (tem de constar nos resultados abaixo — não inventes outro código):
+${eanDigits}
+
+Nome no nosso cadastro (referência; pode não bater 100% com o título da loja):
+"${hint}"
+
+Mercado Livre já validado por EAN (pode ser null):
+${JSON.stringify(mlContext ?? null)}
+
+Resultados Google Custom Search (já filtrados — cada um contém o EAN no título ou resumo):
+${JSON.stringify({ items: filtered })}
+
+Se a lista Google estiver vazia mas o contexto ML acima existir, podes basear-te só no ML e usar matched_ean "${eanDigits}".
+
+Regras:
+- Responde APENAS com JSON válido (sem markdown).
+- matched_ean: usa a string "${eanDigits}" quando houver evidência clara do produto; se não houver evidência, usa null e deixa photos vazio.
+- photos: só URLs http(s) que apareçam nos resultados ou no contexto ML; nunca inventar.
+- dimensions_cm: "a × l × p" em cm ou null; weight_grams inteiro em gramas ou null; price_reference BRL ou null.
+- source exatamente: "google_gemini_ean"
+
+Exemplo de formato (substitui valores):
+{"title":"Nome do produto","matched_ean":"${eanDigits}","weight_grams":null,"dimensions_cm":null,"photos":[],"price_reference":null,"source":"google_gemini_ean"}`;
+
+  const geminiRes = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: { temperature: 0.15 },
+    }),
+  });
+  if (!geminiRes.ok) return null;
+  const geminiData = (await geminiRes.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const parsed = normalizeGeminiJson(text);
+  if (!parsed) return null;
+  const converted = toResponseFromGemini(parsed, 'google_gemini_ean');
+  if (!converted) return null;
+  const me = digitsOnly(String(parsed.matched_ean ?? converted.matched_ean ?? ''));
+  if (me !== eanDigits) return null;
+  if (!converted.title?.trim()) converted.title = hint !== 'não indicado' ? hint : `EAN ${eanDigits}`;
+  return converted;
+}
+
 function needsEnrichment(r: BuscarProdutoResponse | null): boolean {
   if (!r) return true;
   const noPhotos = !r.photos?.length;
@@ -256,9 +414,10 @@ function mergePreferMl(
     price_reference: ml.price_reference ?? gem.price_reference,
     source:
       ml.photos.length && ml.weight_grams != null && ml.dimensions_cm
-        ? 'mercadolivre'
-        : 'mercadolivre_google_gemini',
+        ? ml.source || 'mercadolivre'
+        : `${ml.source || 'mercadolivre'}_google_gemini`,
     ml_url: ml.ml_url ?? gem.ml_url,
+    matched_ean: ml.matched_ean ?? gem.matched_ean ?? null,
   };
 }
 
@@ -321,6 +480,60 @@ export async function getBuscarProdutoInfo(query: string): Promise<BuscarProduto
   }
 
   if (!finalResult) return null;
+  cache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, payload: finalResult });
+  return finalResult;
+}
+
+/**
+ * Pesquisa por código de barras: só aceita fontes em que o EAN aparece (ML: atributo/título; Google: snippet+título).
+ * O nome do cadastro é só contexto para o Gemini; não exige coincidir com a descrição da loja.
+ */
+export async function getBuscarProdutoInfoByBarcode(
+  rawEan: string,
+  productNameHint?: string | null
+): Promise<BuscarProdutoResponse | null> {
+  const eanDigits = digitsOnly(rawEan);
+  if (!isPlausibleGtinDigits(eanDigits)) return null;
+
+  const cacheKey = `ean_${eanDigits}`;
+  const hit = cache.get(cacheKey);
+  if (hit && hit.expires > Date.now()) {
+    return hit.payload;
+  }
+
+  const hint = productNameHint?.trim() || null;
+  let mlResult: BuscarProdutoResponse | null = null;
+  try {
+    mlResult = await fetchMercadoLivreByValidatedBarcode(eanDigits);
+  } catch {
+    mlResult = null;
+  }
+
+  let gemResult: BuscarProdutoResponse | null = null;
+  if (hasApiAccessConfigured()) {
+    try {
+      gemResult = await fetchGoogleGeminiEnrichmentByBarcode(eanDigits, hint, mlResult);
+    } catch {
+      gemResult = null;
+    }
+  }
+
+  let finalResult: BuscarProdutoResponse | null = null;
+  if (mlResult && gemResult) {
+    finalResult = mergePreferMl(mlResult, gemResult);
+  } else {
+    finalResult = pickBestSingle(eanDigits, mlResult, gemResult);
+  }
+
+  if (mlResult && needsEnrichment(mlResult) && gemResult) {
+    finalResult = mergePreferMl(mlResult, gemResult);
+  }
+
+  if (!finalResult) return null;
+  if (!finalResult.matched_ean) {
+    finalResult = { ...finalResult, matched_ean: eanDigits };
+  }
+
   cache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, payload: finalResult });
   return finalResult;
 }

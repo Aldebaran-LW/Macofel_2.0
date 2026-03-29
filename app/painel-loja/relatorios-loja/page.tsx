@@ -21,8 +21,8 @@ export default async function RelatoriosLojaPage() {
   return (
     <PainelLojaPlaceholderPage title="Relatórios da loja">
       <p className="mb-4">
-        Relatórios operacionais e de loja. Hoje o relatório de inventário / stock está no módulo de
-        estoque físico.
+        Relatórios operacionais e de loja. Hoje o relatório de inventário está no módulo de estoque
+        físico.
       </p>
       {stock ? (
         <Link

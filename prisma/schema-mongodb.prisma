@@ -1,8 +1,9 @@
 // Schema Prisma para MongoDB — catálogo da loja (produtos + categorias + hero).
 // Após alterar: `npx prisma db push --schema=./prisma/schema-mongodb.prisma` e `npm run prisma:generate`.
+// Output em node_modules (não `.prisma/` na raiz) para evitar EPERM no Windows ao substituir query_engine com o IDE aberto.
 generator client {
   provider      = "prisma-client-js"
-  output        = "../.prisma/mongodb-client"
+  output        = "../node_modules/.prisma-mongodb"
   binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
@@ -47,6 +48,8 @@ model Product {
   weight       Float?
   /// EAN / código de barras numérico (apenas dígitos no import).
   codBarra     String?
+  /// Marca do relatório LW (coluna «Marca» no Excel). PDF não traz marca → fica null.
+  marca        String?
   /// true = ATIVO, false = INATIVO. O catálogo público filtra `status !== false`.
   status       Boolean  @default(true)
   featured     Boolean  @default(false)
@@ -56,6 +59,8 @@ model Product {
   categoryId   String   @db.ObjectId
   /// Texto livre (ex.: dimensões para envio); enriquecimento ML/Gemini pode preencher.
   dimensionsCm String?
+  /// Última pré-visualização do enriquecimento por EAN (Master); evita repetir o lote até pedires «incluir já consultados».
+  eanEnrichmentCheckedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -64,6 +69,8 @@ model Product {
   @@map("products")
   @@index([categoryId])
   @@index([featured])
+  @@index([marca])
+  @@index([eanEnrichmentCheckedAt])
 }
 
 model HeroImage {
@@ -79,3 +86,6 @@ model HeroImage {
   @@index([order])
   @@index([active])
 }
+
+
+

@@ -149,10 +149,15 @@ def resolve_category_id(
     return oid
 
 
-def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[str, Any]:
-    """Grava produtos no Mongo com as mesmas chaves camelCase que o Prisma (codigo, cost, …).
+def run_import(
+    db: Database,
+    rows: list[dict[str, Any]],
+    upsert: bool,
+    preserve_stock_for_existing: bool = False,
+) -> dict[str, Any]:
+    """Grava produtos no Mongo com as mesmas chaves camelCase que o Prisma (codigo, cost, marca, …).
 
-    Cada `row` vem do Excel parseado em relatorio_xlsx (code, name, grupo, price, stock, cost, …).
+    Cada `row` vem do Excel parseado em relatorio_xlsx (code, name, grupo, marca, price, stock, cost, …).
     Match de produto existente: primeiro `slug` derivado de código+nome, depois campo único `codigo`.
     """
     cat_cache: dict[str, ObjectId] = {}
@@ -177,6 +182,11 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
             price = float(row.get("price") or 0)
             stock = int(row.get("stock") or 0)
             description = str(row.get("description") or "Importado.")
+            raw_marca = str(row.get("marca") or "").strip()
+            if not raw_marca or raw_marca in ("—", "-"):
+                marca_val = None
+            else:
+                marca_val = raw_marca
             raw = row.get("cost")
             if raw is not None and raw != "":
                 try:
@@ -196,6 +206,11 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
                 if not upsert:
                     skipped += 1
                     continue
+                stock_write = (
+                    int(existing.get("stock") or 0)
+                    if preserve_stock_for_existing
+                    else stock
+                )
                 db["products"].update_one(
                     {"_id": existing["_id"]},
                     {
@@ -203,13 +218,14 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
                             "name": name,
                             "description": description,
                             "price": price,
-                            "stock": stock,
+                            "stock": stock_write,
                             "categoryId": cat_id,
                             "codigo": codigo,
                             "cost": cost_val,
                             "pricePrazo": None,
                             "unidade": None,
                             "codBarra": None,
+                            "marca": marca_val,
                             "status": True,
                             "updatedAt": datetime.now(timezone.utc),
                         }
@@ -239,6 +255,7 @@ def run_import(db: Database, rows: list[dict[str, Any]], upsert: bool) -> dict[s
                     "pricePrazo": None,
                     "unidade": None,
                     "codBarra": None,
+                    "marca": marca_val,
                     "status": True,
                     "createdAt": now,
                     "updatedAt": now,
@@ -273,6 +290,7 @@ async def import_catalog(
     file: UploadFile = File(...),
     upsert: str = Form("true"),
     enrich_ai: str = Form("false"),
+    preserve_stock_db: str = Form("false"),
 ):
     fname = (file.filename or "").lower()
     if not re.search(r"\.(xlsx|xls)$", fname):
@@ -314,6 +332,7 @@ async def import_catalog(
 
     db = get_db()
     do_upsert = upsert.lower() in ("1", "true", "yes", "on")
-    result = run_import(db, rows, do_upsert)
+    keep_stock = preserve_stock_db.lower() in ("1", "true", "yes", "on")
+    result = run_import(db, rows, do_upsert, keep_stock)
     result["warnings"] = warnings
     return result

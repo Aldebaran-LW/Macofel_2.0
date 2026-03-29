@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
         applied = (res.modifiedCount ?? 0) + (res.upsertedCount ?? 0);
       }
     } catch (e: any) {
-      errors.push({ productId: 'bulk', error: e?.message || 'Falha ao atualizar stock em lote' });
+      errors.push({ productId: 'bulk', error: e?.message || 'Falha ao atualizar estoque em lote' });
     }
   }
 

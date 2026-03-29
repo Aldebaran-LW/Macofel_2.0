@@ -3,7 +3,7 @@
 // @ts-ignore
 import { PrismaClient as PostgresPrisma } from '../.prisma/postgres-client';
 // @ts-ignore
-import { PrismaClient as MongoPrisma } from '../.prisma/mongodb-client';
+import { PrismaClient as MongoPrisma } from '../node_modules/.prisma-mongodb';
 import dotenv from 'dotenv';
 
 dotenv.config();

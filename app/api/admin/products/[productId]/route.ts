@@ -37,6 +37,7 @@ export async function PATCH(
       pricePrazo,
       unidade,
       codBarra,
+      marca,
       status,
     } = body;
 
@@ -99,6 +100,10 @@ export async function PATCH(
         codBarra != null && String(codBarra).replace(/\D/g, '') !== ''
           ? String(codBarra).replace(/\D/g, '')
           : null;
+    }
+    if (marca !== undefined) {
+      updateData.marca =
+        marca != null && String(marca).trim() !== '' ? String(marca).trim() : null;
     }
     if (status !== undefined) {
       updateData.status = status === false || status === 'false' ? false : true;
@@ -187,3 +192,7 @@ export async function DELETE(
     );
   }
 }
+
+
+
+

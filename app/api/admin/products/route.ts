@@ -5,10 +5,50 @@ import { isAdminDashboardRole } from '@/lib/permissions';
 import mongoPrisma from '@/lib/mongodb';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 import { applyExtraFieldsFromEnrichment } from '@/lib/product-web-enrichment';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- cliente gerado em node_modules/.prisma-mongodb
+// @ts-ignore
+import type { Prisma } from '../../../../node_modules/.prisma-mongodb';
 
 export const dynamic = 'force-dynamic';
 
-/** Lista produtos para o painel (sem passar pelo guard do catálogo público). Inclui inativos. */
+function buildAdminProductWhere(searchParams: URLSearchParams): Prisma.ProductWhereInput {
+  const and: Prisma.ProductWhereInput[] = [];
+  const q = (searchParams.get('q') ?? '').trim();
+  if (q) {
+    and.push({
+      OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { slug: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { codigo: { contains: q, mode: 'insensitive' } },
+        { codBarra: { contains: q, mode: 'insensitive' } },
+        { marca: { contains: q, mode: 'insensitive' } },
+        { category: { name: { contains: q, mode: 'insensitive' } } },
+      ],
+    });
+  }
+
+  const categoryId = searchParams.get('categoryId');
+  if (categoryId && categoryId !== 'all') {
+    and.push({ categoryId });
+  }
+
+  const catalog = searchParams.get('catalog') ?? 'all';
+  if (catalog === 'active') and.push({ status: true });
+  if (catalog === 'inactive') and.push({ status: false });
+
+  const stock = searchParams.get('stock') ?? 'all';
+  if (stock === 'in_stock') and.push({ stock: { gt: 0 } });
+  if (stock === 'out') and.push({ stock: { lte: 0 } });
+
+  const featured = searchParams.get('featured') ?? 'all';
+  if (featured === 'yes') and.push({ featured: true });
+  if (featured === 'no') and.push({ featured: false });
+
+  return and.length ? { AND: and } : {};
+}
+
+/** Lista produtos para o painel (sem passar pelo guard do catálogo público). Inclui inativos. Paginação: page, limit (máx. 200). */
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -17,13 +57,24 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') ?? '200', 10)));
+    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)));
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+    const skip = (page - 1) * limit;
 
-    const products = await mongoPrisma.product.findMany({
-      take: limit,
-      orderBy: { updatedAt: 'desc' },
-      include: { category: true },
-    });
+    const where = buildAdminProductWhere(searchParams);
+
+    const [total, products] = await Promise.all([
+      mongoPrisma.product.count({ where }),
+      mongoPrisma.product.findMany({
+        where,
+        take: limit,
+        skip,
+        orderBy: { updatedAt: 'desc' },
+        include: { category: true },
+      }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
 
     const mapped = products.map((p) => ({
       id: p.id,
@@ -42,13 +93,22 @@ export async function GET(req: NextRequest) {
       pricePrazo: p.pricePrazo ?? null,
       unidade: p.unidade ?? null,
       codBarra: p.codBarra ?? null,
+      marca: p.marca ?? null,
       status: p.status,
       category: p.category
         ? { id: p.category.id, name: p.category.name }
         : { id: p.categoryId, name: '—' },
     }));
 
-    return NextResponse.json({ products: mapped });
+    return NextResponse.json({
+      products: mapped,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('GET /api/admin/products:', error);
@@ -97,6 +157,7 @@ export async function POST(req: NextRequest) {
       pricePrazo,
       unidade,
       codBarra,
+      marca,
       status,
     } = body;
 
@@ -146,6 +207,8 @@ export async function POST(req: NextRequest) {
       codBarra != null && String(codBarra).replace(/\D/g, '') !== ''
         ? String(codBarra).replace(/\D/g, '')
         : null;
+    const marcaStr =
+      marca != null && String(marca).trim() !== '' ? String(marca).trim() : null;
     const statusBool = status === false || status === 'false' ? false : true;
 
     const product = await mongoPrisma.product.create({
@@ -168,6 +231,7 @@ export async function POST(req: NextRequest) {
             : null,
         unidade: unidadeStr,
         codBarra: codBarraStr,
+        marca: marcaStr,
         status: statusBool,
       },
       include: { category: true },

@@ -8,6 +8,8 @@
  *
  * Regra de atualização (upsert): procura produto existente por `slug` (derivado de código+nome);
  * se não achar e existir `codigo`, tenta `findUnique({ codigo })` para não duplicar quando o slug mudou.
+ * Excel grava `marca` a partir da coluna «Marca»; PDF não tem marca.
+ * `preserveStockForExisting`: em update, mantém `stock` já gravado em BD.
  */
 import mongoPrisma from './mongodb';
 import type { RelatorioProdutoPdfRow } from './relatorio-produtos-pdf';
@@ -51,7 +53,14 @@ export type ProductCatalogImportRow = {
   codBarra?: string | null;
   /** Omitir ou true = ATIVO; false = INATIVO (PDF). */
   status?: boolean;
+  marca?: string | null;
 };
+
+function normMarca(raw: string | null | undefined): string | null {
+  const t = String(raw ?? '').trim();
+  if (!t || t === '—' || t === '-') return null;
+  return t;
+}
 
 function normCodigo(code: string): string | null {
   const c = String(code ?? '').trim();
@@ -122,10 +131,11 @@ async function uniqueProductSlug(base: string): Promise<string> {
 /**
  * Percorre `rows` e faz create ou update em `Product`.
  * @param options.upsert — se false, produto que já existe (slug ou codigo) é contado como skipped.
+ * @param options.preserveStockForExisting — em atualização (upsert), mantém `stock` do documento em BD.
  */
 export async function runProductCatalogImport(
   rows: ProductCatalogImportRow[],
-  options: { upsert: boolean }
+  options: { upsert: boolean; preserveStockForExisting?: boolean }
 ): Promise<RelatorioProductImportResult> {
   const catCache = new Map<string, string>();
   const existingCategories = await mongoPrisma.category.findMany({
@@ -150,6 +160,7 @@ export async function runProductCatalogImport(
     const unidade = row.unidade?.trim() || null;
     const codBarra = row.codBarra?.replace(/\D/g, '') || null;
     const status = row.status !== false;
+    const marca = normMarca(row.marca ?? null);
 
     try {
       // 1º pelo slug esperado desta importação; 2º pelo codigo único (evita duplicado se o nome/slug mudou).
@@ -169,13 +180,14 @@ export async function runProductCatalogImport(
           skipped += 1;
           continue;
         }
+        const stockToWrite = options.preserveStockForExisting ? existing.stock : row.stock;
         await mongoPrisma.product.update({
           where: { id: existing.id },
           data: {
             name: row.name,
             description: row.description,
             price,
-            stock: row.stock,
+            stock: stockToWrite,
             categoryId,
             weight: weightVal,
             codigo,
@@ -184,6 +196,7 @@ export async function runProductCatalogImport(
             unidade,
             codBarra,
             status,
+            marca,
           },
         });
         updated += 1;
@@ -209,6 +222,7 @@ export async function runProductCatalogImport(
           unidade,
           codBarra,
           status,
+          marca,
         },
       });
       created += 1;
@@ -229,7 +243,7 @@ export async function runProductCatalogImport(
 
 export async function runRelatorioProductImport(
   rows: RelatorioEstoqueRow[],
-  options: { upsert: boolean }
+  options: { upsert: boolean; preserveStockForExisting?: boolean }
 ): Promise<RelatorioProductImportResult> {
   const mapped: ProductCatalogImportRow[] = rows.map((r) => ({
     code: r.code,
@@ -244,6 +258,7 @@ export async function runRelatorioProductImport(
     unidade: null,
     codBarra: null,
     status: true,
+    marca: normMarca(r.marca),
   }));
   return runProductCatalogImport(mapped, options);
 }
@@ -251,7 +266,7 @@ export async function runRelatorioProductImport(
 /** PDF LW parseado em `relatorio-produtos-pdf.ts` (texto + linhas ATIVO/INATIVO). */
 export async function runPdfRelatorioProductImport(
   rows: RelatorioProdutoPdfRow[],
-  options: { upsert: boolean }
+  options: { upsert: boolean; preserveStockForExisting?: boolean }
 ): Promise<RelatorioProductImportResult> {
   const mapped: ProductCatalogImportRow[] = rows.map((r) => ({
     code: r.codigo,
@@ -266,6 +281,13 @@ export async function runPdfRelatorioProductImport(
     unidade: r.unid?.trim() || null,
     codBarra: r.codBarra ? String(r.codBarra).replace(/\D/g, '') || null : null,
     status: r.status?.toUpperCase() !== 'INATIVO',
+    marca: null,
   }));
   return runProductCatalogImport(mapped, options);
 }
+
+
+
+
+
+

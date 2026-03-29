@@ -190,9 +190,10 @@ function cleanEan(s: string): string {
   return String(s ?? '').replace(/\D/g, '');
 }
 
+/** GTIN-8 / UPC-A (12) / EAN-13 / GTIN-14. Exclui 9–11 dígitos: confundem com códigos internos no meio da linha (ex. 3258202140) quando Cod.Barra está vazio no PDF. */
 function isLikelyEan(s: string): boolean {
   const d = cleanEan(s);
-  return d.length >= 8 && d.length <= 14;
+  return d.length === 8 || d.length === 12 || d.length === 13 || d.length === 14;
 }
 
 /** Parte após ATIVO/INATIVO: Unid. Peso Estoque [EAN] Venda Vista Venda Prazo */

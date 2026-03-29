@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       code: r.code,
       name: r.name,
       grupo: r.grupo,
+      marca: r.marca,
       stock: r.stock,
       price: r.price,
       slug: importRowSlug(r.code, r.name),

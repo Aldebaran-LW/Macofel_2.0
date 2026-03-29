@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, RefreshCw, UserPlus, Pencil } from 'lucide-react';
+import { Users, RefreshCw, UserPlus, Pencil, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -189,6 +189,12 @@ export default function MasterEquipePage() {
           <Button type="button" variant="default" size="sm" onClick={() => setCreateOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Novo funcionário
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/master/senhas">
+              <KeyRound className="mr-2 h-4 w-4" />
+              Redefinir senhas
+            </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} />

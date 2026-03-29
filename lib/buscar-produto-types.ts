@@ -6,4 +6,6 @@ export type BuscarProdutoResponse = {
   price_reference: number | null;
   source: string;
   ml_url?: string | null;
+  /** Quando a pesquisa foi por EAN, confirma o código que fez match na fonte. */
+  matched_ean?: string | null;
 };

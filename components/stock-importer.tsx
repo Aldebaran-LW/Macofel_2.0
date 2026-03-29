@@ -361,6 +361,8 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
   const [products, setProducts] = useState<ProductLite[]>([]);
   const [conflictResolutions, setConflictResolutions] = useState<Record<string, string>>({});
   const [preventDuplicate, setPreventDuplicate] = useState(true);
+  /** add = somar quantidades ao estoque atual; set = substituir estoque pelo valor do ficheiro */
+  const [stockApplyMode, setStockApplyMode] = useState<'add' | 'set'>('add');
 
   const parsedItems = useMemo(() => {
     if (source === 'csv') return parseCsvText(csvText);
@@ -562,7 +564,7 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source,
-          mode: 'add',
+          mode: stockApplyMode,
           documentHash: preview.documentHash,
           items: resolvedItems,
           mappingsToUpsert,
@@ -681,20 +683,53 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
 
       {preview ? (
         <div className="space-y-4">
-          <Card className="p-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="font-semibold">Prévia</div>
-                <div className="text-sm text-gray-600">
-                  Válidos: {preview.totals.valid} · Resolvidos: {preview.totals.resolved} · Conflitos:{' '}
-                  {preview.totals.conflicts}
-                </div>
-                {preview.documentHash ? (
-                  <div className="text-xs text-gray-500">documentHash: {preview.documentHash.slice(0, 12)}…</div>
-                ) : null}
+          <Card className="p-4 space-y-4">
+            <div>
+              <div className="font-semibold">Prévia</div>
+              <div className="text-sm text-gray-600">
+                Válidos: {preview.totals.valid} · Resolvidos: {preview.totals.resolved} · Conflitos:{' '}
+                {preview.totals.conflicts}
               </div>
+              {preview.documentHash ? (
+                <div className="text-xs text-gray-500">documentHash: {preview.documentHash.slice(0, 12)}…</div>
+              ) : null}
+            </div>
+            <fieldset className="rounded-lg border border-gray-200 bg-gray-50/80 p-3 space-y-2">
+              <legend className="px-1 text-sm font-medium text-gray-900">Como aplicar ao estoque</legend>
+              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                <input
+                  type="radio"
+                  name="stockApplyMode"
+                  className="mt-1"
+                  checked={stockApplyMode === 'add'}
+                  onChange={() => setStockApplyMode('add')}
+                />
+                <span>
+                  <strong>Somar ao estoque atual</strong> — cada quantidade do ficheiro é <em>acrescentada</em>{' '}
+                  ao que já está na base (ex.: entrada de mercadoria / NF-e).
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                <input
+                  type="radio"
+                  name="stockApplyMode"
+                  className="mt-1"
+                  checked={stockApplyMode === 'set'}
+                  onChange={() => setStockApplyMode('set')}
+                />
+                <span>
+                  <strong>Definir estoque</strong> — <em>substitui</em> o estoque do produto pelo valor do
+                  ficheiro (não soma).
+                </span>
+              </label>
+            </fieldset>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
               <Button onClick={() => void applyImport()} disabled={applying}>
-                {applying ? 'Aplicando...' : 'Aplicar importação (somar no estoque)'}
+                {applying
+                  ? 'Aplicando...'
+                  : stockApplyMode === 'add'
+                    ? 'Aplicar importação (somar ao estoque)'
+                    : 'Aplicar importação (definir estoque)'}
               </Button>
             </div>
           </Card>
@@ -752,7 +787,9 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
                     <div className="min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{r.productName}</div>
                       <div className="text-sm text-gray-600">
-                        +{r.quantity} · {r.externalCode ? `código: ${r.externalCode}` : 'sem código'} · {r.resolution}
+                        {stockApplyMode === 'add' ? '+' : '='}
+                        {r.quantity} · {r.externalCode ? `código: ${r.externalCode}` : 'sem código'} ·{' '}
+                        {r.resolution}
                       </div>
                     </div>
                   </div>

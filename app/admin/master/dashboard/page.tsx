@@ -1,22 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  Users,
-  Settings,
-  Warehouse,
-  ScrollText,
-  Download,
-  KeyRound,
-  ArrowRight,
-  Monitor,
-} from 'lucide-react';
+import { Users, Settings, Warehouse, ScrollText, ArrowRight, Monitor } from 'lucide-react';
 
 const cards = [
   {
     href: '/admin/master/equipe',
-    title: 'Equipe interna',
-    desc: 'Criar funcionários e atribuir papéis. Clientes do site ficam em Admin → Clientes.',
+    title: 'Equipe e senhas',
+    desc: 'Criar funcionários, roles e redefinir senhas da equipa. Clientes do site: Admin → Clientes.',
     icon: Users,
   },
   {
@@ -28,7 +19,7 @@ const cards = [
   {
     href: '/admin/estoque',
     title: 'Controle de Estoque',
-    desc: 'Alertas, movimentações, importação e relatórios. Com Master: o menu laranja mantém-se nestas páginas.',
+    desc: 'Alertas, movimentações, importação, relatórios e atalhos Master (busca por EAN, exportação).',
     icon: Warehouse,
   },
   {
@@ -38,22 +29,10 @@ const cards = [
     icon: ScrollText,
   },
   {
-    href: '/admin/master/exportacao',
-    title: 'Exportação de dados',
-    desc: 'Exportar conjuntos completos para backup ou análise.',
-    icon: Download,
-  },
-  {
     href: '/admin/master/pdv-desktop',
     title: 'PDV Desktop (Windows)',
     desc: 'Descarregar o instalador do caixa para PCs da loja.',
     icon: Monitor,
-  },
-  {
-    href: '/admin/master/senhas',
-    title: 'Redefinição de senhas',
-    desc: 'Equipa interna. Clientes: painel Admin → Clientes.',
-    icon: KeyRound,
   },
 ];
 
