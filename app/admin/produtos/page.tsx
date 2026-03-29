@@ -615,10 +615,13 @@ export default function AdminProdutosPage() {
               (código, nome, grupo, marca, estoque, valores).
             </p>
             <p>
-              <strong>PDF:</strong> relatório <em>Produtos / Código de barras</em> com texto
-              selecionável. Colunas esperadas: Código, Produto, Unid., Cod.Barra, Peso, Custo, Venda
-              Vista, Venda Prazo, Estoque, Status. O preço no site usa <strong>Venda Vista</strong>{' '}
-              (se zero, usa Venda Prazo). Categoria: <strong>Importado PDF</strong>.
+              <strong>PDF:</strong> o export LW <em>Relatório de Produtos / Código de barras</em>{' '}
+              (ficheiro típico: <code className="text-[10px]">Relatorio de Produtos Codigo de Barras LW.pdf</code>
+              ) com <strong>texto selecionável</strong> — PDF só de imagem (scan) não funciona. Colunas:
+              Código, Produto, Unid., Cod.Barra, Peso, Custo, Venda Vista, Venda Prazo, Estoque, Status.
+              Preço no site: <strong>Venda Vista</strong> (se zero, usa Venda Prazo). Categoria:{' '}
+              <strong>Importado PDF</strong>. Use <strong>Prévia</strong> ou <strong>Importar</strong> aqui; o
+              servidor dedicado (Render) só aceita Excel.
             </p>
             <p className="text-xs text-gray-500">
               Tamanho máximo do ficheiro: {MAX_IMPORT_FILE_DESC} (em Vercel Hobby o limite da plataforma

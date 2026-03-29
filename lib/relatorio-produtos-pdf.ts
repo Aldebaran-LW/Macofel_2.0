@@ -1,6 +1,8 @@
 /**
- * Relatório PDF "Produtos / Código de barras" (LW).
+ * Relatório PDF "Produtos / Código de barras" (LW), ex.: `Relatorio de Produtos Codigo de Barras LW.pdf`.
  * Colunas lógicas: Código; Produto; Unid.; Cod.Barra; Peso; Custo; Venda Vista; Venda Prazo; Estoque; Status
+ *
+ * Diagnóstico local (sem gravar BD): `npx tsx scripts/debug-pdf-relatorio.ts "caminho/para/o.pdf"`
  */
 
 import path from 'path';
@@ -168,8 +170,17 @@ function isNoiseLine(line: string): boolean {
   const s = line.trim();
   if (!s) return true;
   if (/^RELATÓRIO\s+DE\s+PRODUTOS/i.test(s)) return true;
+  // Título/capa sem número de produto no início (ex.: "Relatorio de Produtos Codigo de Barras LW")
+  if (
+    !/^\d/.test(s) &&
+    /relat[óo]rio/i.test(s) &&
+    /produtos?/i.test(s) &&
+    /(c[óo]digo|cod\.?)\s*(de\s+)?barras?/i.test(s)
+  ) {
+    return true;
+  }
   if (/^DATA:\s*\d/i.test(s)) return true;
-  if (/Código\s+Produto\s+/i.test(s) && /Status/i.test(s)) return true;
+  if (/C[oó]digo\s+Produto\s+/i.test(s) && /Status/i.test(s)) return true;
   if (/^\d+\s*Pag\.?\s*$/i.test(s)) return true;
   if (/^--\s*\d+\s+of\s+\d+\s*--$/i.test(s)) return true;
   return false;
