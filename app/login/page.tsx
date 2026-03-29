@@ -55,7 +55,7 @@ export default function LoginPage() {
         });
         const sessionData = await res.json();
         const userRole = sessionData?.user ? (sessionData.user as any)?.role : null;
-        const callbackTarget = safeCallbackPath(searchParams.get('callbackUrl'));
+        const callbackTarget = safeCallbackPath(searchParams?.get('callbackUrl'));
 
         if (callbackTarget && typeof window !== 'undefined') {
           toast.success('Login realizado com sucesso!');

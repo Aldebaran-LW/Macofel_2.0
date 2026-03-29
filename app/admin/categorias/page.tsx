@@ -34,7 +34,7 @@ export default function AdminCategoriasPage() {
   });
 
   const searchParams = useSearchParams();
-  const editId = searchParams.get('edit');
+  const editId = searchParams?.get('edit') ?? null;
 
   useEffect(() => {
     fetchCategories();

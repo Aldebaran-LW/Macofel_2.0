@@ -83,7 +83,7 @@ export default function AdminHeroImagesPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const editId = searchParams.get('edit');
+  const editId = searchParams?.get('edit') ?? null;
 
   useEffect(() => {
     fetchSlides();
@@ -207,11 +207,13 @@ export default function AdminHeroImagesPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     resetForm();
-    if (searchParams.get('edit')) {
-      const params = new URLSearchParams(searchParams.toString());
+    const sp = searchParams;
+    if (sp?.get('edit')) {
+      const params = new URLSearchParams(sp.toString());
       params.delete('edit');
       const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      const basePath = pathname ?? '/';
+      router.replace(qs ? `${basePath}?${qs}` : basePath, { scroll: false });
     }
   };
 
