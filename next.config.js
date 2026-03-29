@@ -1,9 +1,23 @@
 const path = require('path');
 
+/**
+ * `output: 'export'` (site estático) não funciona neste projeto (API routes, sessão, DB).
+ * Com `NEXT_OUTPUT_MODE=export` o build falha: <Html> fora de _document em /404 e /500.
+ * Na Render: não definas export — usa `npm start` após `npm run build`.
+ */
+function resolveOutputMode() {
+  const v = (process.env.NEXT_OUTPUT_MODE || '').trim();
+  if (v === 'standalone') return 'standalone';
+  // 'export' e outros valores ignorados — ver comentário acima
+  return undefined;
+}
+
+const resolvedOutput = resolveOutputMode();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
-  output: process.env.NEXT_OUTPUT_MODE,
+  ...(resolvedOutput ? { output: resolvedOutput } : {}),
   /** Evita reempacotar pdfjs no Webpack (corrige "Object.defineProperty called on non-object" em dev). */
   serverExternalPackages: ['pdfjs-dist'],
   // Removido outputFileTracingRoot experimental que causa erro routes-manifest.json na Vercel
