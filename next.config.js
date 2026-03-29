@@ -18,8 +18,6 @@ const resolvedOutput = resolveOutputMode();
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   ...(resolvedOutput ? { output: resolvedOutput } : {}),
-  /** Evita reempacotar pdfjs no Webpack (corrige "Object.defineProperty called on non-object" em dev). */
-  serverExternalPackages: ['pdfjs-dist'],
   // Removido outputFileTracingRoot experimental que causa erro routes-manifest.json na Vercel
   eslint: {
     ignoreDuringBuilds: true,
@@ -28,8 +26,9 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: { unoptimized: true },
-  /** Permite FormData/body maiores em Server Actions e alinha com importações grandes (VPS/self-hosted). */
+  /** Next 14.2: use serverComponentsExternalPackages (serverExternalPackages é Next 15+). */
   experimental: {
+    serverComponentsExternalPackages: ['pdfjs-dist'],
     serverActions: {
       bodySizeLimit: '100mb',
     },
