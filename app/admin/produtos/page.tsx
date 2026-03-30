@@ -30,7 +30,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
+import {
+  importFileTooLarge,
+  IS_VERCEL_STYLE_DEPLOY,
+  MAX_IMPORT_FILE_DESC,
+  readJsonOrBodyLimitError,
+} from '@/lib/import-upload-limits';
 
 interface Product {
   id: string;
@@ -58,6 +63,25 @@ interface Product {
 interface Category {
   id: string;
   name: string;
+}
+
+/** Pré-visualização de importação de catálogo (resposta JSON da API). */
+interface CatalogImportPreviewSample {
+  code: string;
+  name: string;
+  stock: number;
+  price: number;
+  slug: string;
+  source?: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf';
+  grupo?: string;
+  marca?: string;
+  barcode?: string;
+  status?: string;
+  vendaPrazo?: number;
+  custo?: number;
+  sheet?: string;
+  row?: number;
+  line?: number;
 }
 
 export default function AdminProdutosPage() {
@@ -93,7 +117,7 @@ export default function AdminProdutosPage() {
   const [importPreviewLoading, setImportPreviewLoading] = useState(false);
   const [importRunLoading, setImportRunLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<{
-    source: 'xls' | 'pdf';
+    source: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf';
     totalRows: number;
     sample: Array<{
       code: string;
@@ -101,7 +125,7 @@ export default function AdminProdutosPage() {
       stock: number;
       price: number;
       slug: string;
-      source?: 'xls' | 'pdf';
+      source?: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf';
       grupo?: string;
       marca?: string;
       barcode?: string;
@@ -431,7 +455,7 @@ export default function AdminProdutosPage() {
 
   const handleImportPreview = async () => {
     if (!importFile) {
-      toast.error('Selecione um ficheiro .xls, .xlsx ou .pdf');
+      toast.error('Selecione um ficheiro .xls, .xlsx, .pdf, .docx, .doc ou .rtf');
       return;
     }
     setImportPreviewLoading(true);
@@ -444,18 +468,27 @@ export default function AdminProdutosPage() {
         method: 'POST',
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || 'Erro na prévia');
+      const parsed = await readJsonOrBodyLimitError(res);
+      if (!parsed.ok) {
+        toast.error(parsed.message);
         return;
       }
+      const data = parsed.data;
+      if (!res.ok) {
+        toast.error(String(data.error || 'Erro na prévia'));
+        return;
+      }
+      const src = data.source as string;
+      const previewSource: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf' =
+        src === 'pdf' || src === 'docx' || src === 'doc' || src === 'rtf' ? src : 'xls';
+      const previewRows = Number(data.totalRows);
       setImportPreview({
-        source: data.source === 'pdf' ? 'pdf' : 'xls',
-        totalRows: data.totalRows,
-        sample: data.sample ?? [],
-        warnings: data.warnings ?? [],
+        source: previewSource,
+        totalRows: Number.isFinite(previewRows) ? previewRows : 0,
+        sample: Array.isArray(data.sample) ? (data.sample as CatalogImportPreviewSample[]) : [],
+        warnings: Array.isArray(data.warnings) ? data.warnings.map(String) : [],
       });
-      toast.success(`Prévia: ${data.totalRows} linha(s) reconhecida(s).`);
+      toast.success(`Prévia: ${Number.isFinite(previewRows) ? previewRows : 0} linha(s) reconhecida(s).`);
     } catch (e) {
       console.error(e);
       toast.error('Erro ao gerar prévia');
@@ -470,7 +503,7 @@ export default function AdminProdutosPage() {
       toast.error(
         kind === 'remote'
           ? 'Selecione um ficheiro .xls ou .xlsx'
-          : 'Selecione um ficheiro .xls, .xlsx ou .pdf'
+          : 'Selecione um ficheiro .xls, .xlsx, .pdf, .docx, .doc ou .rtf'
       );
       return;
     }
@@ -478,6 +511,12 @@ export default function AdminProdutosPage() {
       const n = importFile.name.toLowerCase();
       if (n.endsWith('.pdf')) {
         toast.error('O servidor dedicado só aceita Excel. Para PDF use a importação normal.');
+        return;
+      }
+      if (n.endsWith('.docx') || n.endsWith('.doc') || n.endsWith('.rtf')) {
+        toast.error(
+          'O servidor dedicado só aceita Excel. Para Word/RTF use a importação normal (nesta janela).'
+        );
         return;
       }
       if (!n.endsWith('.xls') && !n.endsWith('.xlsx')) {
@@ -504,7 +543,12 @@ export default function AdminProdutosPage() {
         method: 'POST',
         body: fd,
       });
-      const data = await res.json();
+      const parsed = await readJsonOrBodyLimitError(res);
+      if (!parsed.ok) {
+        toast.error(parsed.message);
+        return;
+      }
+      const data = parsed.data;
       if (!res.ok) {
         toast.error(
           [data.error, data.details].filter(Boolean).join(' — ') || 'Erro na importação'
@@ -512,15 +556,15 @@ export default function AdminProdutosPage() {
         return;
       }
       setImportResult({
-        created: data.created,
-        updated: data.updated,
-        skipped: data.skipped,
-        errors: data.errors ?? [],
-        warnings: data.warnings ?? [],
+        created: data.created as number,
+        updated: data.updated as number,
+        skipped: data.skipped as number,
+        errors: (data.errors as Array<{ name: string; message: string }>) ?? [],
+        warnings: (data.warnings as string[]) ?? [],
       });
-      const c = data.created ?? 0;
-      const u = data.updated ?? 0;
-      const s = data.skipped ?? 0;
+      const c = (data.created as number) ?? 0;
+      const u = (data.updated as number) ?? 0;
+      const s = (data.skipped as number) ?? 0;
       if (c + u === 0) {
         toast.warning(
           s > 0
@@ -561,16 +605,21 @@ export default function AdminProdutosPage() {
         method: 'POST',
         body: fd,
       });
-      const data = await res.json().catch(() => null);
+      const parsed = await readJsonOrBodyLimitError(res);
+      if (!parsed.ok) {
+        toast.error(parsed.message);
+        return;
+      }
+      const data = parsed.data;
       if (!res.ok) {
-        const detail = data?.detail;
+        const detail = data.detail;
         const detailStr =
           typeof detail === 'string'
             ? detail
             : Array.isArray(detail)
               ? detail.map((x: { msg?: string }) => x?.msg).filter(Boolean).join('; ')
               : '';
-        toast.error(data?.error || detailStr || 'Erro na importação remota');
+        toast.error(String(data.error || detailStr || 'Erro na importação remota'));
         return;
       }
       const rawErrs = Array.isArray(data.errors) ? data.errors : [];
@@ -578,15 +627,18 @@ export default function AdminProdutosPage() {
         name: String(e?.name ?? '—'),
         message: String(e?.message ?? e?.msg ?? ''),
       }));
+      const cr = Number(data.created);
+      const ur = Number(data.updated);
+      const sr = Number(data.skipped);
       setImportResult({
-        created: data.created ?? 0,
-        updated: data.updated ?? 0,
-        skipped: data.skipped ?? 0,
+        created: Number.isFinite(cr) ? cr : 0,
+        updated: Number.isFinite(ur) ? ur : 0,
+        skipped: Number.isFinite(sr) ? sr : 0,
         errors: normErrors,
-        warnings: Array.isArray(data.warnings) ? data.warnings : [],
+        warnings: Array.isArray(data.warnings) ? data.warnings.map(String) : [],
       });
       toast.success(
-        `Importação (servidor dedicado): ${data.created ?? 0} novos, ${data.updated ?? 0} atualizados, ${data.skipped ?? 0} ignorados.`
+        `Importação (servidor dedicado): ${Number.isFinite(cr) ? cr : 0} novos, ${Number.isFinite(ur) ? ur : 0} atualizados, ${Number.isFinite(sr) ? sr : 0} ignorados.`
       );
       setListPage(1);
       bumpProductList();
@@ -652,7 +704,7 @@ export default function AdminProdutosPage() {
             }}
           >
             <FileText className="h-4 w-4 mr-2" />
-            Importar (.xls / .pdf)
+            Importar (Excel / PDF / Word)
           </Button>
           <Button onClick={() => handleOpenDialog()} className="bg-red-600 hover:bg-red-700">
             <Plus className="h-4 w-4 mr-2" />
@@ -965,7 +1017,7 @@ export default function AdminProdutosPage() {
       >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Importar catálogo (Excel ou PDF)</DialogTitle>
+            <DialogTitle>Importar catálogo (Excel, PDF ou Word/RTF)</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm text-gray-600">
             <p>
@@ -973,25 +1025,39 @@ export default function AdminProdutosPage() {
               valores.
             </p>
             <p>
+              <strong>Word / RTF:</strong> o mesmo layout de colunas que o Excel (Produto, Grupo, Marca, Estoque,
+              valores). Preferir <strong>tabela</strong> no documento; em .doc/.rtf o texto deve manter colunas
+              separadas por tab ou vários espaços.
+            </p>
+            <p>
               <strong>PDF:</strong> exportação <em>Produtos / código de barras</em> do seu software, com{' '}
               <strong>texto que consiga copiar</strong> (PDF digitalizado não serve). Preço no site: coluna{' '}
               <strong>Venda Vista</strong>; se estiver vazio, usa <strong>Venda Prazo</strong>. Categoria atribuída:{' '}
               <strong>Importado PDF</strong>.
             </p>
-            <p className="text-xs text-gray-500">Tamanho máximo: {MAX_IMPORT_FILE_DESC}.</p>
+            <p className="text-xs text-gray-500">Tamanho máximo por ficheiro neste ambiente: {MAX_IMPORT_FILE_DESC}.</p>
+            {IS_VERCEL_STYLE_DEPLOY ? (
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                Alojamento Vercel: o pedido HTTP fica limitado a cerca de <strong>4 MB</strong>. PDFs ou Excel
+                maiores falham com erro de tamanho — use <strong>servidor dedicado</strong> (Excel), divida o
+                ficheiro, ou aloje a app num VPS/Render com limite maior.
+              </p>
+            ) : null}
             {importRemoteAvailable ? (
               <p className="text-xs text-blue-800 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
-                <strong>Importação no servidor dedicado:</strong> só Excel (útil para ficheiros grandes). PDF:
-                use Prévia / Importar nesta janela.
+                <strong>Importação no servidor dedicado:</strong> só Excel (útil para ficheiros grandes). PDF /
+                Word: use Prévia / Importar nesta janela (ou reduza o ficheiro na Vercel).
               </p>
             ) : importRemoteAvailable === false ? (
-              <p className="text-xs text-gray-400">Servidor dedicado não configurado — importação local (Excel e PDF).</p>
+              <p className="text-xs text-gray-400">
+                Servidor dedicado não configurado — importação local (Excel, PDF, Word/RTF).
+              </p>
             ) : null}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">Ficheiro</label>
               <Input
                 type="file"
-                accept=".xls,.xlsx,.pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf"
+                accept=".xls,.xlsx,.pdf,.doc,.docx,.rtf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,text/rtf"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f && importFileTooLarge(f)) {

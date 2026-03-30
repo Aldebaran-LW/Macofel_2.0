@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
+import {
+  isWordLikeCatalogFile,
+  parseRelatorioEstoqueWordLike,
+} from '@/lib/relatorio-estoque-doc-word';
 import { importRowSlug, parseRelatorioEstoqueWorkbook } from '@/lib/relatorio-estoque-xls';
 import {
   parseRelatorioProdutosPdf,
@@ -59,6 +63,30 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         source: 'pdf',
+        totalRows: rows.length,
+        previewCount: sample.length,
+        sample,
+        warnings,
+      });
+    }
+
+    if (isWordLikeCatalogFile(fname, file.type)) {
+      const { rows, warnings, source } = await parseRelatorioEstoqueWordLike(buf, fname);
+      const sample = rows.slice(0, MAX_PREVIEW).map((r) => ({
+        code: r.code,
+        name: r.name,
+        grupo: r.grupo,
+        marca: r.marca,
+        stock: r.stock,
+        price: r.price,
+        slug: importRowSlug(r.code, r.name),
+        sheet: r.sheetName,
+        row: r.rowIndex,
+        source,
+      }));
+
+      return NextResponse.json({
+        source,
         totalRows: rows.length,
         previewCount: sample.length,
         sample,

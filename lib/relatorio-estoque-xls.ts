@@ -198,6 +198,86 @@ export function catalogUnitPrice(stock: number, vlVenda: number, vlCusto: number
   return Math.max(0, deriveUnitPrice(stock, vlVenda, vlCusto));
 }
 
+/**
+ * Matriz de células (ex.: folha Excel ou tabela Word) com o mesmo cabeçalho «Relação de estoque».
+ */
+export function parseRelatorioEstoqueFromSheetRows(
+  rows: string[][],
+  sheetName: string
+): { rows: RelatorioEstoqueRow[]; warnings: string[] } {
+  const warnings: string[] = [];
+  const out: RelatorioEstoqueRow[] = [];
+
+  const hi = findHeaderRowIndex(rows);
+  if (hi < 0) {
+    warnings.push(`Folha ignorada (sem cabeçalho esperado): ${sheetName}`);
+    return { rows: out, warnings };
+  }
+  const sample = firstSampleDataRow(rows, hi);
+  const colMap = buildColMap(rows[hi], sample);
+  if (!colMap) {
+    warnings.push(`Folha ignorada (colunas incompletas): ${sheetName}`);
+    return { rows: out, warnings };
+  }
+
+  for (let r = hi + 1; r < rows.length; r++) {
+    const cells = rows[r];
+    if (!cells.length) continue;
+    if (isFooterOrNoise(cells, colMap.nameCol, colMap.codeCol)) continue;
+
+    const name = String(cells[colMap.nameCol] ?? '').trim();
+    if (!name) continue;
+
+    const code = String(cells[colMap.codeCol] ?? '').trim();
+    const grupo = String(cells[colMap.grupoCol] ?? '').trim() || 'Sem grupo';
+    const marca = String(cells[colMap.marcaCol] ?? '').trim() || '—';
+
+    const stockCandidates = [
+      colMap.estoqueCol,
+      colMap.estoqueCol - 1,
+      colMap.estoqueCol + 1,
+    ].filter((i) => i >= 0);
+    let stockRaw = NaN;
+    for (const c of stockCandidates) {
+      stockRaw = parseBrDecimal(cells[c]);
+      if (Number.isFinite(stockRaw)) break;
+    }
+    const stock = Number.isFinite(stockRaw) ? Math.round(stockRaw) : 0;
+
+    const pickMoney = (primary: number): number => {
+      if (primary < 0) return NaN;
+      const order = [primary, primary - 1, primary + 1].filter((i) => i >= 0);
+      for (const c of order) {
+        const n = parseBrDecimal(cells[c]);
+        if (Number.isFinite(n)) return n;
+      }
+      return NaN;
+    };
+
+    const vlCusto = pickMoney(colMap.vlCustoCol);
+    const vlVenda = pickMoney(colMap.vlVendaCol);
+
+    const vc = Number.isFinite(vlCusto) ? vlCusto : 0;
+    const vv = Number.isFinite(vlVenda) ? vlVenda : 0;
+    const price = catalogUnitPrice(stock, vv, vc);
+
+    out.push({
+      sheetName,
+      rowIndex: r + 1,
+      code,
+      name,
+      grupo,
+      marca,
+      stock,
+      vlCusto: vc,
+      vlVenda: vv,
+      price,
+    });
+  }
+
+  return { rows: out, warnings };
+}
+
 export function parseRelatorioEstoqueWorkbook(buffer: ArrayBuffer): {
   rows: RelatorioEstoqueRow[];
   warnings: string[];
@@ -211,73 +291,9 @@ export function parseRelatorioEstoqueWorkbook(buffer: ArrayBuffer): {
     if (!sheet) continue;
     const matrix = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: '' });
     const rows = matrix.map((r) => rowAsArray(r));
-    const hi = findHeaderRowIndex(rows);
-    if (hi < 0) {
-      warnings.push(`Folha ignorada (sem cabeçalho esperado): ${sheetName}`);
-      continue;
-    }
-    const sample = firstSampleDataRow(rows, hi);
-    const colMap = buildColMap(rows[hi], sample);
-    if (!colMap) {
-      warnings.push(`Folha ignorada (colunas incompletas): ${sheetName}`);
-      continue;
-    }
-
-    for (let r = hi + 1; r < rows.length; r++) {
-      const cells = rows[r];
-      if (!cells.length) continue;
-      if (isFooterOrNoise(cells, colMap.nameCol, colMap.codeCol)) continue;
-
-      const name = String(cells[colMap.nameCol] ?? '').trim();
-      if (!name) continue;
-
-      const code = String(cells[colMap.codeCol] ?? '').trim();
-      const grupo = String(cells[colMap.grupoCol] ?? '').trim() || 'Sem grupo';
-      const marca = String(cells[colMap.marcaCol] ?? '').trim() || '—';
-
-      // O Excel costuma deslocar o valor de "Estoque" uma coluna à esquerda do cabeçalho.
-      const stockCandidates = [
-        colMap.estoqueCol,
-        colMap.estoqueCol - 1,
-        colMap.estoqueCol + 1,
-      ].filter((i) => i >= 0);
-      let stockRaw = NaN;
-      for (const c of stockCandidates) {
-        stockRaw = parseBrDecimal(cells[c]);
-        if (Number.isFinite(stockRaw)) break;
-      }
-      const stock = Number.isFinite(stockRaw) ? Math.round(stockRaw) : 0;
-
-      const pickMoney = (primary: number): number => {
-        if (primary < 0) return NaN;
-        const order = [primary, primary - 1, primary + 1].filter((i) => i >= 0);
-        for (const c of order) {
-          const n = parseBrDecimal(cells[c]);
-          if (Number.isFinite(n)) return n;
-        }
-        return NaN;
-      };
-
-      const vlCusto = pickMoney(colMap.vlCustoCol);
-      const vlVenda = pickMoney(colMap.vlVendaCol);
-
-      const vc = Number.isFinite(vlCusto) ? vlCusto : 0;
-      const vv = Number.isFinite(vlVenda) ? vlVenda : 0;
-      const price = catalogUnitPrice(stock, vv, vc);
-
-      out.push({
-        sheetName,
-        rowIndex: r + 1,
-        code,
-        name,
-        grupo,
-        marca,
-        stock,
-        vlCusto: vc,
-        vlVenda: vv,
-        price,
-      });
-    }
+    const { rows: part, warnings: w } = parseRelatorioEstoqueFromSheetRows(rows, sheetName);
+    out.push(...part);
+    warnings.push(...w);
   }
 
   return { rows: out, warnings };

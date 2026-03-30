@@ -6,6 +6,10 @@ import {
   runPdfRelatorioProductImport,
   runRelatorioProductImport,
 } from '@/lib/product-relatorio-import';
+import {
+  isWordLikeCatalogFile,
+  parseRelatorioEstoqueWordLike,
+} from '@/lib/relatorio-estoque-doc-word';
 import { parseRelatorioEstoqueWorkbook } from '@/lib/relatorio-estoque-xls';
 import { parseRelatorioProdutosPdf } from '@/lib/relatorio-produtos-pdf';
 import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
@@ -59,6 +63,29 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({
         source: 'pdf',
+        created,
+        updated,
+        skipped,
+        errors,
+        warnings,
+        totalParsed: rows.length,
+      });
+    }
+
+    if (isWordLikeCatalogFile(fname, file.type)) {
+      const { rows, warnings, source } = await parseRelatorioEstoqueWordLike(buf, fname);
+      if (rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Nenhuma linha de produto encontrada', warnings },
+          { status: 400 }
+        );
+      }
+      const { created, updated, skipped, errors } = await runRelatorioProductImport(rows, {
+        upsert,
+        preserveStockForExisting,
+      });
+      return NextResponse.json({
+        source,
         created,
         updated,
         skipped,
