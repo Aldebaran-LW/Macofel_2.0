@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
+import { promoteCatalogDraftById } from '@/lib/catalog-draft-promote';
 
 /** Alinhado a catalog-agent/tools/mongodb_tools.py — coleção products, revisão por string status. */
 export async function saveProductsForReview(products: Record<string, unknown>[]): Promise<number> {
@@ -27,20 +28,8 @@ export async function getPendingReviewProducts(limit = 100): Promise<Record<stri
 }
 
 export async function approvePendingProduct(productId: string, notes = ''): Promise<boolean> {
-  const db = await connectToDatabase();
-  const col = db.collection('products');
-  const result = await col.updateOne(
-    { _id: new ObjectId(productId) },
-    {
-      $set: {
-        status: 'active',
-        reviewed_at: new Date(),
-        review_status: 'approved',
-        review_notes: notes,
-      },
-    }
-  );
-  return result.modifiedCount > 0;
+  const r = await promoteCatalogDraftById(productId, notes);
+  return r.ok;
 }
 
 export async function rejectPendingProduct(productId: string, notes: string): Promise<boolean> {

@@ -21,6 +21,25 @@ const dbName = 'test'; // Banco onde populamos os produtos
 let client: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
+// Catálogo público: aceitar ativos legados e excluir inativos em formatos mistos.
+const INACTIVE_STATUS_VALUES = [
+  false,
+  0,
+  '0',
+  'false',
+  'inativo',
+  'INATIVO',
+  'inactive',
+  'INACTIVE',
+  /** Rascunhos / fila do agente de catálogo (não listar na vitrine). */
+  'pending_review',
+  'rejected',
+];
+
+export function isInactiveProductStatus(status: unknown): boolean {
+  return (INACTIVE_STATUS_VALUES as readonly unknown[]).includes(status);
+}
+
 export async function connectToDatabase(): Promise<Db> {
   if (cachedDb) {
     return cachedDb;
@@ -46,12 +65,21 @@ export async function connectToDatabase(): Promise<Db> {
 export async function getProducts(filters?: {
   search?: string;
   categorySlug?: string;
+  subcategorias?: string[];
+  marcas?: string[];
+  materiais?: string[];
+  acabamentos?: string[];
+  tipos?: string[];
+  bitolas?: string[];
+  voltagens?: string[];
   minPrice?: number;
   maxPrice?: number;
+  inStock?: boolean;
+  onSale?: boolean;
   featured?: boolean;
   page?: number;
   limit?: number;
-  sort?: 'price_asc' | 'price_desc' | 'name' | 'relevance';
+  sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name_asc' | 'newest' | 'best_selling';
 }) {
   const db = await connectToDatabase();
   const productsCollection = db.collection('products');
@@ -64,16 +92,70 @@ export async function getProducts(filters?: {
     query.$or = [
       { name: { $regex: filters.search, $options: 'i' } },
       { description: { $regex: filters.search, $options: 'i' } },
+      { slug: { $regex: filters.search, $options: 'i' } },
     ];
   }
 
-  // Filtro de categoria
+  // Filtro de categoria (com descendentes recursivos)
   if (filters?.categorySlug) {
     const category = await categoriesCollection.findOne({ slug: filters.categorySlug });
     if (category) {
-      query.categoryId = category._id;
+      const objectIds: ObjectId[] = [category._id];
+      const stringIds = new Set<string>([category._id.toString()]);
+      const queue: string[] = [category._id.toString()];
+      while (queue.length > 0) {
+        const parentId = queue.shift()!;
+        const parentMatch: any[] = [{ parentId }];
+        if (ObjectId.isValid(parentId)) {
+          parentMatch.push({ parentId: new ObjectId(parentId) });
+        }
+        const children = await categoriesCollection
+          .find({ $or: parentMatch }, { projection: { _id: 1 } })
+          .toArray();
+        for (const child of children) {
+          const childId = child._id.toString();
+          if (stringIds.has(childId)) continue;
+          objectIds.push(child._id);
+          stringIds.add(childId);
+          queue.push(childId);
+        }
+      }
+      query.categoryId = { $in: [...objectIds, ...Array.from(stringIds)] };
     }
   }
+
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const multiFieldFilter = (
+    values: string[] | undefined,
+    fields: string | string[]
+  ): Record<string, any> | null => {
+    if (!values || values.length === 0) return null;
+    const cleaned = values.map((v) => v.trim()).filter(Boolean);
+    if (cleaned.length === 0) return null;
+    const clauses = cleaned.map((value) => {
+      const regex = { $regex: `^${escapeRegex(value)}$`, $options: 'i' };
+      if (Array.isArray(fields)) return { $or: fields.map((f) => ({ [f]: regex })) };
+      return { [fields]: regex };
+    });
+    return { $or: clauses };
+  };
+
+  const andClauses: any[] = [];
+  const marcasFilter = multiFieldFilter(filters?.marcas, 'marca');
+  if (marcasFilter) andClauses.push(marcasFilter);
+  const materiaisFilter = multiFieldFilter(filters?.materiais, ['material', 'materialTipo']);
+  if (materiaisFilter) andClauses.push(materiaisFilter);
+  const acabamentosFilter = multiFieldFilter(filters?.acabamentos, ['acabamento', 'corAcabamento']);
+  if (acabamentosFilter) andClauses.push(acabamentosFilter);
+  const tiposFilter = multiFieldFilter(filters?.tipos, ['tipo', 'toolType']);
+  if (tiposFilter) andClauses.push(tiposFilter);
+  const bitolasFilter = multiFieldFilter(filters?.bitolas, 'bitola');
+  if (bitolasFilter) andClauses.push(bitolasFilter);
+  const voltagensFilter = multiFieldFilter(filters?.voltagens, ['voltagem', 'tensao']);
+  if (voltagensFilter) andClauses.push(voltagensFilter);
+  const subcategoriasFilter = multiFieldFilter(filters?.subcategorias, 'subcategoria');
+  if (subcategoriasFilter) andClauses.push(subcategoriasFilter);
 
   // Filtro de preço
   if (filters?.minPrice || filters?.maxPrice) {
@@ -87,8 +169,22 @@ export async function getProducts(filters?: {
     query.featured = true;
   }
 
-  // Catálogo público: esconder INATIVO. Em Mongo, doc sem campo `status` ainda entra ($ne false).
-  query.status = { $ne: false };
+  if (filters?.inStock) {
+    query.stock = { $gt: 0 };
+  }
+
+  if (filters?.onSale) {
+    andClauses.push({
+      $or: [{ onSale: true }, { promocao: true }, { promotion: true }, { originalPrice: { $gt: 0 } }],
+    });
+  }
+
+  if (andClauses.length > 0) {
+    query.$and = [...(query.$and ?? []), ...andClauses];
+  }
+
+  // Catálogo público: esconder inativos mesmo com dados legados (boolean/string/numérico).
+  query.status = { $nin: INACTIVE_STATUS_VALUES };
 
   // Paginação
   const page = filters?.page || 1;
@@ -98,10 +194,15 @@ export async function getProducts(filters?: {
   // Ordenação
   const sortOption = filters?.sort || 'relevance';
   const sortSpec: [string, 1 | -1][] =
-    sortOption === 'price_asc' ? [['price', 1]] :
-    sortOption === 'price_desc' ? [['price', -1]] :
-    sortOption === 'name' ? [['name', 1]] :
-    [['createdAt', -1]];
+    sortOption === 'price_asc'
+      ? [['price', 1]]
+      : sortOption === 'price_desc'
+        ? [['price', -1]]
+        : sortOption === 'name_asc'
+          ? [['name', 1]]
+          : sortOption === 'best_selling'
+            ? [['soldCount', -1], ['createdAt', -1]]
+            : [['createdAt', -1]];
 
   // Buscar produtos
   const products = await productsCollection
@@ -111,43 +212,74 @@ export async function getProducts(filters?: {
     .limit(limit)
     .toArray();
 
-  // Buscar categorias para cada produto
-  const productsWithCategories = await Promise.all(
-    products.map(async (product: any) => {
-      // Converter categoryId para ObjectId se necessário
-      const categoryId = product.categoryId instanceof ObjectId 
-        ? product.categoryId 
-        : new ObjectId(product.categoryId);
-      
-      const category = await categoriesCollection.findOne({
-        _id: categoryId,
-      });
-      return {
-        id: product._id.toString(),
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        price: product.price,
-        stock: product.stock,
-        minStock: product.minStock ?? null,
-        weight: product.weight ?? null,
-        dimensionsCm: product.dimensionsCm ?? null,
-        imageUrl: product.imageUrl,
-        imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
-        featured: product.featured,
-        categoryId: product.categoryId,
-        category: category
-          ? {
-              id: category._id.toString(),
-              name: category.name,
-              slug: category.slug,
-            }
-          : null,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt,
-      };
-    })
+  // Evita N+1: resolve categorias dos itens em lote.
+  const categoryIds: ObjectId[] = [];
+  for (const product of products as any[]) {
+    if (product.categoryId instanceof ObjectId) {
+      categoryIds.push(product.categoryId);
+      continue;
+    }
+    if (
+      typeof product.categoryId === 'string' &&
+      product.categoryId.trim() &&
+      ObjectId.isValid(product.categoryId)
+    ) {
+      categoryIds.push(new ObjectId(product.categoryId));
+    }
+  }
+  const uniqueCategoryIds = Array.from(
+    new Map(categoryIds.map((id) => [id.toString(), id])).values()
   );
+  const categories = uniqueCategoryIds.length
+    ? await categoriesCollection.find({ _id: { $in: uniqueCategoryIds } }).toArray()
+    : [];
+  const categoryById = new Map(categories.map((c: any) => [c._id.toString(), c]));
+
+  const productsWithCategories = products.map((product: any) => {
+    let category: any = null;
+    if (product.categoryId instanceof ObjectId) {
+      category = categoryById.get(product.categoryId.toString()) ?? null;
+    } else if (
+      typeof product.categoryId === 'string' &&
+      product.categoryId.trim() &&
+      ObjectId.isValid(product.categoryId)
+    ) {
+      category = categoryById.get(product.categoryId) ?? null;
+    }
+    return {
+      id: product._id.toString(),
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      price: product.price,
+      pricePrazo: product.pricePrazo ?? null,
+      stock: product.stock,
+      minStock: product.minStock ?? null,
+      weight: product.weight ?? null,
+      dimensionsCm: product.dimensionsCm ?? null,
+      imageUrl: product.imageUrl,
+      imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
+      featured: product.featured,
+      onSale: Boolean(product.onSale ?? product.promocao ?? product.promotion),
+      marca: product.marca ?? null,
+      subcategoria: product.subcategoria ?? null,
+      material: product.material ?? product.materialTipo ?? null,
+      acabamento: product.acabamento ?? product.corAcabamento ?? null,
+      tipo: product.tipo ?? product.toolType ?? null,
+      bitola: product.bitola ?? null,
+      voltagem: product.voltagem ?? product.tensao ?? null,
+      categoryId: product.categoryId,
+      category: category
+        ? {
+            id: category._id.toString(),
+            name: category.name,
+            slug: category.slug,
+          }
+        : null,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
+  });
 
   // Contar total
   const total = await productsCollection.countDocuments(query);
@@ -161,6 +293,159 @@ export async function getProducts(filters?: {
   };
 }
 
+export async function getProductFilterOptions(filters?: {
+  search?: string;
+  categorySlug?: string;
+  subcategorias?: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  onSale?: boolean;
+  /** Só faz sentido com `categorySlug`: lista subcategorias (grupos) dentro da macro. */
+  includeSubcategorias?: boolean;
+}): Promise<{
+  marcas: string[];
+  materiais: string[];
+  acabamentos: string[];
+  tipos: string[];
+  bitolas: string[];
+  voltagens: string[];
+  subcategorias: string[];
+  maxPrice: number;
+}> {
+  const db = await connectToDatabase();
+  const productsCollection = db.collection('products');
+  const categoriesCollection = db.collection('categories');
+
+  const query: any = {};
+
+  if (filters?.search) {
+    query.$or = [
+      { name: { $regex: filters.search, $options: 'i' } },
+      { description: { $regex: filters.search, $options: 'i' } },
+      { slug: { $regex: filters.search, $options: 'i' } },
+    ];
+  }
+
+  if (filters?.categorySlug) {
+    const category = await categoriesCollection.findOne({ slug: filters.categorySlug });
+    if (category) {
+      const objectIds: ObjectId[] = [category._id];
+      const stringIds = new Set<string>([category._id.toString()]);
+      const queue: string[] = [category._id.toString()];
+      while (queue.length > 0) {
+        const parentId = queue.shift()!;
+        const parentMatch: any[] = [{ parentId }];
+        if (ObjectId.isValid(parentId)) {
+          parentMatch.push({ parentId: new ObjectId(parentId) });
+        }
+        const children = await categoriesCollection
+          .find({ $or: parentMatch }, { projection: { _id: 1 } })
+          .toArray();
+        for (const child of children) {
+          const childId = child._id.toString();
+          if (stringIds.has(childId)) continue;
+          objectIds.push(child._id);
+          stringIds.add(childId);
+          queue.push(childId);
+        }
+      }
+      query.categoryId = { $in: [...objectIds, ...Array.from(stringIds)] };
+    }
+  }
+
+  if (filters?.minPrice || filters?.maxPrice) {
+    query.price = {};
+    if (filters.minPrice) query.price.$gte = filters.minPrice;
+    if (filters.maxPrice) query.price.$lte = filters.maxPrice;
+  }
+
+  query.status = { $nin: INACTIVE_STATUS_VALUES };
+  if (filters?.inStock) query.stock = { $gt: 0 };
+  if (filters?.onSale) {
+    query.$and = [
+      ...(query.$and ?? []),
+      { $or: [{ onSale: true }, { promocao: true }, { promotion: true }, { originalPrice: { $gt: 0 } }] },
+    ];
+  }
+
+  /** Match sem filtro de subcategoria: usado para listar todas as subcategorias da macro. */
+  const queryForSubcatList: any = { ...query };
+  if (Array.isArray(query.$and)) queryForSubcatList.$and = [...query.$and];
+
+  const subcats = filters?.subcategorias?.map((v) => v.trim()).filter(Boolean) ?? [];
+  if (subcats.length > 0) {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.$and = [
+      ...(query.$and ?? []),
+      {
+        $or: subcats.map((value) => ({
+          subcategoria: { $regex: `^${escapeRegex(value)}$`, $options: 'i' },
+        })),
+      },
+    ];
+  }
+
+  const wantSubcats =
+    filters?.includeSubcategorias === true &&
+    Boolean(filters?.categorySlug?.trim());
+
+  const [
+    marcasRaw,
+    materiaisRaw,
+    materiaisAltRaw,
+    acabRaw,
+    acabAltRaw,
+    tiposRaw,
+    tiposAltRaw,
+    bitolasRaw,
+    voltagensRaw,
+    voltagensAltRaw,
+    subcategoriasRaw,
+    maxPriceAgg,
+  ] = await Promise.all([
+    productsCollection.distinct('marca', query),
+    productsCollection.distinct('material', query),
+    productsCollection.distinct('materialTipo', query),
+    productsCollection.distinct('acabamento', query),
+    productsCollection.distinct('corAcabamento', query),
+    productsCollection.distinct('tipo', query),
+    productsCollection.distinct('toolType', query),
+    productsCollection.distinct('bitola', query),
+    productsCollection.distinct('voltagem', query),
+    productsCollection.distinct('tensao', query),
+    wantSubcats
+      ? productsCollection.distinct('subcategoria', queryForSubcatList)
+      : Promise.resolve([]),
+    productsCollection
+      .aggregate([{ $match: query }, { $group: { _id: null, maxPrice: { $max: '$price' } } }])
+      .toArray(),
+  ]);
+
+  const marcas = (marcasRaw as any[])
+    .map((x) => String(x ?? '').trim())
+    .filter((x) => x.length > 0 && x !== '—' && x !== '-')
+    .sort((a, b) => a.localeCompare(b, 'pt', { sensitivity: 'base' }));
+
+  const clean = (arr: any[]) =>
+    arr
+      .map((x) => String(x ?? '').trim())
+      .filter((x) => x.length > 0 && x !== '—' && x !== '-' && x !== 'Sem grupo')
+      .sort((a, b) => a.localeCompare(b, 'pt', { sensitivity: 'base' }));
+
+  const uniq = (arr: string[]) => Array.from(new Set(arr));
+
+  const materiais = uniq(clean([...(materiaisRaw as any[]), ...(materiaisAltRaw as any[])]));
+  const acabamentos = uniq(clean([...(acabRaw as any[]), ...(acabAltRaw as any[])]));
+  const tipos = uniq(clean([...(tiposRaw as any[]), ...(tiposAltRaw as any[])]));
+  const bitolas = uniq(clean(bitolasRaw as any[]));
+  const voltagens = uniq(clean([...(voltagensRaw as any[]), ...(voltagensAltRaw as any[])]));
+  const subcategorias = wantSubcats ? uniq(clean(subcategoriasRaw as any[])) : [];
+  const maxPrice = Number(maxPriceAgg?.[0]?.maxPrice ?? 0);
+
+  return { marcas, materiais, acabamentos, tipos, bitolas, voltagens, subcategorias, maxPrice };
+}
+
 export async function getProductBySlug(slug: string) {
   const db = await connectToDatabase();
   const productsCollection = db.collection('products');
@@ -172,8 +457,7 @@ export async function getProductBySlug(slug: string) {
     return null;
   }
 
-  // Ficha do produto: tratar como inexistente se importação marcou INATIVO.
-  if (product.status === false) {
+  if (isInactiveProductStatus(product.status)) {
     return null;
   }
 
@@ -191,6 +475,7 @@ export async function getProductBySlug(slug: string) {
     slug: product.slug,
     description: product.description,
     price: product.price,
+    pricePrazo: product.pricePrazo ?? null,
     stock: product.stock,
     minStock: product.minStock ?? null,
     weight: product.weight ?? null,
@@ -214,18 +499,65 @@ export async function getProductBySlug(slug: string) {
 export async function getCategories() {
   const db = await connectToDatabase();
   const categoriesCollection = db.collection('categories');
+  const productsCollection = db.collection('products');
 
-  const categories = await categoriesCollection.find({}).sort({ name: 1 }).toArray();
+  const categories = await categoriesCollection
+    .find({})
+    .sort({ isRoot: -1, sortOrder: 1, name: 1 })
+    .toArray();
 
-  // Importante: evitar N queries (countDocuments por categoria) para reduzir timeouts.
-  // A UI usa `_count?.products || 0`, então podemos enviar 0 quando não calculado.
+  const countsAgg = await productsCollection
+    .aggregate<{ _id: any; count: number }>([
+      {
+        $match: {
+          categoryId: { $ne: null },
+          status: { $nin: INACTIVE_STATUS_VALUES },
+        },
+      },
+      { $group: { _id: '$categoryId', count: { $sum: 1 } } },
+    ])
+    .toArray();
+
+  const directCountByCategoryId = new Map<string, number>();
+  for (const row of countsAgg) {
+    const key =
+      row._id instanceof ObjectId ? row._id.toString() : String(row._id ?? '').trim();
+    if (!key) continue;
+    directCountByCategoryId.set(key, Number(row.count ?? 0));
+  }
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const category of categories) {
+    const parent = category.parentId ? String(category.parentId) : '';
+    if (!parent) continue;
+    const arr = childrenByParent.get(parent) ?? [];
+    arr.push(category._id.toString());
+    childrenByParent.set(parent, arr);
+  }
+
+  const subtreeMemo = new Map<string, number>();
+  const calcSubtreeCount = (categoryId: string): number => {
+    const cached = subtreeMemo.get(categoryId);
+    if (cached != null) return cached;
+    let total = directCountByCategoryId.get(categoryId) ?? 0;
+    const children = childrenByParent.get(categoryId) ?? [];
+    for (const childId of children) total += calcSubtreeCount(childId);
+    subtreeMemo.set(categoryId, total);
+    return total;
+  };
+
   return categories.map((category: any) => ({
     id: category._id.toString(),
     name: category.name,
     slug: category.slug,
     description: category.description,
+    parentId: category.parentId ? String(category.parentId) : null,
+    isRoot: category.isRoot === true,
+    isActive: category.isActive !== false,
+    sortOrder: Number(category.sortOrder ?? 999),
     _count: {
-      products: 0,
+      products: calcSubtreeCount(category._id.toString()),
+      directProducts: directCountByCategoryId.get(category._id.toString()) ?? 0,
     },
     createdAt: category.createdAt,
     updatedAt: category.updatedAt,

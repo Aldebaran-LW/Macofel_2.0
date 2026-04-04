@@ -154,11 +154,17 @@ export async function processCatalogImport(
       if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
       try {
         const cleaned = cleanImportRow(row as Record<string, unknown>);
+        const subcategoriaGrupo = String(cleaned.category ?? '').trim();
         const enriched = await enrichWithGemini(cleaned);
         const categorized = await categorizeProduct(enriched);
+        const macroSlug = String(
+          categorized.macroCategorySlug ?? categorized.category ?? ''
+        ).trim();
 
         processed.push({
           ...categorized,
+          subcategoria: subcategoriaGrupo,
+          macroCategorySlug: macroSlug,
           status: 'pending_review',
           created_at: new Date(),
           reviewed_at: null,
@@ -264,7 +270,7 @@ Marca: ${product.marca}
   const result = await model.generateContent(prompt);
   const category = normalizeCategorySlug(result.response.text());
 
-  return { ...product, category };
+  return { ...product, category, macroCategorySlug: category };
 }
 
 export async function processCatalogImportFromUrl(

@@ -11,6 +11,8 @@ type PendingRow = {
   name?: string;
   codigo?: string;
   description?: string;
+  subcategoria?: string;
+  macroCategorySlug?: string;
 };
 
 export default function ProdutosPendentes() {
@@ -37,11 +39,12 @@ export default function ProdutosPendentes() {
       credentials: 'include',
     });
 
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       toast.success('Produto aprovado!');
       fetchPending();
     } else {
-      toast.error('Erro ao aprovar');
+      toast.error(typeof data.error === 'string' ? data.error : 'Erro ao aprovar');
     }
   };
 
@@ -77,6 +80,12 @@ export default function ProdutosPendentes() {
             <CardHeader>
               <CardTitle className="line-clamp-2">{p.name}</CardTitle>
               <p className="text-sm text-muted-foreground">Código: {p.codigo ?? '—'}</p>
+              {(p.macroCategorySlug || p.subcategoria) && (
+                <p className="text-xs text-muted-foreground">
+                  Macro: {p.macroCategorySlug ?? '—'}
+                  {p.subcategoria ? ` · Grupo: ${p.subcategoria}` : ''}
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
