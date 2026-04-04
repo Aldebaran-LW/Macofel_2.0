@@ -24,6 +24,7 @@ import {
   importRowSlug,
   slugifyProductKey,
 } from './relatorio-estoque-xls';
+import { macroCategorySlugForGrupo } from './grupo-macro-categoria';
 
 export type RelatorioProductImportResult = {
   created: number;
@@ -43,8 +44,8 @@ export type ProductCatalogImportRow = {
   /** Sempre preço à vista unitário (site usa este campo). */
   price: number;
   stock: number;
-  /** Nome da categoria: Excel usa “grupo”; PDF usa categoria fixa “Importado PDF”. */
-  categoryName: string;
+  /** Subcategoria (filtro): Excel usa “grupo”; PDF pode ficar vazio. */
+  subcategoria: string;
   /** Kg → campo Prisma `weight`. */
   weight?: number | null;
   cost?: number | null;
@@ -76,47 +77,6 @@ function unitCostFromEstoqueRow(row: RelatorioEstoqueRow): number | null {
   return Number.isFinite(u) && u >= 0 ? Math.round(u * 10000) / 10000 : null;
 }
 
-async function uniqueCategorySlug(base: string): Promise<string> {
-  let s = base.slice(0, 80) || 'categoria';
-  let i = 0;
-  for (;;) {
-    const ex = await mongoPrisma.category.findUnique({ where: { slug: s } });
-    if (!ex) return s;
-    i += 1;
-    s = `${base}-${i}`.slice(0, 80);
-  }
-}
-
-async function resolveCategoryId(
-  grupo: string,
-  cache: Map<string, string>,
-  existingCategories: { id: string; name: string }[]
-): Promise<string> {
-  const g = grupo.trim() || 'Sem grupo';
-  const key = g.toLowerCase();
-  const hitCache = cache.get(key);
-  if (hitCache) return hitCache;
-
-  const hit = existingCategories.find((c) => c.name.trim().toLowerCase() === key);
-  if (hit) {
-    cache.set(key, hit.id);
-    return hit.id;
-  }
-
-  const slugBase = slugifyProductKey(g) || 'sem-grupo';
-  const slug = await uniqueCategorySlug(slugBase);
-  const created = await mongoPrisma.category.create({
-    data: {
-      name: g,
-      slug,
-      description: 'Categoria criada na importação do catálogo.',
-    },
-  });
-  existingCategories.push({ id: created.id, name: created.name });
-  cache.set(key, created.id);
-  return created.id;
-}
-
 async function uniqueProductSlug(base: string): Promise<string> {
   let s = base.slice(0, 120);
   let i = 0;
@@ -135,12 +95,28 @@ async function uniqueProductSlug(base: string): Promise<string> {
  */
 export async function runProductCatalogImport(
   rows: ProductCatalogImportRow[],
-  options: { upsert: boolean; preserveStockForExisting?: boolean }
+  options: {
+    upsert: boolean;
+    preserveStockForExisting?: boolean;
+    categoryId: string;
+    /**
+     * Se true (padrão), cada linha usa o mapa `grupo-macro-categoria` para `categoryId`;
+     * grupos desconhecidos ou vazios usam `categoryId` (reserva: primeira macro da vitrine ou override no admin).
+     */
+    routeGrupoToMacroCategory?: boolean;
+  }
 ): Promise<RelatorioProductImportResult> {
-  const catCache = new Map<string, string>();
-  const existingCategories = await mongoPrisma.category.findMany({
-    select: { id: true, name: true },
-  });
+  const fallbackCategoryId = options.categoryId;
+  const route = options.routeGrupoToMacroCategory !== false;
+
+  let slugToId: Map<string, string> | null = null;
+  if (route) {
+    const cats = await mongoPrisma.category.findMany({
+      select: { id: true, slug: true },
+    });
+    slugToId = new Map(cats.map((c) => [c.slug, c.id]));
+  }
+
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -148,7 +124,6 @@ export async function runProductCatalogImport(
 
   for (const row of rows) {
     const baseSlug = importRowSlug(row.code, row.name);
-    const categoryId = await resolveCategoryId(row.categoryName, catCache, existingCategories);
     const weightVal =
       row.weight != null && Number.isFinite(row.weight) && row.weight > 0 ? row.weight : null;
     const codigo = normCodigo(row.code);
@@ -161,6 +136,14 @@ export async function runProductCatalogImport(
     const codBarra = row.codBarra?.replace(/\D/g, '') || null;
     const status = row.status !== false;
     const marca = normMarca(row.marca ?? null);
+    const subcategoria = String(row.subcategoria ?? '').trim() || null;
+
+    const grupoLabel = subcategoria ?? '';
+    const macroSlug = route ? macroCategorySlugForGrupo(grupoLabel) : null;
+    const resolvedCategoryId =
+      macroSlug && slugToId?.get(macroSlug)
+        ? slugToId.get(macroSlug)!
+        : fallbackCategoryId;
 
     try {
       // 1º pelo slug esperado desta importação; 2º pelo codigo único (evita duplicado se o nome/slug mudou).
@@ -188,7 +171,7 @@ export async function runProductCatalogImport(
             description: row.description,
             price,
             stock: stockToWrite,
-            categoryId,
+            categoryId: resolvedCategoryId,
             weight: weightVal,
             codigo,
             cost,
@@ -197,6 +180,8 @@ export async function runProductCatalogImport(
             codBarra,
             status,
             marca,
+            subcategoria,
+            origin: 'import',
           },
         });
         updated += 1;
@@ -213,7 +198,7 @@ export async function runProductCatalogImport(
           price,
           stock: row.stock,
           minStock: 0,
-          categoryId,
+          categoryId: resolvedCategoryId,
           featured: false,
           weight: weightVal,
           codigo,
@@ -223,6 +208,8 @@ export async function runProductCatalogImport(
           codBarra,
           status,
           marca,
+          subcategoria,
+          origin: 'import',
         },
       });
       created += 1;
@@ -243,7 +230,7 @@ export async function runProductCatalogImport(
 
 export async function runRelatorioProductImport(
   rows: RelatorioEstoqueRow[],
-  options: { upsert: boolean; preserveStockForExisting?: boolean }
+  options: { upsert: boolean; preserveStockForExisting?: boolean; categoryId: string }
 ): Promise<RelatorioProductImportResult> {
   const mapped: ProductCatalogImportRow[] = rows.map((r) => ({
     code: r.code,
@@ -251,10 +238,11 @@ export async function runRelatorioProductImport(
     description: buildImportDescription(r),
     price: r.price,
     stock: r.stock,
-    categoryName: r.grupo,
+    subcategoria: r.grupo,
     weight: null,
     cost: unitCostFromEstoqueRow(r),
-    pricePrazo: null,
+    pricePrazo:
+      r.pricePrazo > 0 && Number.isFinite(r.pricePrazo) ? r.pricePrazo : null,
     unidade: null,
     codBarra: null,
     status: true,
@@ -266,7 +254,12 @@ export async function runRelatorioProductImport(
 /** PDF LW parseado em `relatorio-produtos-pdf.ts` (texto + linhas ATIVO/INATIVO). */
 export async function runPdfRelatorioProductImport(
   rows: RelatorioProdutoPdfRow[],
-  options: { upsert: boolean; preserveStockForExisting?: boolean }
+  options: {
+    upsert: boolean;
+    preserveStockForExisting?: boolean;
+    categoryId: string;
+    routeGrupoToMacroCategory?: boolean;
+  }
 ): Promise<RelatorioProductImportResult> {
   const mapped: ProductCatalogImportRow[] = rows.map((r) => ({
     code: r.codigo,
@@ -274,7 +267,7 @@ export async function runPdfRelatorioProductImport(
     description: buildPdfImportDescription(r),
     price: pdfRowToCatalogPrice(r),
     stock: r.estoque,
-    categoryName: PDF_CATEGORY,
+    subcategoria: '',
     weight: r.peso > 0 ? r.peso : null,
     cost: r.custo > 0 && Number.isFinite(r.custo) ? r.custo : null,
     pricePrazo: r.vendaPrazo > 0 && Number.isFinite(r.vendaPrazo) ? r.vendaPrazo : null,
@@ -283,7 +276,10 @@ export async function runPdfRelatorioProductImport(
     status: r.status?.toUpperCase() !== 'INATIVO',
     marca: null,
   }));
-  return runProductCatalogImport(mapped, options);
+  return runProductCatalogImport(mapped, {
+    ...options,
+    routeGrupoToMacroCategory: options.routeGrupoToMacroCategory !== false,
+  });
 }
 
 
