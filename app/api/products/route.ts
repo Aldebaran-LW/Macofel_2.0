@@ -25,20 +25,51 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') ?? '12');
     const search = searchParams.get('search') ?? '';
     const categorySlug = searchParams.get('category') ?? '';
+    const marcas = searchParams.getAll('marca');
+    const materiais = searchParams.getAll('material');
+    const acabamentos = searchParams.getAll('acabamento');
+    const tipos = searchParams.getAll('tipo');
+    const bitolas = searchParams.getAll('bitola');
+    const voltagens = searchParams.getAll('voltagem');
+    const subcategorias = searchParams.getAll('subcategoria');
     const minPrice = parseFloat(searchParams.get('minPrice') ?? '0');
     const maxPrice = parseFloat(searchParams.get('maxPrice') ?? '999999');
     const featured = searchParams.get('featured') === 'true';
-    const sort = searchParams.get('sort') as 'price_asc' | 'price_desc' | 'name' | 'relevance' | null;
+    const inStock = searchParams.get('inStock') === 'true';
+    const onSale = searchParams.get('onSale') === 'true';
+    const rawSort = searchParams.get('sort');
+    const sortParam = rawSort === 'name' ? 'name_asc' : rawSort;
+    const sort = sortParam as
+      | 'relevance'
+      | 'price_asc'
+      | 'price_desc'
+      | 'name_asc'
+      | 'newest'
+      | 'best_selling'
+      | null;
 
     const result = await getProducts({
       search: search || undefined,
       categorySlug: categorySlug || undefined,
+      subcategorias: subcategorias.length ? subcategorias : undefined,
+      marcas: marcas.length ? marcas : undefined,
+      materiais: materiais.length ? materiais : undefined,
+      acabamentos: acabamentos.length ? acabamentos : undefined,
+      tipos: tipos.length ? tipos : undefined,
+      bitolas: bitolas.length ? bitolas : undefined,
+      voltagens: voltagens.length ? voltagens : undefined,
       minPrice: minPrice > 0 ? minPrice : undefined,
       maxPrice: maxPrice < 999999 ? maxPrice : undefined,
+      inStock: inStock || undefined,
+      onSale: onSale || undefined,
       featured: featured || undefined,
       page,
       limit,
-      sort: sort && ['price_asc', 'price_desc', 'name', 'relevance'].includes(sort) ? sort : undefined,
+      sort:
+        sort &&
+        ['relevance', 'price_asc', 'price_desc', 'name_asc', 'newest', 'best_selling'].includes(sort)
+          ? sort
+          : undefined,
     });
 
     return NextResponse.json(
