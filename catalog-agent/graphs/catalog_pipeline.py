@@ -13,3 +13,6 @@ workflow.add_edge("enrich", "categorize")
 workflow.add_edge("categorize", END)
 
 catalog_graph = workflow.compile()
+
+# Alias esperado por main.py e integrações externas
+catalog_pipeline = catalog_graph

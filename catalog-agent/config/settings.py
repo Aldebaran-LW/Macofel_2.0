@@ -10,6 +10,11 @@ class Settings(BaseModel):
     MONGODB_URI: str = os.getenv("MONGODB_URI")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
+    # Fila de revisão do agente (não usar a coleção `products` do Prisma: schema diferente).
+    MONGODB_CATALOG_QUEUE_COLLECTION: str = os.getenv(
+        "MONGODB_CATALOG_QUEUE_COLLECTION", "catalog_agent_pending_review"
+    )
+    MONGODB_DB_NAME: str | None = os.getenv("MONGODB_DB_NAME") or None
 
     # Configuração de custos
     GEMINI_MODEL: str = "gemini-2.5-flash"  # Flash para volume
