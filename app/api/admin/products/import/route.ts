@@ -13,6 +13,7 @@ import {
 import { parseRelatorioEstoqueWorkbook } from '@/lib/relatorio-estoque-xls';
 import { parseRelatorioProdutosPdf } from '@/lib/relatorio-produtos-pdf';
 import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
+import { resolveImportFallbackCategoryId } from '@/lib/import-fallback-category';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,10 +36,27 @@ export async function POST(req: NextRequest) {
     const preserveRaw = form.get('preserve_stock_db');
     const preserveStockForExisting =
       preserveRaw === 'true' || preserveRaw === '1';
+    const categoryIdRaw = form.get('categoryId');
+    const categoryIdForm = typeof categoryIdRaw === 'string' ? categoryIdRaw.trim() : '';
 
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: 'Envie o ficheiro no campo file' }, { status: 400 });
     }
+
+    const resolved = await resolveImportFallbackCategoryId(
+      categoryIdForm.length ? categoryIdForm : undefined
+    );
+    if (!resolved) {
+      return NextResponse.json(
+        {
+          error: categoryIdForm.length
+            ? 'Categoria (reserva) inválida ou não encontrada.'
+            : 'Nenhuma categoria macro na base. Crie as categorias da vitrine ou escolha uma reserva.',
+        },
+        { status: 400 }
+      );
+    }
+    const categoryId = resolved.id;
 
     const fname = file instanceof File ? file.name : 'upload';
     if (importFileTooLarge(file)) {
@@ -60,6 +78,7 @@ export async function POST(req: NextRequest) {
       const { created, updated, skipped, errors } = await runPdfRelatorioProductImport(rows, {
         upsert,
         preserveStockForExisting,
+        categoryId,
       });
       return NextResponse.json({
         source: 'pdf',
@@ -83,6 +102,7 @@ export async function POST(req: NextRequest) {
       const { created, updated, skipped, errors } = await runRelatorioProductImport(rows, {
         upsert,
         preserveStockForExisting,
+        categoryId,
       });
       return NextResponse.json({
         source,
@@ -106,6 +126,7 @@ export async function POST(req: NextRequest) {
     const { created, updated, skipped, errors } = await runRelatorioProductImport(rows, {
       upsert,
       preserveStockForExisting,
+      categoryId,
     });
 
     return NextResponse.json({
