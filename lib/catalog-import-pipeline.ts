@@ -36,14 +36,21 @@ const VALID_CATEGORIES = [
   'material-eletrico',
 ] as const;
 
-/** Compatível com tipos antigos de `RelatorioEstoqueRow` (só `vlVendaPrazo`) e novos (`pricePrazo`). */
+/**
+ * Preço a prazo unitário vindo do relatório. Usa `Record` porque versões antigas do tipo
+ * `RelatorioEstoqueRow` no repo não declaram `pricePrazo` / `vlVendaPrazo` (build Vercel).
+ */
 function relatorioRowPricePrazo(row: RelatorioEstoqueRow): number | null {
-  const r = row as RelatorioEstoqueRow & { pricePrazo?: number };
-  const unit =
-    typeof r.pricePrazo === 'number' && r.pricePrazo > 0 && Number.isFinite(r.pricePrazo)
-      ? r.pricePrazo
-      : r.vlVendaPrazo;
-  return unit > 0 && Number.isFinite(unit) ? unit : null;
+  const r = row as unknown as Record<string, unknown>;
+  const asPositiveNum = (v: unknown): number | null => {
+    if (typeof v === 'number' && v > 0 && Number.isFinite(v)) return v;
+    return null;
+  };
+  return (
+    asPositiveNum(r.pricePrazo) ??
+    asPositiveNum(r.vlVendaPrazo) ??
+    null
+  );
 }
 
 function rowFromRelatorioEstoque(row: RelatorioEstoqueRow): Record<string, unknown> {
