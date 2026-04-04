@@ -6,11 +6,34 @@
 import { ObjectId } from 'mongodb';
 import mongoPrisma from '@/lib/mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
-import { resolveImportFallbackCategoryId } from '@/lib/import-fallback-category';
 import {
   runProductCatalogImport,
   type ProductCatalogImportRow,
 } from '@/lib/product-relatorio-import';
+
+/** Mesma ordem de macros do catálogo / agente (evita depender de ficheiros só locais no repo). */
+const MACRO_SLUG_FALLBACK_ORDER = [
+  'cimento-argamassa',
+  'tijolos-blocos',
+  'tintas-acessorios',
+  'ferramentas',
+  'material-hidraulico',
+  'material-eletrico',
+] as const;
+
+async function resolvePromoteFallbackCategoryId(): Promise<string | null> {
+  const cats = await mongoPrisma.category.findMany({
+    where: { slug: { in: [...MACRO_SLUG_FALLBACK_ORDER] } },
+    select: { id: true, slug: true },
+  });
+  const bySlug = new Map(cats.map((c) => [c.slug, c.id]));
+  for (const slug of MACRO_SLUG_FALLBACK_ORDER) {
+    const id = bySlug.get(slug);
+    if (id) return id;
+  }
+  const anyCat = await mongoPrisma.category.findFirst({ orderBy: { name: 'asc' } });
+  return anyCat?.id ?? null;
+}
 
 function numOr(
   v: unknown,
@@ -76,8 +99,7 @@ export async function promoteCatalogDraftById(
       categoryId = c?.id ?? null;
     }
     if (!categoryId) {
-      const fb = await resolveImportFallbackCategoryId(null);
-      categoryId = fb?.id ?? null;
+      categoryId = await resolvePromoteFallbackCategoryId();
     }
     if (!categoryId) {
       return { ok: false, message: 'Não há categoria no sistema para associar o produto' };
