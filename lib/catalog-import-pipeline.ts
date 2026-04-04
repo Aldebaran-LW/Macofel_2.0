@@ -36,14 +36,23 @@ const VALID_CATEGORIES = [
   'material-eletrico',
 ] as const;
 
+/** Compatível com tipos antigos de `RelatorioEstoqueRow` (só `vlVendaPrazo`) e novos (`pricePrazo`). */
+function relatorioRowPricePrazo(row: RelatorioEstoqueRow): number | null {
+  const r = row as RelatorioEstoqueRow & { pricePrazo?: number };
+  const unit =
+    typeof r.pricePrazo === 'number' && r.pricePrazo > 0 && Number.isFinite(r.pricePrazo)
+      ? r.pricePrazo
+      : r.vlVendaPrazo;
+  return unit > 0 && Number.isFinite(unit) ? unit : null;
+}
+
 function rowFromRelatorioEstoque(row: RelatorioEstoqueRow): Record<string, unknown> {
   return {
     name: row.name,
     codigo: row.code,
     description: buildImportDescription(row),
     price: row.price,
-    pricePrazo:
-      row.pricePrazo > 0 && Number.isFinite(row.pricePrazo) ? row.pricePrazo : null,
+    pricePrazo: relatorioRowPricePrazo(row),
     stock: row.stock,
     marca: row.marca,
     slug: importRowSlug(row.code, row.name),
