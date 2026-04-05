@@ -1,0 +1,99 @@
+================================================================================
+CHAVES DE AMBIENTE — ATUALIZAÇÃO MANUAL (.env local + Vercel)
+Projeto Macofel (Next.js + Blob + Render)
+================================================================================
+
+Use este ficheiro como checklist. Não commite segredos em repositórios públicos.
+O ficheiro .env já está no .gitignore.
+
+--------------------------------------------------------------------------------
+1) BLOB_READ_WRITE_TOKEN  (obrigatório para importação com agente / Vercel Blob)
+--------------------------------------------------------------------------------
+
+O quê: token Read & Write do Vercel Blob. Sem isto, /api/admin/catalog/upload falha.
+
+Passo a passo:
+  a) Vercel Dashboard → o teu projeto → Storage → Blob (criar store se ainda não existir).
+  b) Na área do Blob, abre a secção de variáveis / token e copia o valor
+     BLOB_READ_WRITE_TOKEN (formato vercel_blob_rw_...).
+  c) No ficheiro .env (raiz do projeto), na linha BLOB_READ_WRITE_TOKEN= cola o valor
+     sem aspas ou com aspas, por exemplo:
+       BLOB_READ_WRITE_TOKEN=vercel_blob_rw_SEU_TOKEN_AQUI
+  d) Reinicia o servidor local (npm run dev) para carregar a variável.
+  e) Na Vercel: Settings → Environment Variables → adiciona BLOB_READ_WRITE_TOKEN
+     com o mesmo valor em Production (e Preview, se usares previews).
+  f) Faz Redeploy do projeto na Vercel após guardar a variável.
+
+Nota: se o token tiver sido exposto (chat, screenshot, etc.), revoga/regenera na Vercel
+e atualiza .env + Vercel de novo.
+
+--------------------------------------------------------------------------------
+2) RENDER_CATALOG_AGENT_URL  (opcional, mas recomendado se usas FastAPI na Render)
+--------------------------------------------------------------------------------
+
+O quê: URL completa do endpoint POST /api/import do serviço Python na Render.
+
+Passo a passo:
+  a) Na Render, abre o Web Service do catálogo e copia a URL pública, ex.:
+       https://NOME-DO-SERVICO.onrender.com/api/import
+  b) No .env:
+       RENDER_CATALOG_AGENT_URL=https://....onrender.com/api/import
+  c) Na Vercel, adiciona a mesma variável (Production / Preview conforme necessário).
+  d) Redeploy.
+
+Se ficar vazio: o upload continua a gravar no Blob, mas o Next só dispara o pipeline
+local se CATALOG_INTERNAL_SECRET estiver configurado e o fluxo interno ativo.
+
+--------------------------------------------------------------------------------
+3) RENDER_CATALOG_WEBHOOK_SECRET  (opcional, segurança entre Vercel e Render)
+--------------------------------------------------------------------------------
+
+O quê: segredo partilhado. O Next envia o header X-Catalog-Webhook-Secret; o serviço
+na Render valida se a variável RENDER_CATALOG_WEBHOOK_SECRET estiver definida lá.
+
+Passo a passo:
+  a) Gera uma string longa e aleatória (pode usar: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))").
+  b) No .env local (não vai para o Git — ficheiro ignorado):
+       RENDER_CATALOG_WEBHOOK_SECRET=o_mesmo_valor_em_todos_os_sítios
+  c) Na Render → Ambiente do serviço Python → Editar → adicionar ou atualizar:
+       Key: RENDER_CATALOG_WEBHOOK_SECRET
+       Value: exatamente o mesmo que no .env
+  d) Na Vercel → Environment Variables → mesma chave e mesmo valor (Production e Preview se aplicável).
+  e) Guardar na Render e na Vercel; redeploy do serviço Render e redeploy do Next.
+
+Se não definires na Render, o /api/import aceita pedidos sem esse header.
+Se definires na Render mas o valor for diferente do .env/Vercel, receberás 401.
+
+IMPORTANTE: O ficheiro .env não deve ser commitado (.gitignore). Copia o segredo
+manualmente para Render e Vercel após o gerares localmente.
+
+--------------------------------------------------------------------------------
+4) CATALOG_INTERNAL_SECRET  (já no teu .env — rever se mudares fluxo)
+--------------------------------------------------------------------------------
+
+O quê: segredo para /api/admin/catalog/process no próprio Next (processamento local).
+
+Atualiza se: quiseres rodar o pipeline sem Render e com job interno; mantém o mesmo
+valor em Vercel se usares esse modo em produção.
+
+--------------------------------------------------------------------------------
+5) Outras chaves que normalmente já tens (confirmar na Vercel em produção)
+--------------------------------------------------------------------------------
+
+  • MONGODB_URI — Atlas; necessário para o site e para o agente na Render ler/gravar produtos.
+  • NEXTAUTH_URL — em produção deve ser a URL pública (ex. https://www.teudominio.com).
+  • NEXTAUTH_SECRET — igual em todos os ambientes onde corre o mesmo login.
+  • GEMINI_API_KEY / GOOGLE_API_KEY — enriquecimento IA (Next e/ou Render, conforme código).
+  • MAX_CATALOG_BATCH — limite de linhas por import no agente (opcional).
+
+--------------------------------------------------------------------------------
+Resumo rápido — o que editar AGORA no .env (final do ficheiro)
+--------------------------------------------------------------------------------
+
+  BLOB_READ_WRITE_TOKEN=          ← colar token Vercel Blob
+  RENDER_CATALOG_AGENT_URL=       ← colar URL /api/import da Render (ou deixar vazio)
+  RENDER_CATALOG_WEBHOOK_SECRET=  ← opcional; alinhar com a Render
+
+Depois: reiniciar dev local; na Vercel replicar variáveis e Redeploy.
+
+================================================================================
