@@ -50,6 +50,10 @@ model Product {
   codBarra     String?
   /// Marca do relatório LW (coluna «Marca» no Excel). PDF não traz marca → fica null.
   marca        String?
+  /// Subcategoria (ex.: coluna «Grupo» do relatório). Usado para filtros no catálogo, sem criar Categories novas.
+  subcategoria String?
+  /// Origem (controlo interno): "import" ou "manual".
+  origin       String?  @default("manual")
   /// true = ATIVO, false = INATIVO. O catálogo público filtra `status !== false`.
   status       Boolean  @default(true)
   featured     Boolean  @default(false)
@@ -70,6 +74,8 @@ model Product {
   @@index([categoryId])
   @@index([featured])
   @@index([marca])
+  @@index([subcategoria])
+  @@index([origin])
   @@index([eanEnrichmentCheckedAt])
 }
 
