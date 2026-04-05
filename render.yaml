@@ -1,23 +1,45 @@
-# Blueprint Render: apenas API Python de importação de catálogo.
-# O site Next.js (Macofel) deve estar na Vercel — não fazer build Next neste blueprint.
-# Ver render-catalog-import/README.md
+# Blueprint Render — serviço web do agente de catálogo (`macofel-catalog-agent`).
+#
+# Por que não há `rootDir: catalog-agent`?
+# Na Render, ficheiros fora do root directory do serviço não existem no build nem em runtime.
+# O ASGI em `catalog-agent/webapp.py` importa `render-catalog-import/main.py` (irmão no monorepo).
+# Com root só em `catalog-agent`, essa pasta não estaria no deploy e o arranque falhava.
+#
+# Build e start correm a partir da raiz do repositório.
+# Sem buildFilter: qualquer push no branch ligado no painel Render dispara redeploy (evita
+# falhas silenciosas quando só mudas lib/prisma/app no mesmo branch).
+#
+# No Next.js (Vercel), defina RENDER_CATALOG_AGENT_URL, por exemplo:
+#   https://macofel-catalog-agent.onrender.com/api/import
+# Não fixe PORT aqui — a Render injeta $PORT.
+#
 services:
   - type: web
-    name: macofel-catalog-import
-    env: python
+    name: macofel-catalog-agent
+    runtime: python
     region: oregon
     plan: free
-    rootDir: render-catalog-import
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r catalog-agent/requirements.txt --no-cache-dir
+    startCommand: cd catalog-agent && uvicorn webapp:app --host 0.0.0.0 --port $PORT --workers 2
+    autoDeploy: true
     envVars:
-      - key: MONGODB_URI
-        sync: false
-      - key: RENDER_CATALOG_IMPORT_SECRET
-        generateValue: true
-      - key: PYTHON_VERSION
-        value: "3.11.0"
-      - key: CORS_ORIGINS
-        sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: CATALOG_INTERNAL_SECRET
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: RENDER_CATALOG_WEBHOOK_SECRET
+        sync: false
+      - key: MAX_CATALOG_BATCH
+        sync: false
+      - key: RENDER_CATALOG_IMPORT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: MONGODB_DB_NAME
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.0"
