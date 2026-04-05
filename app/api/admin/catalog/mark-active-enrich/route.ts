@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
       mode?: 'short_description' | 'all';
       shortDescriptionMaxLen?: number;
       maxToMark?: number;
+      /** false = incluir ativos sem EAN válido (legado). */
+      requireValidBarcode?: boolean;
     };
 
     const mode = body.mode ?? 'short_description';
@@ -40,9 +42,13 @@ export async function POST(request: NextRequest) {
       typeof body.maxToMark === 'number' && body.maxToMark > 0
         ? body.maxToMark
         : undefined;
+    const requireValidBarcode = body.requireValidBarcode !== false;
 
     if (mode === 'all') {
-      const { marked } = await markActiveProductsForEnrichmentAll({ maxToMark });
+      const { marked } = await markActiveProductsForEnrichmentAll({
+        maxToMark,
+        requireValidBarcode,
+      });
       return NextResponse.json({
         ok: true,
         mode: 'all',
@@ -59,6 +65,7 @@ export async function POST(request: NextRequest) {
     const { marked } = await markActiveProductsForShortDescriptionEnrichment({
       shortDescriptionMaxLen: shortLen,
       maxToMark,
+      requireValidBarcode,
     });
 
     return NextResponse.json({

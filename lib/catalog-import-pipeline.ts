@@ -3,6 +3,8 @@ import type { Collection, Document } from 'mongodb';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { connectToDatabase } from './mongodb-native';
 import mongoPrisma from '@/lib/mongodb';
+import { getBuscarProdutoInfoByBarcode } from '@/lib/buscar-produto-service';
+import { normalizeValidGtin } from '@/lib/gtin-validate';
 import {
   CATALOG_AGENT_GEMINI_MODEL,
   GEMINI_API_KEY,
@@ -216,6 +218,11 @@ export async function processCatalogImport(
 export function cleanImportRow(row: Record<string, unknown>) {
   const name = String(row.name ?? row.Produto ?? '').trim();
   const pp = row.pricePrazo ?? row['Venda Prazo'];
+  const codBarraRaw = row.codBarra ?? row.cod_barra ?? row.ean;
+  const codBarra =
+    typeof codBarraRaw === 'string' || typeof codBarraRaw === 'number'
+      ? String(codBarraRaw).replace(/\D/g, '') || ''
+      : '';
   return {
     name,
     codigo: String(row.codigo ?? row.Codigo ?? '').trim(),
@@ -230,18 +237,58 @@ export function cleanImportRow(row: Record<string, unknown>) {
       name.toLowerCase().replace(/\s+/g, '-'),
     imageUrl: row.imageUrl != null ? row.imageUrl : null,
     category: String(row.category ?? '').trim(),
+    codBarra,
   };
 }
 
-async function enrichWithGemini(product: Record<string, unknown>) {
+type BarcodeVerifiedContext = { apiTitle: string; source?: string; ean: string };
+
+async function geminiBarcodeCoherence(
+  storeName: string,
+  storeDescription: string,
+  gtinTitle: string,
+  ean: string
+): Promise<boolean> {
+  const desc = storeDescription.slice(0, 500);
+  const prompt = `É o mesmo produto físico comercializado?
+
+EAN/GTIN: ${ean}
+Nome no cadastro da loja: ${storeName}
+Descrição na loja (trecho): ${desc || '(vazia)'}
+Título encontrado em bases de dados de código de barras (validado com o EAN no anúncio ou snippet): ${gtinTitle}
+
+Responde APENAS uma palavra: SIM ou NÃO.
+SIM = é razoavelmente o mesmo artigo (marca, linha ou tipo de produto coerentes).
+NÃO = produto diferente, genérico demais, ou título não condiz com o nome/descrição da loja.`;
+
+  const result = await model.generateContent(prompt);
+  const t = result.response.text().trim().toUpperCase();
+  return t.startsWith('SIM') || /^S[\s,.]/.test(t);
+}
+
+async function enrichWithGemini(
+  product: Record<string, unknown>,
+  barcode?: BarcodeVerifiedContext
+) {
+  const bc = barcode
+    ? `
+Referência validada pelo código de barras (prioriza estes dados como factuais; harmoniza com o nome da loja sem contradizer o GTIN):
+EAN: ${barcode.ean}
+Título na base GTIN (${barcode.source ?? 'fonte externa'}): ${barcode.apiTitle}
+`
+    : '';
+  const eanLine = product.codBarra
+    ? `Código de barras (EAN/GTIN): ${product.codBarra}\n`
+    : '';
+
   const prompt = `
 Escreva uma descrição longa (180-280 palavras), persuasiva e otimizada para SEO para este produto de materiais de construção:
 
 Nome: ${product.name}
-Código: ${product.codigo}
-Marca: ${product.marca}
+Código interno: ${product.codigo}
+${eanLine}Marca: ${product.marca}
 Descrição original: ${product.description}
-
+${bc}
 Use linguagem técnica correta, destaque benefícios práticos, durabilidade, rendimento e aplicação. 
 Inclua palavras-chave naturalmente.
 `;
@@ -359,8 +406,75 @@ export async function applyGeminiEnrichmentToCatalogDocument(
       return;
     }
 
+    let barcodeCtx: BarcodeVerifiedContext | undefined;
+    if (live) {
+      const ean = normalizeValidGtin(raw.codBarra ?? cleaned.codBarra);
+      if (!ean) {
+        await col.updateOne(
+          { _id },
+          {
+            $set: {
+              enrichmentStatus: 'skipped',
+              enrichment_notes:
+                'Enriquecimento: EAN ausente, formato inválido ou dígito de controlo incorreto.',
+              updatedAt: new Date(),
+            },
+          }
+        );
+        return;
+      }
+
+      let info: Awaited<ReturnType<typeof getBuscarProdutoInfoByBarcode>> = null;
+      try {
+        info = await getBuscarProdutoInfoByBarcode(ean, cleaned.name);
+      } catch {
+        info = null;
+      }
+      if (!info?.title?.trim()) {
+        await col.updateOne(
+          { _id },
+          {
+            $set: {
+              enrichmentStatus: 'skipped',
+              enrichment_notes:
+                'Enriquecimento: EAN não confirmado nas fontes (Mercado Livre / Google com EAN visível).',
+              updatedAt: new Date(),
+            },
+          }
+        );
+        return;
+      }
+
+      const coherent = await geminiBarcodeCoherence(
+        cleaned.name,
+        cleaned.description,
+        info.title.trim(),
+        ean
+      );
+      if (!coherent) {
+        await col.updateOne(
+          { _id },
+          {
+            $set: {
+              enrichmentStatus: 'skipped',
+              enrichment_notes:
+                'Enriquecimento: título validado pelo GTIN não condiz com nome/descrição do cadastro.',
+              updatedAt: new Date(),
+            },
+          }
+        );
+        return;
+      }
+
+      barcodeCtx = {
+        ean,
+        apiTitle: info.title.trim(),
+        source: info.source,
+      };
+    }
+
     const subcategoriaGrupo = String(cleaned.category ?? '').trim();
-    const enriched = await enrichWithGemini(cleaned);
+    const enriched = await enrichWithGemini(cleaned, barcodeCtx);
     const categorized = (await categorizeProduct(enriched)) as Record<string, unknown>;
     const macroSlug = String(
       categorized.macroCategorySlug ?? categorized.category ?? ''
@@ -377,6 +491,7 @@ export async function applyGeminiEnrichmentToCatalogDocument(
         marca: categorized.marca || null,
         subcategoria: subcategoriaGrupo || null,
         enrichmentStatus: 'done',
+        enrichment_notes: null,
         updatedAt: new Date(),
       };
       if (categoryId) setLive.categoryId = categoryId;

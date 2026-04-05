@@ -1,17 +1,22 @@
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { MAX_CATALOG_BATCH, GEMINI_API_KEY } from '@/env';
 import { applyGeminiEnrichmentToCatalogDocument } from '@/lib/catalog-import-pipeline';
+import { normalizeValidGtin } from '@/lib/gtin-validate';
 
 const DEFAULT_SHORT_LEN = 160;
 const DEFAULT_MAX_MARK = 300;
+const SCAN_CAP = 800;
 
 /**
  * Marca produtos ativos (`status: true`) com descrição curta para `enrichmentStatus: pending`,
  * para serem processados por `enrichActiveCatalogPendingProducts`.
+ * Por defeito só entram produtos com EAN/GTIN válido (checksum) em `codBarra`.
  */
 export async function markActiveProductsForShortDescriptionEnrichment(options?: {
   shortDescriptionMaxLen?: number;
   maxToMark?: number;
+  /** Se true (padrão), exige `codBarra` com GTIN válido. */
+  requireValidBarcode?: boolean;
 }): Promise<{ marked: number }> {
   const shortDescriptionMaxLen =
     options?.shortDescriptionMaxLen ?? DEFAULT_SHORT_LEN;
@@ -19,23 +24,33 @@ export async function markActiveProductsForShortDescriptionEnrichment(options?: 
     options?.maxToMark ?? DEFAULT_MAX_MARK,
     5000
   );
+  const requireValidBarcode = options?.requireValidBarcode !== false;
 
   const db = await connectToDatabase();
   const col = db.collection('products');
 
-  const docs = await col
-    .find({
-      status: true,
-      enrichmentStatus: { $nin: ['pending', 'running'] },
-      $expr: {
-        $lt: [
-          { $strLenCP: { $toString: { $ifNull: ['$description', ''] } } },
-          shortDescriptionMaxLen,
-        ],
-      },
-    })
-    .limit(maxToMark)
+  const baseFilter: Record<string, unknown> = {
+    status: true,
+    enrichmentStatus: { $nin: ['pending', 'running'] },
+    $expr: {
+      $lt: [
+        { $strLenCP: { $toString: { $ifNull: ['$description', ''] } } },
+        shortDescriptionMaxLen,
+      ],
+    },
+  };
+  if (requireValidBarcode) {
+    baseFilter.codBarra = { $exists: true, $nin: [null, ''] };
+  }
+
+  const scan = await col
+    .find(baseFilter)
+    .limit(requireValidBarcode ? SCAN_CAP : maxToMark)
     .toArray();
+
+  const docs = requireValidBarcode
+    ? scan.filter((d) => normalizeValidGtin(d.codBarra) != null).slice(0, maxToMark)
+    : scan;
 
   if (!docs.length) return { marked: 0 };
 
@@ -50,22 +65,34 @@ export async function markActiveProductsForShortDescriptionEnrichment(options?: 
 
 /**
  * Marca até N produtos ativos (sem filtro de descrição). Use com cuidado.
+ * Por defeito só com GTIN válido em `codBarra`.
  */
 export async function markActiveProductsForEnrichmentAll(options?: {
   maxToMark?: number;
+  requireValidBarcode?: boolean;
 }): Promise<{ marked: number }> {
   const maxToMark = Math.min(options?.maxToMark ?? DEFAULT_MAX_MARK, 5000);
+  const requireValidBarcode = options?.requireValidBarcode !== false;
 
   const db = await connectToDatabase();
   const col = db.collection('products');
 
-  const docs = await col
-    .find({
-      status: true,
-      enrichmentStatus: { $nin: ['pending', 'running'] },
-    })
-    .limit(maxToMark)
+  const filter: Record<string, unknown> = {
+    status: true,
+    enrichmentStatus: { $nin: ['pending', 'running'] },
+  };
+  if (requireValidBarcode) {
+    filter.codBarra = { $exists: true, $nin: [null, ''] };
+  }
+
+  const scan = await col
+    .find(filter)
+    .limit(requireValidBarcode ? SCAN_CAP : maxToMark)
     .toArray();
+
+  const docs = requireValidBarcode
+    ? scan.filter((d) => normalizeValidGtin(d.codBarra) != null).slice(0, maxToMark)
+    : scan;
 
   if (!docs.length) return { marked: 0 };
 
@@ -109,6 +136,20 @@ export async function enrichActiveCatalogPendingProducts(options?: {
     .toArray();
 
   for (const doc of docs) {
+    if (normalizeValidGtin(doc.codBarra) == null) {
+      await col.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            enrichmentStatus: 'skipped',
+            enrichment_notes:
+              'Fila: removido — sem EAN válido (use marcação com requireValidBarcode ou corrija codBarra).',
+            updatedAt: new Date(),
+          },
+        }
+      );
+      continue;
+    }
     await applyGeminiEnrichmentToCatalogDocument(col, doc);
   }
 

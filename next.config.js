@@ -32,6 +32,16 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '100mb',
     },
+    /**
+     * pdfjs-dist usa `import(workerSrc)` para o fake worker no Node; sem isto o ficheiro
+     * não entra no bundle serverless (Vercel `/var/task`) e falha com ESM MODULE_NOT_FOUND.
+     */
+    outputFileTracingIncludes: {
+      '/api/**': [
+        './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+        './node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+      ],
+    },
   },
   /** Defesa em profundidade (CHECKLIST_SEGURANCA Fase 4) — sem CSP estrita para não quebrar o app legacy. */
   async headers() {

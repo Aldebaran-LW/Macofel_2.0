@@ -5,6 +5,8 @@
  * Diagnóstico local (sem gravar BD): `npx tsx scripts/debug-pdf-relatorio.ts "caminho/para/o.pdf"`
  */
 
+import fs from 'fs';
+import { createRequire } from 'module';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { importRowSlug, parseBrDecimal } from './relatorio-estoque-xls';
@@ -107,7 +109,7 @@ export type ExtractPdfTextResult = { lines: string[]; truncated: boolean };
 export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<ExtractPdfTextResult> {
   ensurePdfJsNodePolyfills();
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const workerFile = path.join(
+  const workerLocal = path.join(
     process.cwd(),
     'node_modules',
     'pdfjs-dist',
@@ -115,8 +117,36 @@ export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<ExtractP
     'build',
     'pdf.worker.mjs'
   );
+  const workerMin = path.join(
+    process.cwd(),
+    'node_modules',
+    'pdfjs-dist',
+    'legacy',
+    'build',
+    'pdf.worker.min.mjs'
+  );
+  let workerFile: string | null = fs.existsSync(workerLocal)
+    ? workerLocal
+    : fs.existsSync(workerMin)
+      ? workerMin
+      : null;
+  if (!workerFile) {
+    try {
+      const req = createRequire(path.join(process.cwd(), 'package.json'));
+      workerFile = req.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    } catch {
+      workerFile = null;
+    }
+  }
+  if (!workerFile || !fs.existsSync(workerFile)) {
+    throw new Error(
+      'pdf.worker.mjs não encontrado (pdfjs-dist). Em deploy Vercel, inclua o worker em ' +
+        'next.config.js → experimental.outputFileTracingIncludes para /api/**.'
+    );
+  }
+  const workerSrc = pathToFileURL(workerFile).href;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = pathToFileURL(workerFile).href;
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = workerSrc;
 
   // Clonar: getDocument pode destacar o ArrayBuffer; chamadas seguintes falhariam.
   const raw = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -125,7 +155,8 @@ export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<ExtractP
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdf = await (pdfjsLib as any).getDocument({
     data,
-    useWorkerFetch: true,
+    /** No Node/serverless: mapas de fonte no processo principal (evita depender do worker para fetch). */
+    useWorkerFetch: false,
     standardFontDataUrl: `${PDFJS_CDN_BASE}/standard_fonts/`,
     cMapUrl: `${PDFJS_CDN_BASE}/cmaps/`,
     cMapPacked: true,
