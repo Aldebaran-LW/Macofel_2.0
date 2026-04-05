@@ -1,8 +1,17 @@
+# CLI / LangGraph (catalog-agent)
 langgraph==0.2.60
 langchain-google-genai==2.0.0
 pydantic==2.10.0
 motor==3.6.0
 python-dotenv==1.0.1
 temporalio==1.7.0
-httpx==0.27.0
 tqdm==4.66.0
+# HTTP + mesmo stack que render-catalog-import (webapp.py carrega main.py de lá)
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+pymongo==4.10.1
+pandas==2.2.3
+openpyxl==3.1.5
+xlrd==2.0.1
+httpx==0.28.1

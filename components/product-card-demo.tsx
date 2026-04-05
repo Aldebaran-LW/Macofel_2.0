@@ -7,12 +7,15 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { publicCategoryLabel } from '@/lib/category-display';
 
 interface Product {
   id: string;
   name: string;
   slug: string;
   price: number;
+  /** Preço a prazo (import LW / admin); opcional */
+  pricePrazo?: number | null;
   imageUrl?: string | null;
   category?: {
     name: string;
@@ -37,6 +40,7 @@ export default function ProductCardDemo({
   const { data: session } = useSession() ?? {};
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+  const categoryLabel = publicCategoryLabel(product.category?.name);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -120,15 +124,28 @@ export default function ProductCardDemo({
       </div>
       <div className="p-6">
         <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-          {product.category?.name || 'Geral'}
+          {categoryLabel || 'Geral'}
         </p>
         <h3 className="text-sm font-bold h-10 overflow-hidden line-clamp-2 mb-4">
           {product.name}
         </h3>
-        <div className="flex items-baseline gap-2 mb-6">
-          <span className="text-xl font-black text-slate-900">
-            R$ {product.price.toFixed(2).replace('.', ',')}
-          </span>
+        <div className="space-y-1 mb-6">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase text-slate-400">À vista</span>
+            <span className="text-xl font-black text-slate-900">
+              R$ {product.price.toFixed(2).replace('.', ',')}
+            </span>
+          </div>
+          {product.pricePrazo != null &&
+            product.pricePrazo > 0 &&
+            Number.isFinite(product.pricePrazo) && (
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase text-slate-400">A prazo</span>
+                <span className="text-base font-bold text-slate-700">
+                  R$ {product.pricePrazo.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+            )}
         </div>
         <button
           onClick={handleAddToCart}

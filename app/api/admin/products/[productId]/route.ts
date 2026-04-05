@@ -38,6 +38,7 @@ export async function PATCH(
       unidade,
       codBarra,
       marca,
+      subcategoria,
       status,
     } = body;
 
@@ -104,6 +105,12 @@ export async function PATCH(
     if (marca !== undefined) {
       updateData.marca =
         marca != null && String(marca).trim() !== '' ? String(marca).trim() : null;
+    }
+    if (subcategoria !== undefined) {
+      (updateData as any).subcategoria =
+        subcategoria != null && String(subcategoria).trim() !== ''
+          ? String(subcategoria).trim()
+          : null;
     }
     if (status !== undefined) {
       updateData.status = status === false || status === 'false' ? false : true;

@@ -1,5 +1,5 @@
 // Funções auxiliares para trabalhar com pedidos e produtos do MongoDB
-import { connectToDatabase } from './mongodb-native';
+import { connectToDatabase, isInactiveProductStatus } from './mongodb-native';
 import { ObjectId } from 'mongodb';
 
 // Enriquecer itens de pedido com produtos do MongoDB
@@ -18,7 +18,7 @@ export async function enrichOrderItems(orderItems: any[]) {
 
       const product = await productsCollection.findOne({ _id: productId });
       
-      if (!product) {
+      if (!product || isInactiveProductStatus(product.status)) {
         return { ...item, product: null };
       }
 
@@ -92,7 +92,7 @@ export async function getCartProductsForOrder(cartItems: any[]): Promise<Array<{
       }
 
       const product = await productsCollection.findOne({ _id: productId });
-      if (!product) {
+      if (!product || isInactiveProductStatus(product.status)) {
         return null;
       }
 

@@ -101,8 +101,10 @@ function ensurePdfJsNodePolyfills(): void {
   }
 }
 
+export type ExtractPdfTextResult = { lines: string[]; truncated: boolean };
+
 /** Agrupa itens do PDF.js por linha visual (Y) e ordena por X. */
-export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<string[]> {
+export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<ExtractPdfTextResult> {
   ensurePdfJsNodePolyfills();
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const workerFile = path.join(
@@ -130,10 +132,15 @@ export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<string[]
     wasmUrl: `${PDFJS_CDN_BASE}/wasm/`,
   }).promise;
   const out: string[] = [];
-  const maxChars = 20_000_000;
+  /** Limite defensivo (PDFs enormes); se excedido, páginas finais não entram e aparece aviso na importação. */
+  const maxChars = 80_000_000;
+  let truncated = false;
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    if (out.join('\n').length > maxChars) break;
+    if (out.join('\n').length > maxChars) {
+      truncated = true;
+      break;
+    }
     // eslint-disable-next-line no-await-in-loop
     const page = await pdf.getPage(pageNum);
     // eslint-disable-next-line no-await-in-loop
@@ -163,7 +170,7 @@ export async function extractPdfTextLines(buffer: ArrayBuffer): Promise<string[]
     }
   }
 
-  return out;
+  return { lines: out, truncated };
 }
 
 function isNoiseLine(line: string): boolean {
@@ -410,9 +417,15 @@ export async function parseRelatorioProdutosPdf(buffer: ArrayBuffer): Promise<{
   warnings: string[];
 }> {
   const warnings: string[] = [];
-  const lines = await extractPdfTextLines(buffer);
+  const { lines, truncated } = await extractPdfTextLines(buffer);
   const rows: RelatorioProdutoPdfRow[] = [];
   let skipped = 0;
+
+  if (truncated) {
+    warnings.push(
+      'PDF truncado no limite de texto: páginas no fim do ficheiro podem não ter sido lidas. Divida o PDF ou use exportação mais curta.'
+    );
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

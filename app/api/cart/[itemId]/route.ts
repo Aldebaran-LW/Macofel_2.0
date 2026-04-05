@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getAuthenticatedUserId } from '@/lib/get-authenticated-user-id';
-import { connectToDatabase } from '@/lib/mongodb-native';
+import { connectToDatabase, isInactiveProductStatus } from '@/lib/mongodb-native';
 import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +58,13 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Produto não encontrado' },
         { status: 404 }
+      );
+    }
+
+    if (isInactiveProductStatus(product.status)) {
+      return NextResponse.json(
+        { error: 'Este produto não está disponível para venda' },
+        { status: 400 }
       );
     }
 

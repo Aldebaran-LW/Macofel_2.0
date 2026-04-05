@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     const buf = await file.arrayBuffer();
-    const lines = await extractPdfTextLines(buf);
+    const { lines } = await extractPdfTextLines(buf);
     const text = lines.join('\n');
 
     return NextResponse.json({ text });

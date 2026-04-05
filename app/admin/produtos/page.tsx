@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import {
   Plus,
@@ -36,6 +38,7 @@ import {
   MAX_IMPORT_FILE_DESC,
   readJsonOrBodyLimitError,
 } from '@/lib/import-upload-limits';
+import { isMasterAdminRole } from '@/lib/permissions';
 
 interface Product {
   id: string;
@@ -72,7 +75,7 @@ interface CatalogImportPreviewSample {
   stock: number;
   price: number;
   slug: string;
-  source?: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf';
+  source?: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt';
   grupo?: string;
   marca?: string;
   barcode?: string;
@@ -85,6 +88,11 @@ interface CatalogImportPreviewSample {
 }
 
 export default function AdminProdutosPage() {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const catalogAiFileRef = useRef<HTMLInputElement>(null);
+  const [importCatalogAiUploading, setImportCatalogAiUploading] = useState(false);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +114,7 @@ export default function AdminProdutosPage() {
     unidade: '',
     codBarra: '',
     marca: '',
+    subcategoria: '',
     statusActive: true,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -117,15 +126,16 @@ export default function AdminProdutosPage() {
   const [importPreviewLoading, setImportPreviewLoading] = useState(false);
   const [importRunLoading, setImportRunLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<{
-    source: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf';
+    source: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt';
     totalRows: number;
     sample: Array<{
       code: string;
       name: string;
       stock: number;
       price: number;
+      pricePrazo?: number;
       slug: string;
-      source?: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf';
+      source?: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt';
       grupo?: string;
       marca?: string;
       barcode?: string;
@@ -159,6 +169,8 @@ export default function AdminProdutosPage() {
   const [filterCatalog, setFilterCatalog] = useState<'all' | 'active' | 'inactive'>('all');
   const [filterStock, setFilterStock] = useState<'all' | 'in_stock' | 'out'>('all');
   const [filterFeatured, setFilterFeatured] = useState<'all' | 'yes' | 'no'>('all');
+  const [filterMarca, setFilterMarca] = useState('');
+  const [filterSubcategoria, setFilterSubcategoria] = useState('');
 
   const [listPage, setListPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -174,14 +186,25 @@ export default function AdminProdutosPage() {
 
   useEffect(() => {
     setListPage(1);
-  }, [debouncedSearch, filterCategoryId, filterCatalog, filterStock, filterFeatured, pageSize]);
+  }, [
+    debouncedSearch,
+    filterCategoryId,
+    filterCatalog,
+    filterStock,
+    filterFeatured,
+    filterMarca,
+    filterSubcategoria,
+    pageSize,
+  ]);
 
   const filtersActive =
     filterSearch.trim() !== '' ||
     filterCategoryId !== 'all' ||
     filterCatalog !== 'all' ||
     filterStock !== 'all' ||
-    filterFeatured !== 'all';
+    filterFeatured !== 'all' ||
+    filterMarca.trim() !== '' ||
+    filterSubcategoria.trim() !== '';
 
   const clearFilters = () => {
     setFilterSearch('');
@@ -189,6 +212,8 @@ export default function AdminProdutosPage() {
     setFilterCatalog('all');
     setFilterStock('all');
     setFilterFeatured('all');
+    setFilterMarca('');
+    setFilterSubcategoria('');
   };
 
   const listQuery = useMemo(() => {
@@ -200,6 +225,8 @@ export default function AdminProdutosPage() {
     if (filterCatalog !== 'all') p.set('catalog', filterCatalog);
     if (filterStock !== 'all') p.set('stock', filterStock);
     if (filterFeatured !== 'all') p.set('featured', filterFeatured);
+    if (filterMarca.trim()) p.set('marca', filterMarca.trim());
+    if (filterSubcategoria.trim()) p.set('subcategoria', filterSubcategoria.trim());
     return p.toString();
   }, [
     listPage,
@@ -209,6 +236,8 @@ export default function AdminProdutosPage() {
     filterCatalog,
     filterStock,
     filterFeatured,
+    filterMarca,
+    filterSubcategoria,
   ]);
 
   useEffect(() => {
@@ -310,6 +339,7 @@ export default function AdminProdutosPage() {
       unidade: '',
       codBarra: '',
       marca: '',
+      subcategoria: '',
       statusActive: true,
     });
     setEditingProduct(null);
@@ -379,6 +409,7 @@ export default function AdminProdutosPage() {
         unidade: product.unidade ?? '',
         codBarra: product.codBarra ?? '',
         marca: product.marca ?? '',
+        subcategoria: (product as any).subcategoria ?? '',
         statusActive: product.status !== false,
       });
       setImagePreview(product.imageUrl || null);
@@ -427,6 +458,7 @@ export default function AdminProdutosPage() {
           unidade: formData.unidade.trim() || null,
           codBarra: formData.codBarra.trim() || null,
           marca: formData.marca.trim() || null,
+          subcategoria: formData.subcategoria.trim() || null,
           status: formData.statusActive,
         }),
       });
@@ -451,11 +483,56 @@ export default function AdminProdutosPage() {
     setImportResult(null);
     setImportUpsert(true);
     setImportRemoteEnrichAi(false);
+    setImportCatalogAiUploading(false);
+    if (catalogAiFileRef.current) catalogAiFileRef.current.value = '';
+  };
+
+  const handleCatalogImportWithAi = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (importFileTooLarge(file)) {
+      toast.error(`Ficheiro demasiado grande (máx. ${MAX_IMPORT_FILE_DESC})`);
+      e.target.value = '';
+      return;
+    }
+    setImportCatalogAiUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/admin/catalog/upload', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(
+          typeof data.error === 'string'
+            ? data.error
+            : `Erro ${res.status} ao enviar para o agente`
+        );
+        return;
+      }
+      toast.success(
+        typeof data.message === 'string' ? data.message : 'Ficheiro enviado ao pipeline de catálogo.'
+      );
+      if (isMasterAdminRole((session?.user as { role?: string })?.role)) {
+        setTimeout(() => router.push('/admin/estoque/produtos-pendentes'), 1200);
+      } else {
+        toast.info(
+          'Rascunhos ficam em revisão: um utilizador Master pode aprovar em Master → Produtos pendentes.'
+        );
+      }
+    } catch {
+      toast.error('Erro de rede ao enviar ficheiro');
+    } finally {
+      setImportCatalogAiUploading(false);
+      e.target.value = '';
+    }
   };
 
   const handleImportPreview = async () => {
     if (!importFile) {
-      toast.error('Selecione um ficheiro .xls, .xlsx, .pdf, .docx, .doc ou .rtf');
+      toast.error('Selecione um ficheiro .xls, .xlsx, .pdf, .docx, .doc, .rtf ou .txt');
       return;
     }
     setImportPreviewLoading(true);
@@ -479,8 +556,8 @@ export default function AdminProdutosPage() {
         return;
       }
       const src = data.source as string;
-      const previewSource: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf' =
-        src === 'pdf' || src === 'docx' || src === 'doc' || src === 'rtf' ? src : 'xls';
+      const previewSource: 'xls' | 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt' =
+        src === 'pdf' || src === 'docx' || src === 'doc' || src === 'rtf' || src === 'txt' ? src : 'xls';
       const previewRows = Number(data.totalRows);
       setImportPreview({
         source: previewSource,
@@ -503,7 +580,7 @@ export default function AdminProdutosPage() {
       toast.error(
         kind === 'remote'
           ? 'Selecione um ficheiro .xls ou .xlsx'
-          : 'Selecione um ficheiro .xls, .xlsx, .pdf, .docx, .doc ou .rtf'
+          : 'Selecione um ficheiro .xls, .xlsx, .pdf, .docx, .doc, .rtf ou .txt'
       );
       return;
     }
@@ -513,9 +590,9 @@ export default function AdminProdutosPage() {
         toast.error('O servidor dedicado só aceita Excel. Para PDF use a importação normal.');
         return;
       }
-      if (n.endsWith('.docx') || n.endsWith('.doc') || n.endsWith('.rtf')) {
+      if (n.endsWith('.docx') || n.endsWith('.doc') || n.endsWith('.rtf') || n.endsWith('.txt')) {
         toast.error(
-          'O servidor dedicado só aceita Excel. Para Word/RTF use a importação normal (nesta janela).'
+          'O servidor dedicado só aceita Excel. Para Word/RTF/TXT use a importação normal (nesta janela).'
         );
         return;
       }
@@ -754,6 +831,26 @@ export default function AdminProdutosPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Subcategoria</label>
+            <Input
+              value={filterSubcategoria}
+              onChange={(e) => setFilterSubcategoria(e.target.value)}
+              placeholder="Ex.: Conexões PVC"
+              className="h-9"
+              aria-label="Filtrar por subcategoria"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Marca</label>
+            <Input
+              value={filterMarca}
+              onChange={(e) => setFilterMarca(e.target.value)}
+              placeholder="Ex.: Tigre"
+              className="h-9"
+              aria-label="Filtrar por marca"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Catálogo</label>
@@ -1017,23 +1114,94 @@ export default function AdminProdutosPage() {
       >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Importar catálogo (Excel, PDF ou Word/RTF)</DialogTitle>
+            <DialogTitle>Importar catálogo (Excel, PDF, Word/RTF ou TXT)</DialogTitle>
           </DialogHeader>
+
+          <div className="space-y-6 border-b border-gray-100 pb-6 mb-2">
+            <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-6">
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full font-medium">
+                  Recomendado
+                </span>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Importar com enriquecimento (agente / pipeline)
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Envia o ficheiro para o Vercel Blob e notifica o{' '}
+                <strong>agente no Render</strong> (se <code className="text-xs bg-white/80 px-1 rounded">RENDER_CATALOG_AGENT_URL</code>{' '}
+                estiver definido) ou o processamento em segundo plano neste servidor. Inclui extração +
+                enriquecimento (Gemini) quando configurado no destino.
+                <br />
+                <strong>Depois verifique «Pendentes de revisão»</strong> antes de publicar no catálogo.
+              </p>
+              <input
+                ref={catalogAiFileRef}
+                type="file"
+                className="hidden"
+                accept=".xlsx,.xls,.pdf,.txt,.doc,.docx,.rtf"
+                onChange={(ev) => void handleCatalogImportWithAi(ev)}
+              />
+              <Button
+                type="button"
+                className="w-full h-12 text-base mt-4"
+                disabled={importCatalogAiUploading}
+                onClick={() => catalogAiFileRef.current?.click()}
+              >
+                {importCatalogAiUploading
+                  ? 'A enviar para o pipeline…'
+                  : 'Importar com agente / pipeline IA'}
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 p-6">
+              <h3 className="font-medium text-gray-900 mb-1">Importar direto (fluxo clássico)</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Pré-visualização e gravação imediata na base — secção abaixo (Prévia / Importar).
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  document
+                    .getElementById('catalog-import-classic-anchor')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  toast.message('Selecione o ficheiro abaixo e use Prévia ou Importar.');
+                }}
+              >
+                Ir para importação clássica
+              </Button>
+            </div>
+          </div>
+
           <div className="space-y-3 text-sm text-gray-600">
             <p>
               <strong>Excel:</strong> relatório de estoque (.xls / .xlsx) — código, nome, marca, quantidades e
-              valores.
+              valores. Ficheiros grandes:{' '}
+              <code className="text-[10px] bg-gray-100 px-1 rounded">
+                npx tsx scripts/split-xls-relatorio.ts &quot;ficheiro.xls&quot; 10 &quot;E:\Produtos exel&quot;
+              </code>{' '}
+              gera <code className="text-[10px]">_part01.xlsx</code> … com o mesmo cabeçalho.
             </p>
             <p>
-              <strong>Word / RTF:</strong> o mesmo layout de colunas que o Excel (Produto, Grupo, Marca, Estoque,
-              valores). Preferir <strong>tabela</strong> no documento; em .doc/.rtf o texto deve manter colunas
-              separadas por tab ou vários espaços.
+              <strong>Word / RTF / TXT:</strong> idealmente o mesmo layout de colunas que o Excel (Produto, Grupo,
+              Marca, Estoque, valores). Com relatório LW em texto vertical, <strong>Venda Vista</strong> e{' '}
+              <strong>Venda Prazo</strong> são lidos em colunas separadas (prévia: «À vista» / «A prazo»). Os{' '}
+              <code className="text-[10px]">_part*.txt</code> do <code className="text-[10px]">split-rtf-relatorio</code>{' '}
+              vêm em <strong>layout vertical</strong> (código e nome em linhas separadas); o import trata isso
+              automaticamente. RTF grandes:{' '}
+              <code className="text-[10px] bg-gray-100 px-1 rounded">
+                npx tsx scripts/split-rtf-relatorio.ts &quot;ficheiro.rtf&quot; 10 &quot;E:\&quot;
+              </code>
+              .
             </p>
             <p>
               <strong>PDF:</strong> exportação <em>Produtos / código de barras</em> do seu software, com{' '}
               <strong>texto que consiga copiar</strong> (PDF digitalizado não serve). Preço no site: coluna{' '}
-              <strong>Venda Vista</strong>; se estiver vazio, usa <strong>Venda Prazo</strong>. Categoria atribuída:{' '}
-              <strong>Importado PDF</strong>.
+              <strong>Venda Vista</strong>; se estiver vazio, usa <strong>Venda Prazo</strong>. A{' '}
+              <strong>macro</strong> vem do mapa de grupos quando existe coluna/grupo; no PDF típico (sem grupo)
+              usa-se a primeira macro da vitrine na base.
             </p>
             <p className="text-xs text-gray-500">Tamanho máximo por ficheiro neste ambiente: {MAX_IMPORT_FILE_DESC}.</p>
             {IS_VERCEL_STYLE_DEPLOY ? (
@@ -1046,18 +1214,20 @@ export default function AdminProdutosPage() {
             {importRemoteAvailable ? (
               <p className="text-xs text-blue-800 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
                 <strong>Importação no servidor dedicado:</strong> só Excel (útil para ficheiros grandes). PDF /
-                Word: use Prévia / Importar nesta janela (ou reduza o ficheiro na Vercel).
+                Word / TXT: use Prévia / Importar nesta janela; RTF enorme →{' '}
+                <code className="text-[10px]">split-rtf-relatorio</code>; Excel enorme →{' '}
+                <code className="text-[10px]">split-xls-relatorio</code>.
               </p>
             ) : importRemoteAvailable === false ? (
               <p className="text-xs text-gray-400">
-                Servidor dedicado não configurado — importação local (Excel, PDF, Word/RTF).
+                Servidor dedicado não configurado — importação local (Excel, PDF, Word/RTF, TXT).
               </p>
             ) : null}
-            <div>
+            <div id="catalog-import-classic-anchor">
               <label className="block text-sm font-medium text-gray-900 mb-1">Ficheiro</label>
               <Input
                 type="file"
-                accept=".xls,.xlsx,.pdf,.doc,.docx,.rtf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,text/rtf"
+                accept=".xls,.xlsx,.pdf,.doc,.docx,.rtf,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,text/rtf,text/plain"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f && importFileTooLarge(f)) {
@@ -1074,6 +1244,10 @@ export default function AdminProdutosPage() {
                 }}
               />
             </div>
+            <p className="text-[11px] text-gray-500 rounded-md bg-gray-50 border border-gray-100 px-2 py-1.5">
+              <strong>Macro:</strong> o <strong>Grupo</strong> do Excel/Word é mapeado automaticamente; PDF sem grupo
+              usa a primeira categoria macro da vitrine na base.
+            </p>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1163,7 +1337,8 @@ export default function AdminProdutosPage() {
                             <th className="px-2 py-1 text-left">Grupo</th>
                             <th className="px-2 py-1 text-left">Marca</th>
                             <th className="px-2 py-1 text-left">Qtd</th>
-                            <th className="px-2 py-1 text-left">Preço</th>
+                            <th className="px-2 py-1 text-left">À vista</th>
+                            <th className="px-2 py-1 text-left">A prazo</th>
                           </>
                         )}
                       </tr>
@@ -1192,6 +1367,11 @@ export default function AdminProdutosPage() {
                               </td>
                               <td className="px-2 py-1">{r.stock}</td>
                               <td className="px-2 py-1">R$ {r.price.toFixed(2)}</td>
+                              <td className="px-2 py-1">
+                                {r.pricePrazo != null && r.pricePrazo > 0
+                                  ? `R$ ${r.pricePrazo.toFixed(2)}`
+                                  : '—'}
+                              </td>
                             </>
                           )}
                         </tr>
@@ -1429,6 +1609,14 @@ export default function AdminProdutosPage() {
                     value={formData.marca}
                     onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
                     placeholder="Coluna Marca do Excel / edição manual"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subcategoria</label>
+                  <Input
+                    value={formData.subcategoria}
+                    onChange={(e) => setFormData({ ...formData, subcategoria: e.target.value })}
+                    placeholder="Coluna Grupo do Excel (filtro no catálogo)"
                   />
                 </div>
                 <div>

@@ -6,6 +6,7 @@ import {
   getRenderCatalogImportBaseUrl,
   getRenderCatalogImportSecret,
 } from '@/lib/render-catalog-import-env';
+import { resolveImportFallbackCategoryId } from '@/lib/import-fallback-category';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,22 @@ export async function POST(req: NextRequest) {
     const preserveRaw = incoming.get('preserve_stock_db');
     const preserveStockDb =
       preserveRaw === 'true' || preserveRaw === '1';
+    const categoryIdRaw = incoming.get('categoryId');
+    const categoryIdForm = typeof categoryIdRaw === 'string' ? categoryIdRaw.trim() : '';
+    const resolved = await resolveImportFallbackCategoryId(
+      categoryIdForm.length ? categoryIdForm : undefined
+    );
+    if (!resolved) {
+      return NextResponse.json(
+        {
+          error: categoryIdForm.length
+            ? 'Categoria (reserva) inválida ou não encontrada.'
+            : 'Nenhuma categoria macro na base. Crie as categorias da vitrine ou escolha uma reserva.',
+        },
+        { status: 400 }
+      );
+    }
+    const categoryId = resolved.id;
 
     const fd = new FormData();
     const fname = file instanceof File ? file.name : 'upload';
@@ -50,6 +67,7 @@ export async function POST(req: NextRequest) {
     fd.append('upsert', upsert ? 'true' : 'false');
     fd.append('enrich_ai', enrichAi ? 'true' : 'false');
     fd.append('preserve_stock_db', preserveStockDb ? 'true' : 'false');
+    fd.append('categoryId', categoryId);
 
     const timeoutMs = enrichAi ? REMOTE_TIMEOUT_ENRICH_MS : REMOTE_TIMEOUT_MS;
     const ctrl = new AbortController();

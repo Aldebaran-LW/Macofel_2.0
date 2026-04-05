@@ -35,6 +35,7 @@ interface Product {
   slug: string;
   description: string;
   price: number;
+  pricePrazo?: number | null;
   stock: number;
   imageUrl?: string;
   category: { name: string; slug: string };
@@ -137,6 +138,10 @@ export default function ProductPage() {
 
   const isOutOfStock = (product?.stock ?? 0) === 0;
   const installment = (product.price / 12).toFixed(2).replace('.', ',');
+  const hasPrazo =
+    product.pricePrazo != null &&
+    product.pricePrazo > 0 &&
+    Number.isFinite(product.pricePrazo);
 
   return (
     <div className="min-h-screen bg-white">
@@ -238,14 +243,38 @@ export default function ProductPage() {
 
             {/* Price */}
             <div className="bg-slate-50 rounded-2xl p-6 mb-6 border border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                À vista
+              </p>
               <div className="flex items-end gap-3 mb-2">
                 <span className="text-4xl md:text-5xl font-black text-slate-900">
                   R$ <span className="text-red-600">{product?.price?.toFixed?.(2).replace('.', ',')}</span>
                 </span>
               </div>
+              {hasPrazo && (
+                <div className="mb-3 pt-3 border-t border-slate-200">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    A prazo
+                  </p>
+                  <span className="text-2xl md:text-3xl font-black text-slate-800">
+                    R$ {product.pricePrazo!.toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
-                <span>ou <strong className="text-slate-700">12x</strong> de <strong className="text-slate-700">R$ {installment}</strong> sem juros</span>
-                <span className="text-emerald-600 font-bold">5% off no PIX</span>
+                {hasPrazo ? (
+                  <span className="text-emerald-600 font-bold">
+                    5% off no PIX sobre o valor à vista
+                  </span>
+                ) : (
+                  <>
+                    <span>
+                      ou <strong className="text-slate-700">12x</strong> de{' '}
+                      <strong className="text-slate-700">R$ {installment}</strong> sem juros
+                    </span>
+                    <span className="text-emerald-600 font-bold">5% off no PIX</span>
+                  </>
+                )}
               </div>
             </div>
 

@@ -45,6 +45,16 @@ function buildAdminProductWhere(searchParams: URLSearchParams): Prisma.ProductWh
   if (featured === 'yes') and.push({ featured: true });
   if (featured === 'no') and.push({ featured: false });
 
+  const marca = (searchParams.get('marca') ?? '').trim();
+  if (marca) {
+    and.push({ marca: { equals: marca, mode: 'insensitive' } });
+  }
+
+  const subcategoria = (searchParams.get('subcategoria') ?? '').trim();
+  if (subcategoria) {
+    and.push({ subcategoria: { equals: subcategoria, mode: 'insensitive' } });
+  }
+
   return and.length ? { AND: and } : {};
 }
 
@@ -94,6 +104,8 @@ export async function GET(req: NextRequest) {
       unidade: p.unidade ?? null,
       codBarra: p.codBarra ?? null,
       marca: p.marca ?? null,
+      subcategoria: (p as any).subcategoria ?? null,
+      origin: (p as any).origin ?? null,
       status: p.status,
       category: p.category
         ? { id: p.category.id, name: p.category.name }
@@ -158,6 +170,7 @@ export async function POST(req: NextRequest) {
       unidade,
       codBarra,
       marca,
+      subcategoria,
       status,
     } = body;
 
@@ -209,6 +222,8 @@ export async function POST(req: NextRequest) {
         : null;
     const marcaStr =
       marca != null && String(marca).trim() !== '' ? String(marca).trim() : null;
+    const subcategoriaStr =
+      subcategoria != null && String(subcategoria).trim() !== '' ? String(subcategoria).trim() : null;
     const statusBool = status === false || status === 'false' ? false : true;
 
     const product = await mongoPrisma.product.create({
@@ -232,6 +247,8 @@ export async function POST(req: NextRequest) {
         unidade: unidadeStr,
         codBarra: codBarraStr,
         marca: marcaStr,
+        subcategoria: subcategoriaStr,
+        origin: 'manual',
         status: statusBool,
       },
       include: { category: true },

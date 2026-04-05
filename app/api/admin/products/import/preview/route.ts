@@ -13,6 +13,7 @@ import {
   pdfRowToCatalogPrice,
 } from '@/lib/relatorio-produtos-pdf';
 import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
+import { resolveImportFallbackCategoryId } from '@/lib/import-fallback-category';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,9 +33,26 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData();
     const file = form.get('file');
+    const categoryIdRaw = form.get('categoryId');
+    const categoryIdForm = typeof categoryIdRaw === 'string' ? categoryIdRaw.trim() : '';
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: 'Envie o ficheiro no campo file' }, { status: 400 });
     }
+
+    const resolved = await resolveImportFallbackCategoryId(
+      categoryIdForm.length ? categoryIdForm : undefined
+    );
+    if (!resolved) {
+      return NextResponse.json(
+        {
+          error: categoryIdForm.length
+            ? 'Categoria (reserva) inválida ou não encontrada.'
+            : 'Nenhuma categoria macro na base. Crie as categorias da vitrine ou escolha uma reserva.',
+        },
+        { status: 400 }
+      );
+    }
+    const categoryId = resolved.id;
 
     const fname = file instanceof File ? file.name : 'upload';
     if (importFileTooLarge(file)) {
@@ -63,6 +81,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         source: 'pdf',
+        categoryId,
+        fallbackCategoryAuto: !resolved.usedExplicit,
         totalRows: rows.length,
         previewCount: sample.length,
         sample,
@@ -79,6 +99,7 @@ export async function POST(req: NextRequest) {
         marca: r.marca,
         stock: r.stock,
         price: r.price,
+        pricePrazo: r.pricePrazo > 0 ? r.pricePrazo : undefined,
         slug: importRowSlug(r.code, r.name),
         sheet: r.sheetName,
         row: r.rowIndex,
@@ -87,6 +108,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         source,
+        categoryId,
+        fallbackCategoryAuto: !resolved.usedExplicit,
         totalRows: rows.length,
         previewCount: sample.length,
         sample,
@@ -102,6 +125,7 @@ export async function POST(req: NextRequest) {
       marca: r.marca,
       stock: r.stock,
       price: r.price,
+      pricePrazo: r.pricePrazo > 0 ? r.pricePrazo : undefined,
       slug: importRowSlug(r.code, r.name),
       sheet: r.sheetName,
       row: r.rowIndex,
@@ -110,6 +134,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       source: 'xls',
+      categoryId,
+      fallbackCategoryAuto: !resolved.usedExplicit,
       totalRows: rows.length,
       previewCount: sample.length,
       sample,

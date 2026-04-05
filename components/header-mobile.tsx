@@ -33,7 +33,7 @@ export default function HeaderMobile() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/categories')
+    fetch('/api/categories?storefront=1')
       .then((res) => (res.ok ? res.json() : []))
       .then((list: Array<{ id: string; name: string; slug: string }>) => {
         if (cancelled || !Array.isArray(list)) return;

@@ -11,6 +11,7 @@ interface Product {
   name: string;
   slug: string;
   price: number;
+  pricePrazo?: number | null;
   imageUrl?: string | null;
   secondaryImageUrl?: string | null;
   category?: { name: string } | null;
@@ -37,6 +38,8 @@ export default function ProductCardV2({
   const [isHovered, setIsHovered] = useState(false);
   const pixPrice = (product.price * 0.9).toFixed(2).replace('.', ',');
   const installment = (product.price / 12).toFixed(2).replace('.', ',');
+  const hasPrazo =
+    product.pricePrazo != null && product.pricePrazo > 0 && Number.isFinite(product.pricePrazo);
 
   const hasSecondaryImage = Boolean(secondaryImageUrl && secondaryImageUrl !== product.imageUrl);
 
@@ -115,13 +118,26 @@ export default function ProductCardV2({
       </div>
 
       {/* Preço */}
-      <div className="mb-4">
-        <p className="text-xl font-black text-emerald-600">
-          R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
-        </p>
-        <p className="text-xs text-gray-500">
-          12x de R$ {installment} no cartão s/ juros
-        </p>
+      <div className="mb-4 space-y-1">
+        {hasPrazo ? (
+          <>
+            <p className="text-lg font-black text-gray-900">
+              À vista R$ {product.price.toFixed(2).replace('.', ',')}
+            </p>
+            <p className="text-base font-bold text-emerald-700">
+              A prazo R$ {product.pricePrazo!.toFixed(2).replace('.', ',')}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-xl font-black text-emerald-600">
+              R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
+            </p>
+            <p className="text-xs text-gray-500">
+              12x de R$ {installment} no cartão s/ juros
+            </p>
+          </>
+        )}
       </div>
 
       {/* Botão Comprar */}

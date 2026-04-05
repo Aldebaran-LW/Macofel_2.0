@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { AlertTriangle, ArrowLeftRight, FileUp, LineChart } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, ClipboardList, FileUp, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
   { slug: 'alertas', label: 'Alertas', icon: AlertTriangle },
   { slug: 'movimentacoes', label: 'Movimentações', icon: ArrowLeftRight },
   { slug: 'importacao', label: 'Importação', icon: FileUp },
+  { slug: 'produtos-pendentes', label: 'Pendentes (IA)', icon: ClipboardList },
   { slug: 'relatorios', label: 'Relatórios', icon: LineChart },
 ] as const;
 

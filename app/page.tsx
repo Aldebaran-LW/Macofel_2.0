@@ -71,18 +71,14 @@ function getFeaturedSecondaryImage(categoryName?: string | null) {
 }
 
 async function ProductsByCategory() {
-  // Buscar categorias reais do banco de dados
-  const db = await import('@/lib/mongodb-native').then(m => m.connectToDatabase());
-  const categoriesCollection = db.collection('categories');
-  const allCategories = await categoriesCollection.find({}).toArray();
-  
-  // Mapear categorias desejadas com slugs do banco
+  // Categorias da vitrine com slugs canónicos + aliases legados.
   const categoryMapping: Record<string, string[]> = {
     'Cimento & Argamassa': ['cimento-argamassa', 'cimento'],
+    'Tijolos & Blocos': ['tijolos-blocos'],
+    'Tintas & Acessórios': ['tintas-acessorios', 'tintas'],
     'Ferramentas': ['ferramentas'],
-    'Elétrica': ['material-eletrico', 'eletrica', 'material eletrico'],
     'Hidráulica': ['material-hidraulico', 'hidraulica', 'material hidraulico'],
-    'Tintas & Vernizes': ['tintas-acessorios', 'tintas'],
+    'Elétrica': ['material-eletrico', 'eletrica', 'material eletrico'],
   };
 
   // Buscar produtos por categoria
@@ -99,18 +95,7 @@ async function ProductsByCategory() {
             break;
           }
         }
-        
-        // Se não encontrou por slug, buscar por nome da categoria nos produtos
-        if (products.length === 0) {
-          const allProducts = await getProducts({ limit: 50 });
-          const categoryNameLower = categoryName.toLowerCase();
-          products = (allProducts.products ?? []).filter((p: any) => {
-            const productCategoryName = p.category?.name?.toLowerCase() || '';
-            return productCategoryName.includes(categoryNameLower.split('&')[0].trim()) ||
-                   productCategoryName.includes(categoryNameLower.split('e')[0].trim());
-          }).slice(0, 8);
-        }
-        
+
         const mappedProducts = products.map((product: any) => ({
           id: product.id,
           name: product.name,
@@ -285,12 +270,25 @@ function ProductCard({ product }: { product: any }) {
 
 
 function CategoryCards() {
+  /** Slugs = coleção `categories` (macros); nomes amigáveis para o carrossel. */
   const categories = [
     {
       name: 'Cimento & Argamassa',
-      slug: 'cimento',
+      slug: 'cimento-argamassa',
       image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop',
       color: 'from-slate-800',
+    },
+    {
+      name: 'Tijolos & Blocos',
+      slug: 'tijolos-blocos',
+      image: 'https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?q=80&w=600&auto=format&fit=crop',
+      color: 'from-orange-900',
+    },
+    {
+      name: 'Tintas & Acessórios',
+      slug: 'tintas-acessorios',
+      image: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=80&w=600&auto=format&fit=crop',
+      color: 'from-purple-900',
     },
     {
       name: 'Ferramentas',
@@ -299,40 +297,16 @@ function CategoryCards() {
       color: 'from-red-900',
     },
     {
-      name: 'Elétrica',
-      slug: 'eletrica',
-      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=600&auto=format&fit=crop',
-      color: 'from-amber-900',
-    },
-    {
       name: 'Hidráulica',
-      slug: 'hidraulica',
+      slug: 'material-hidraulico',
       image: 'https://macofel-tres.lwdigitalforge.com/api/images/69b16bb18ca4517796426f87',
       color: 'from-blue-900',
     },
     {
-      name: 'Acabamentos',
-      slug: 'acabamentos',
-      image: 'https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?q=80&w=600&auto=format&fit=crop',
-      color: 'from-emerald-900',
-    },
-    {
-      name: 'Tintas & Vernizes',
-      slug: 'tintas',
-      image: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=80&w=600&auto=format&fit=crop',
-      color: 'from-purple-900',
-    },
-    {
-      name: 'Iluminação',
-      slug: 'iluminacao',
-      image: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?q=80&w=600&auto=format&fit=crop',
-      color: 'from-yellow-900',
-    },
-    {
-      name: 'Jardinagem',
-      slug: 'jardim',
-      image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?q=80&w=600&auto=format&fit=crop',
-      color: 'from-green-900',
+      name: 'Elétrica',
+      slug: 'material-eletrico',
+      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=600&auto=format&fit=crop',
+      color: 'from-amber-900',
     },
   ];
 
@@ -406,7 +380,6 @@ export default async function HomePageDecarStyle() {
       <ServiceBadges />
       <CategoryCards />
       <FeaturedProducts />
-      <ProductsByCategory />
       <StoreFooter />
       <StoreWhatsAppFloat />
     </div>

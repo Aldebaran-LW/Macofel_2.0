@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { importFileTooLarge, MAX_IMPORT_FILE_DESC } from '@/lib/import-upload-limits';
+import ImportacaoEstoqueModal, {
+  IMPORTACAO_ESTOQUE_CLASSICA_ID,
+} from '@/components/importacao-estoque-modal';
 
 type Source = 'csv' | 'xlsx' | 'xml' | 'pdf';
 
@@ -589,13 +592,15 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
       <div>
         <h1 className="text-3xl font-bold">Importação de estoque</h1>
         <p className="text-gray-600 mt-1">
-          CSV/XLSX/XML (NF-e). Faz prévia, tenta reconhecer por ObjectId ou mapeamento, e permite resolver conflitos.
+          Catálogo com agente IA (acima) ou importação clássica de movimentos de estoque (NF-e, CSV, XLSX, PDF).
         </p>
       </div>
 
       {showSubnav ? <StockSubnav /> : null}
 
-      <Card className="p-4 space-y-4">
+      <ImportacaoEstoqueModal />
+
+      <Card id={IMPORTACAO_ESTOQUE_CLASSICA_ID} className="p-4 space-y-4 scroll-mt-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <div className="text-sm font-medium">Fonte</div>

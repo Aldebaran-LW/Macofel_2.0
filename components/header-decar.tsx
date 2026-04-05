@@ -109,7 +109,7 @@ export default function HeaderDecar() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch('/api/categories?storefront=1');
       if (res.ok) {
         const data = await res.json();
         setCategories(data?.slice(0, 8) ?? []);
