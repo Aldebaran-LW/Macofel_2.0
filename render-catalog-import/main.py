@@ -3,7 +3,7 @@ Macofel Catalog Agent — serviço FastAPI na Render (catálogo + MongoDB).
 
 Pipeline POST /api/import (chamado pelo Next após upload no Vercel Blob):
   1. Baixar o ficheiro com httpx (header Authorization Bearer se `blobReadToken` no JSON).
-  2. Parse Excel (.xls/.xlsx) via `parse_excel_bytes` → `relatorio_xlsx.parse_relatorio_sheet`.
+  2. Parse Excel (.xls/.xlsx) ou PDF LW via `parse_excel_bytes` / `relatorio_pdf.parse_relatorio_produtos_pdf_bytes`.
   3. Limitar linhas com env MAX_CATALOG_BATCH (1–100, default 50).
   4. Enriquecimento Gemini opcional (`importType` full-catalog + chave API).
   5. Inserir documentos em `products` com `status: pending_review`.
@@ -38,6 +38,7 @@ from pymongo.database import Database
 
 from gemini_enrich import enrich_catalog_rows, gemini_configured
 from grupo_macro_categoria import macro_category_slug_for_grupo
+from relatorio_pdf import parse_relatorio_produtos_pdf_bytes
 from relatorio_xlsx import import_row_slug, parse_relatorio_sheet
 
 app = FastAPI(title="Macofel Catalog Agent", version="1.0.0")
@@ -412,20 +413,24 @@ async def start_import_from_blob(
 
     Corpo JSON: fileUrl, fileName, importType (default full-catalog), userId opcional,
     blobReadToken opcional (Bearer ao Blob privado).
+
+    Formatos: .xls / .xlsx (parse interno) ou .pdf (pypdf + heurística alinhada ao relatório LW).
     """
     url = (data.fileUrl or "").strip()
     fname = (data.fileName or "").strip()
     if not url or not fname:
         raise HTTPException(400, "fileUrl e fileName são obrigatórios")
 
-    # 1. Baixar o arquivo do Vercel Blob
+    filename_lower = fname.lower()
+
+    # 1. Baixar o arquivo do Vercel Blob (timeout maior para PDFs grandes)
     headers: dict[str, str] = {}
     tok = (data.blobReadToken or "").strip()
     if tok:
         headers["Authorization"] = f"Bearer {tok}"
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(180.0)) as client:
             resp = await client.get(url, headers=headers)
             resp.raise_for_status()
             file_bytes = resp.content
@@ -437,35 +442,41 @@ async def start_import_from_blob(
     except httpx.RequestError as e:
         raise HTTPException(502, f"Erro de rede ao baixar ficheiro: {e}") from e
 
-    lower = fname.lower()
-    if not re.search(r"\.(xlsx|xls)$", lower):
-        raise HTTPException(
-            415,
-            "Neste serviço, /api/import aceita apenas .xls / .xlsx (relatório tipo Macofel). "
-            "Para PDF/Word use o processamento no Next.js.",
-        )
-
     if len(file_bytes) > 100 * 1024 * 1024:
         raise HTTPException(413, "Ficheiro acima de 100 MB")
 
     try:
-        # 2. Parser já definido neste módulo: tupla (rows, warnings), não dict
-        try:
-            rows, warnings = await asyncio.to_thread(parse_excel_bytes, file_bytes)
-        except Exception as e:  # noqa: BLE001
-            raise HTTPException(400, f"Erro ao ler Excel: {e}") from e
+        rows: list[dict[str, Any]]
+        warnings: list[str]
+
+        if filename_lower.endswith((".xls", ".xlsx")):
+            try:
+                rows, warnings = await asyncio.to_thread(parse_excel_bytes, file_bytes)
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(400, f"Erro ao ler Excel: {e}") from e
+        elif filename_lower.endswith(".pdf"):
+            try:
+                rows, warnings = await asyncio.to_thread(
+                    parse_relatorio_produtos_pdf_bytes, file_bytes
+                )
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(400, f"Erro ao ler PDF: {e}") from e
+        else:
+            raise HTTPException(
+                status_code=415,
+                detail="Formato suportado: .xls, .xlsx ou .pdf (relatório tipo Macofel / LW).",
+            )
 
         if not rows:
             return {
                 "status": "ok",
                 "importId": f"import-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
-                "message": "Nenhuma linha válida encontrada",
+                "message": "Nenhuma linha válida encontrada no arquivo",
                 "processed": 0,
                 "pending_review": 0,
                 "warnings": list(warnings),
             }
 
-        # 3. Limite de lote (env MAX_CATALOG_BATCH via _max_catalog_batch)
         max_batch = _max_catalog_batch()
         if len(rows) > max_batch:
             rows = rows[:max_batch]
@@ -473,7 +484,6 @@ async def start_import_from_blob(
                 f"Limitado a {max_batch} linhas (MAX_CATALOG_BATCH). Total parseado: maior."
             ]
 
-        # 4. Pipeline atual: Gemini opcional + gravação pending_review no MongoDB
         want_ai = data.importType == "full-catalog" and gemini_configured()
         if want_ai and rows:
             rows, ai_warnings = await asyncio.to_thread(enrich_catalog_rows, rows)
