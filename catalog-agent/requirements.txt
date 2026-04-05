@@ -10,7 +10,8 @@ tqdm==4.66.0
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 python-multipart==0.0.12
-pymongo==4.10.1
+# motor 3.6.x exige pymongo>=4.9,<4.10 (4.10.1 quebra o resolver do pip)
+pymongo==4.9.2
 pandas==2.2.3
 openpyxl==3.1.5
 xlrd==2.0.1
