@@ -13,6 +13,8 @@ export type RelatorioEstoqueColMap = {
   estoqueCol: number;
   vlCustoCol: number;
   vlVendaCol: number;
+  /** -1 se a folha não tiver coluna de valor a prazo */
+  vlVendaPrazoCol: number;
 };
 
 export type RelatorioEstoqueRow = {
@@ -25,7 +27,11 @@ export type RelatorioEstoqueRow = {
   stock: number;
   vlCusto: number;
   vlVenda: number;
+  vlVendaPrazo: number;
+  /** Preço unitário à vista (catálogo) */
   price: number;
+  /** Preço unitário a prazo quando a folha traz a coluna */
+  pricePrazo: number;
 };
 
 export function slugifyProductKey(input: string): string {
@@ -54,7 +60,8 @@ function rowAsArray(row: unknown): string[] {
   return row.map((c) => String(c ?? '').trim());
 }
 
-function findHeaderRowIndex(rows: string[][]): number {
+/** Índice da linha de cabeçalho (Produto, Grupo, Marca, Estoque…); -1 se não encontrar. */
+export function findRelatorioEstoqueHeaderRowIndex(rows: string[][]): number {
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (r.length < 6) continue;
@@ -137,9 +144,28 @@ function buildColMap(header: string[], sampleRow?: string[]): RelatorioEstoqueCo
   const vlCustoCol = header.findIndex(
     (v) => v.includes('Vl.Est.Custo') || v.toLowerCase().includes('vl.est.custo')
   );
-  const vlVendaCol = header.findIndex(
-    (v) => v.includes('Vl.Est.Venda') || v.toLowerCase().includes('vl.est.venda')
-  );
+  const vlVendaPrazoCol = header.findIndex((v) => {
+    const tl = String(v ?? '')
+      .trim()
+      .toLowerCase();
+    return (
+      tl.includes('venda prazo') ||
+      tl.includes('vl.est.venda prazo') ||
+      tl.includes('vl.est.prazo') ||
+      tl.includes('vlest.vendaprazo')
+    );
+  });
+  const vlVendaCol = header.findIndex((v) => {
+    const t = String(v ?? '').trim();
+    const tl = t.toLowerCase();
+    if (tl.includes('prazo')) return false;
+    return (
+      t.includes('Vl.Est.Venda') ||
+      tl.includes('vl.est.venda') ||
+      tl.includes('venda vista') ||
+      tl === 'venda vista'
+    );
+  });
 
   if (estoqueCol < 0) return null;
 
@@ -154,6 +180,7 @@ function buildColMap(header: string[], sampleRow?: string[]): RelatorioEstoqueCo
     estoqueCol,
     vlCustoCol,
     vlVendaCol,
+    vlVendaPrazoCol,
   };
 }
 
@@ -199,16 +226,41 @@ export function catalogUnitPrice(stock: number, vlVenda: number, vlCusto: number
 }
 
 /**
+ * Relatório LW «Produtos / código de barras»: colunas Custo e Venda Vista são **unitárias** por artigo,
+ * não «valor total em estoque». O catálogo deve usar Venda Vista (à vista) tal como vem na folha.
+ */
+export function catalogUnitPriceLwBarcode(_stock: number, vlVenda: number, vlCusto: number): number {
+  void _stock;
+  const vv = Number.isFinite(vlVenda) && vlVenda > 0 ? vlVenda : 0;
+  if (vv > 0) return Math.max(0, Math.round(vv * 10000) / 10000);
+  const vc = Number.isFinite(vlCusto) && vlCusto > 0 ? vlCusto : 0;
+  return Math.max(0, Math.round(vc * 10000) / 10000);
+}
+
+/** LW: coluna «Venda Prazo» também é unitária por artigo (como a vista). */
+export function catalogPrazoUnitLwBarcode(_stock: number, vlVendaPrazo: number): number {
+  void _stock;
+  const v = Number.isFinite(vlVendaPrazo) && vlVendaPrazo > 0 ? vlVendaPrazo : 0;
+  return Math.max(0, Math.round(v * 10000) / 10000);
+}
+
+export type ParseRelatorioEstoqueSheetOpts = {
+  /** LW código de barras / produtos: Venda Vista = preço unitário à vista. */
+  vendaVistaIsUnitPrice?: boolean;
+};
+
+/**
  * Matriz de células (ex.: folha Excel ou tabela Word) com o mesmo cabeçalho «Relação de estoque».
  */
 export function parseRelatorioEstoqueFromSheetRows(
   rows: string[][],
-  sheetName: string
+  sheetName: string,
+  opts?: ParseRelatorioEstoqueSheetOpts
 ): { rows: RelatorioEstoqueRow[]; warnings: string[] } {
   const warnings: string[] = [];
   const out: RelatorioEstoqueRow[] = [];
 
-  const hi = findHeaderRowIndex(rows);
+  const hi = findRelatorioEstoqueHeaderRowIndex(rows);
   if (hi < 0) {
     warnings.push(`Folha ignorada (sem cabeçalho esperado): ${sheetName}`);
     return { rows: out, warnings };
@@ -256,10 +308,22 @@ export function parseRelatorioEstoqueFromSheetRows(
 
     const vlCusto = pickMoney(colMap.vlCustoCol);
     const vlVenda = pickMoney(colMap.vlVendaCol);
+    const vlVendaPrazoRaw =
+      colMap.vlVendaPrazoCol >= 0 ? pickMoney(colMap.vlVendaPrazoCol) : NaN;
 
     const vc = Number.isFinite(vlCusto) ? vlCusto : 0;
     const vv = Number.isFinite(vlVenda) ? vlVenda : 0;
-    const price = catalogUnitPrice(stock, vv, vc);
+    const vvp = Number.isFinite(vlVendaPrazoRaw) ? vlVendaPrazoRaw : 0;
+
+    const price = opts?.vendaVistaIsUnitPrice
+      ? catalogUnitPriceLwBarcode(stock, vv, vc)
+      : catalogUnitPrice(stock, vv, vc);
+
+    const pricePrazo = opts?.vendaVistaIsUnitPrice
+      ? catalogPrazoUnitLwBarcode(stock, vvp)
+      : vvp > 0
+        ? Math.max(0, deriveUnitPrice(stock, vvp, 0))
+        : 0;
 
     out.push({
       sheetName,
@@ -271,7 +335,9 @@ export function parseRelatorioEstoqueFromSheetRows(
       stock,
       vlCusto: vc,
       vlVenda: vv,
+      vlVendaPrazo: vvp,
       price,
+      pricePrazo,
     });
   }
 
