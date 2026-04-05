@@ -1,0 +1,549 @@
+================================================================================
+  MACOFEL 2.0 — CATÁLOGO, IMPORTAÇÃO E AGENTE (AUTOMATION)
+  Documento em texto: PARTE I = ambiente local e fluxos; PARTE II = código
+  (inventário + reprodução integral de módulos centrais).
+  Complementa DOC_MACOFEL_PDV_LOCAL_E_CODIGO.txt (visão global do site).
+================================================================================
+
+
+################################################################################
+# PARTE I — LOCAL, DADOS E FLUXOS DE CATÁLOGO / IMPORTAÇÃO (COMPLETO)
+################################################################################
+
+## I.1 Visão geral
+  O catálogo público lê produtos e categorias no MongoDB. A listagem típica usa
+  lib/mongodb-native.ts (driver nativo). O admin importa Excel/PDF/Word (e fluxos
+  agendados) para criar ou atualizar produtos; grupo do Excel mapeia para
+  categoria macro via lib/grupo-macro-categoria.ts; o texto do grupo fica em
+  Product.subcategoria para filtros.
+
+## I.2 Modelo mental
+  • Product (Mongo): slug, codigo, name, price, pricePrazo, stock, categoryId,
+    marca, subcategoria, status, featured, imageUrl(s), codBarra, etc.
+  • Category: macros da vitrine (slugs alinhados a STOREFRONT_CATEGORY_SLUG_ORDER).
+  • Catálogo inativo: status false ou valores em INACTIVE_STATUS_VALUES
+    (inclui pending_review / rejected para rascunhos do agente).
+
+## I.3 APIs públicas de catálogo
+  Protegidas por lib/api-catalog-guard.ts (same-origin, PDV_API_KEY, hosts).
+  • GET /api/products — paginação, filtros, sort
+  • GET /api/products/[slug]
+  • GET /api/products/filters
+  • GET /api/categories — ?storefront=1 filtra ordem da vitrine
+
+## I.4 Importação manual (admin)
+  • POST app/api/admin/products/import — multipart; categoryId opcional no form;
+    resolve fallback com resolveImportFallbackCategoryId.
+  • Parsers: lib/relatorio-estoque-xls.ts, relatorio-estoque-doc-word.ts,
+    relatorio-produtos-pdf.ts
+  • Escrita: lib/product-relatorio-import.ts — runRelatorioProductImport,
+    runPdfRelatorioProductImport, runProductCatalogImport (categoryId obrigatório).
+  • Pré-visualização: app/api/admin/products/import/preview/route.ts
+  • Limites de tamanho: lib/import-upload-limits.ts (Vercel ~4 MB por defeito).
+
+## I.5 Pipeline do «catalog agent» (branch / automação)
+  Rotas típicas sob app/api/admin/catalog/:
+  • import — inicia pipeline (URL ou fluxo interno)
+  • upload — @vercel/blob para ficheiros grandes
+  • process — processamento em background; header x-catalog-secret =
+    CATALOG_INTERNAL_SECRET
+  • pending — listar rascunhos pending_review
+  • approve/[id], reject/[id] — revisão humana
+  Lógica: lib/catalog-import-pipeline.ts, lib/catalog-pending-mongo.ts,
+  lib/catalog-draft-promote.ts (promove rascunho → Product Prisma e apaga draft).
+
+## I.6 Variáveis de ambiente específicas (servidor)
+  Ver env.ts no repositório:
+  • GEMINI_API_KEY
+  • CATALOG_AGENT_GEMINI_MODEL (opcional)
+  • MAX_CATALOG_BATCH (default 50, cap 100)
+  • CATALOG_INTERNAL_SECRET — /api/admin/catalog/process
+
+  Vercel Blob (upload): credenciais do pacote @vercel/blob (variáveis que a
+  plataforma injeta ou BLOB_READ_WRITE_TOKEN conforme documentação Vercel).
+
+## I.7 Ferramentas externas / Python
+  • catalog-agent/ — agente IA (Python) e integração com Mongo.
+  • render-catalog-import/ — serviço de import no Render (README na pasta).
+  • scripts/split-xls-relatorio.ts, split-rtf-relatorio.ts — ficheiros grandes.
+
+## I.8 Deploy recomendado para o agente
+  Jobs longos e ficheiros grandes: preferir Railway/Render/worker dedicado em vez
+  de só Vercel serverless; o site pode continuar na Vercel.
+
+## I.9 Páginas UI relacionadas
+  • /catalogo, /produto/[slug]
+  • /admin/produtos — importação clássica
+  • /admin/master/produtos-pendentes — fila de revisão (quando existir no branch)
+
+
+################################################################################
+# PARTE II — CÓDIGO (INVENTÁRIO + TEXTO INTEGRAL DE MÓDULOS CENTRAIS)
+################################################################################
+
+## II.1 Rotas API mais relevantes para catálogo / import / agente
+app/api/products/route.ts
+app/api/products/[slug]/route.ts
+app/api/products/filters/route.ts
+app/api/categories/route.ts
+app/api/admin/products/route.ts
+app/api/admin/products/[productId]/route.ts
+app/api/admin/products/import/route.ts
+app/api/admin/products/import/preview/route.ts
+app/api/admin/products/import/remote/route.ts
+app/api/admin/products/import/remote-available/route.ts
+app/api/admin/catalog/import/route.ts
+app/api/admin/catalog/upload/route.ts
+app/api/admin/catalog/process/route.ts
+app/api/admin/catalog/pending/route.ts
+app/api/admin/catalog/approve/[id]/route.ts
+app/api/admin/catalog/reject/[id]/route.ts
+app/api/admin/stock/extract-pdf-text/route.ts
+
+## II.2 Módulos lib diretamente ligados ao catálogo / import
+lib/mongodb-native.ts
+lib/mongodb.ts
+lib/api-catalog-guard.ts
+lib/storefront-categories.ts
+lib/import-fallback-category.ts
+lib/import-upload-limits.ts
+lib/grupo-macro-categoria.ts
+lib/relatorio-estoque-xls.ts
+lib/relatorio-estoque-doc-word.ts
+lib/relatorio-produtos-pdf.ts
+lib/product-relatorio-import.ts
+lib/catalog-import-pipeline.ts
+lib/catalog-pending-mongo.ts
+lib/catalog-draft-promote.ts
+lib/category-display.ts
+lib/category-hierarchy.ts
+lib/product-web-enrichment.ts
+lib/render-catalog-import-env.ts
+env.ts
+
+Nota: lib/grupo-macro-categoria.ts e lib/product-relatorio-import.ts são extensos;
+o conteúdo integral está apenas no repositório Git (não cabem aqui sem duplicar
+milhares de linhas).
+
+--------------------------------------------------------------------------------
+## II.3 Código integral — env.ts (raiz do projeto)
+--------------------------------------------------------------------------------
+
+/** Variáveis de ambiente tipadas para uso no servidor (evita espalhar process.env). */
+
+export const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
+
+export const CATALOG_AGENT_GEMINI_MODEL =
+  process.env.CATALOG_AGENT_GEMINI_MODEL?.trim() || '';
+
+/** Limite de produtos por importação (evita timeout). Padrão 50. */
+const parsedBatch = parseInt(process.env.MAX_CATALOG_BATCH ?? '', 10);
+export const MAX_CATALOG_BATCH = Number.isFinite(parsedBatch) && parsedBatch > 0
+  ? Math.min(100, parsedBatch)
+  : 50;
+
+/** Segredo para `/api/admin/catalog/process` (header `x-catalog-secret`). */
+export const CATALOG_INTERNAL_SECRET = process.env.CATALOG_INTERNAL_SECRET ?? '';
+
+--------------------------------------------------------------------------------
+## II.4 Código integral — lib/storefront-categories.ts
+--------------------------------------------------------------------------------
+
+/**
+ * Categorias macro exibidas na vitrine (menu, catálogo, carrosséis).
+ * Alinhado ao seed (`scripts/seed-mongodb.ts`) e ao mapa `grupo-macro-categoria`.
+ * Admin continua a ver todas as categorias em `/api/categories` sem `storefront=1`.
+ */
+export const STOREFRONT_CATEGORY_SLUG_ORDER = [
+  'cimento-argamassa',
+  'tijolos-blocos',
+  'tintas-acessorios',
+  'ferramentas',
+  'material-hidraulico',
+  'material-eletrico',
+] as const;
+
+export type StorefrontCategorySlug = (typeof STOREFRONT_CATEGORY_SLUG_ORDER)[number];
+
+const SLUG_SET = new Set<string>(STOREFRONT_CATEGORY_SLUG_ORDER);
+
+export function isStorefrontCategorySlug(slug: string): boolean {
+  return SLUG_SET.has(slug);
+}
+
+/** Mantém só slugs da vitrine, na ordem canónica (omite ausentes na BD). */
+export function filterCategoriesForStorefront<T extends { slug: string }>(categories: T[]): T[] {
+  const bySlug = new Map(categories.map((c) => [c.slug, c]));
+  return STOREFRONT_CATEGORY_SLUG_ORDER.map((slug) => bySlug.get(slug)).filter(
+    (c): c is T => c != null
+  );
+}
+
+--------------------------------------------------------------------------------
+## II.5 Código integral — lib/import-fallback-category.ts
+--------------------------------------------------------------------------------
+
+import mongoPrisma from '@/lib/mongodb';
+import { STOREFRONT_CATEGORY_SLUG_ORDER } from '@/lib/storefront-categories';
+
+/**
+ * `categoryId` explícito (admin) ou primeira macro da vitrine existente na BD — usado quando
+ * o grupo não mapeia (ou PDF/linha sem grupo).
+ */
+export async function resolveImportFallbackCategoryId(
+  explicitCategoryId: string | null | undefined
+): Promise<{ id: string; usedExplicit: boolean } | null> {
+  const trimmed = String(explicitCategoryId ?? '').trim();
+  if (trimmed) {
+    const cat = await mongoPrisma.category.findUnique({ where: { id: trimmed } });
+    if (!cat) return null;
+    return { id: cat.id, usedExplicit: true };
+  }
+
+  const slugs = [...STOREFRONT_CATEGORY_SLUG_ORDER];
+  const cats = await mongoPrisma.category.findMany({
+    where: { slug: { in: slugs } },
+    select: { id: true, slug: true },
+  });
+  const bySlug = new Map(cats.map((c) => [c.slug, c.id]));
+  for (const slug of slugs) {
+    const id = bySlug.get(slug);
+    if (id) return { id, usedExplicit: false };
+  }
+
+  const anyCat = await mongoPrisma.category.findFirst({ orderBy: { name: 'asc' } });
+  return anyCat ? { id: anyCat.id, usedExplicit: false } : null;
+}
+
+--------------------------------------------------------------------------------
+## II.6 Código integral — lib/import-upload-limits.ts
+--------------------------------------------------------------------------------
+
+/**
+ * Limite de upload para importações admin (Excel/PDF/Word de catálogo).
+ *
+ * - VPS / `next start` local: até 100 MB (ajustável).
+ * - Vercel: o corpo do pedido para Serverless fica ~4,5 MB; acima disso a plataforma
+ *   devolve 413 em HTML — por isso usamos ~4 MB por defeito quando `NEXT_PUBLIC_VERCEL_ENV` ou `VERCEL=1`.
+ * - Sobrescrever: `NEXT_PUBLIC_MAX_IMPORT_FILE_MB` (também lido no cliente para o input e toasts).
+ */
+
+const MB = 1024 * 1024;
+
+export function resolveMaxImportMegabytes(): number {
+  const raw = process.env.NEXT_PUBLIC_MAX_IMPORT_FILE_MB;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 1 && n <= 100) return Math.floor(n);
+  }
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV) return 4;
+  if (process.env.VERCEL === '1') return 4;
+  return 100;
+}
+
+const _mb = resolveMaxImportMegabytes();
+
+export const MAX_IMPORT_FILE_BYTES = Math.floor(_mb * MB);
+export const MAX_IMPORT_FILE_DESC = `${_mb} MB`;
+
+/** Deploy onde o limite do pedido é baixo (Vercel); usado para texto de ajuda na UI. */
+export const IS_VERCEL_STYLE_DEPLOY = Boolean(process.env.NEXT_PUBLIC_VERCEL_ENV);
+
+export function importFileTooLarge(file: Blob): boolean {
+  return file.size > MAX_IMPORT_FILE_BYTES;
+}
+
+/**
+ * Evita `res.json()` quando o proxy devolve HTML (413 "Request Entity Too Large", etc.).
+ */
+export async function readJsonOrBodyLimitError(
+  res: Response
+): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; message: string }> {
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  const raw = await res.text();
+  if (ct.includes('application/json')) {
+    try {
+      return { ok: true, data: JSON.parse(raw) as Record<string, unknown> };
+    } catch {
+      return { ok: false, message: 'Resposta JSON inválida do servidor.' };
+    }
+  }
+  if (res.status === 413) {
+    return {
+      ok: false,
+      message: `Ficheiro ou pedido demasiado grande para este ambiente (máx. ${MAX_IMPORT_FILE_DESC}). Na Vercel o limite do pedido é cerca de 4 MB: reduza o PDF, exporte menos páginas, ou use o servidor dedicado / VPS com limite maior.`,
+    };
+  }
+  const trimmed = raw.trim().replace(/\s+/g, ' ');
+  return {
+    ok: false,
+    message: trimmed.slice(0, 160) || `Erro HTTP ${res.status}`,
+  };
+}
+
+--------------------------------------------------------------------------------
+## II.7 Código integral — lib/catalog-draft-promote.ts
+--------------------------------------------------------------------------------
+
+/**
+ * Promove rascunho (`status: pending_review` na coleção products) para produto Prisma
+ * (categoryId, subcategoria, status boolean, etc.) e remove o documento de rascunho.
+ */
+
+import { ObjectId } from 'mongodb';
+import mongoPrisma from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/mongodb-native';
+import {
+  runProductCatalogImport,
+  type ProductCatalogImportRow,
+} from '@/lib/product-relatorio-import';
+
+/** Mesma ordem de macros do catálogo / agente (evita depender de ficheiros só locais no repo). */
+const MACRO_SLUG_FALLBACK_ORDER = [
+  'cimento-argamassa',
+  'tijolos-blocos',
+  'tintas-acessorios',
+  'ferramentas',
+  'material-hidraulico',
+  'material-eletrico',
+] as const;
+
+async function resolvePromoteFallbackCategoryId(): Promise<string | null> {
+  const cats = await mongoPrisma.category.findMany({
+    where: { slug: { in: [...MACRO_SLUG_FALLBACK_ORDER] } },
+    select: { id: true, slug: true },
+  });
+  const bySlug = new Map(cats.map((c) => [c.slug, c.id]));
+  for (const slug of MACRO_SLUG_FALLBACK_ORDER) {
+    const id = bySlug.get(slug);
+    if (id) return id;
+  }
+  const anyCat = await mongoPrisma.category.findFirst({ orderBy: { name: 'asc' } });
+  return anyCat?.id ?? null;
+}
+
+function numOr(
+  v: unknown,
+  fallback: number,
+  mode: 'float' | 'int'
+): number {
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    return mode === 'int' ? Math.trunc(v) : v;
+  }
+  const n =
+    mode === 'int'
+      ? parseInt(String(v ?? ''), 10)
+      : parseFloat(String(v ?? ''));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normMarcaPromote(raw: unknown): string | null {
+  const t = String(raw ?? '').trim();
+  if (!t || t === '—' || t === '-') return null;
+  return t;
+}
+
+export type PromoteDraftResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+/**
+ * Lê o rascunho no Mongo nativo, grava/atualiza via `runProductCatalogImport` e apaga o rascunho.
+ */
+export async function promoteCatalogDraftById(
+  draftId: string,
+  _notes?: string
+): Promise<PromoteDraftResult> {
+  if (!draftId?.trim() || !ObjectId.isValid(draftId)) {
+    return { ok: false, message: 'ID inválido' };
+  }
+
+  try {
+    const db = await connectToDatabase();
+    const col = db.collection('products');
+    const draft = await col.findOne({ _id: new ObjectId(draftId) });
+
+    if (!draft) {
+      return { ok: false, message: 'Rascunho não encontrado' };
+    }
+    if (draft.status !== 'pending_review') {
+      return { ok: false, message: 'Este item não está pendente de revisão' };
+    }
+
+    const name = String(draft.name ?? '').trim();
+    if (!name) {
+      return { ok: false, message: 'Rascunho sem nome' };
+    }
+
+    const macroSlug = String(
+      draft.macroCategorySlug ?? draft.category ?? ''
+    ).trim();
+    let categoryId: string | null = null;
+    if (macroSlug) {
+      const c = await mongoPrisma.category.findUnique({
+        where: { slug: macroSlug },
+      });
+      categoryId = c?.id ?? null;
+    }
+    if (!categoryId) {
+      categoryId = await resolvePromoteFallbackCategoryId();
+    }
+    if (!categoryId) {
+      return { ok: false, message: 'Não há categoria no sistema para associar o produto' };
+    }
+
+    const pricePrazoRaw = draft.pricePrazo;
+    const pricePrazo =
+      pricePrazoRaw != null && pricePrazoRaw !== ''
+        ? numOr(pricePrazoRaw, NaN, 'float')
+        : NaN;
+    const pricePrazoFin =
+      Number.isFinite(pricePrazo) && pricePrazo > 0 ? pricePrazo : null;
+
+    const row: ProductCatalogImportRow = {
+      code: String(draft.codigo ?? '').trim(),
+      name,
+      description: String(draft.description ?? '').trim() || name,
+      price: numOr(draft.price, 0, 'float'),
+      stock: numOr(draft.stock, 0, 'int'),
+      subcategoria: String(draft.subcategoria ?? '').trim(),
+      weight:
+        typeof draft.weight === 'number' && draft.weight > 0
+          ? draft.weight
+          : null,
+      cost:
+        typeof draft.cost === 'number' && Number.isFinite(draft.cost)
+          ? draft.cost
+          : null,
+      pricePrazo: pricePrazoFin,
+      unidade: draft.unidade ? String(draft.unidade).trim() || null : null,
+      codBarra: draft.codBarra
+        ? String(draft.codBarra).replace(/\D/g, '') || null
+        : null,
+      status: true,
+      marca: normMarcaPromote(draft.marca),
+    };
+
+    const result = await runProductCatalogImport([row], {
+      upsert: true,
+      categoryId,
+      routeGrupoToMacroCategory: false,
+    });
+
+    if (result.errors.length > 0) {
+      return {
+        ok: false,
+        message: result.errors.map((e) => e.message).join('; '),
+      };
+    }
+    if (result.created === 0 && result.updated === 0) {
+      return { ok: false, message: 'Importação não aplicada (skipped ou dados inválidos)' };
+    }
+
+    await col.deleteOne({ _id: new ObjectId(draftId) });
+    return { ok: true };
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, message };
+  }
+}
+
+--------------------------------------------------------------------------------
+## II.8 Código integral — lib/api-catalog-guard.ts
+  (igual ao documento do projeto completo; necessário para leitura isolada.)
+--------------------------------------------------------------------------------
+
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+
+/**
+ * Protege GET de catálogo (/api/products, /api/categories) contra uso arbitrário (curl, scrapers).
+ *
+ * Permite:
+ * - Header Authorization: Bearer <PDV_API_KEY> ou X-API-Key (PDV desktop, integrações)
+ * - Navegador no mesmo site: Sec-Fetch-Site: same-origin
+ * - Origin ou Referer com hostname permitido (NEXTAUTH_URL + ALLOWED_CATALOG_API_HOSTS)
+ * - Em development: localhost
+ */
+function suppliedKey(req: NextRequest): string | null {
+  const auth = req.headers.get('authorization');
+  const bearer =
+    auth?.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : null;
+  const key = req.headers.get('x-api-key');
+  return bearer || key?.trim() || null;
+}
+
+function parseHostname(urlLike: string | null): string | null {
+  if (!urlLike) return null;
+  try {
+    return new URL(urlLike).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function allowedHosts(): string[] {
+  const hosts = new Set<string>();
+  const nu = process.env.NEXTAUTH_URL;
+  if (nu) {
+    const h = parseHostname(nu.startsWith('http') ? nu : `https://${nu}`);
+    if (h) hosts.add(h);
+  }
+  const extra = process.env.ALLOWED_CATALOG_API_HOSTS;
+  if (extra) {
+    for (const part of extra.split(',')) {
+      const t = part.trim().toLowerCase();
+      if (t) hosts.add(t);
+    }
+  }
+  return [...hosts];
+}
+
+export function isCatalogApiRequestAllowed(req: NextRequest): boolean {
+  const secret = process.env.PDV_API_KEY;
+  const key = suppliedKey(req);
+  if (secret && key && key === secret) return true;
+
+  const secSite = req.headers.get('sec-fetch-site');
+  if (secSite === 'same-origin') return true;
+
+  const hosts = allowedHosts();
+  const originHost = parseHostname(req.headers.get('origin'));
+  const refererHost = parseHostname(req.headers.get('referer'));
+
+  if (originHost && hosts.includes(originHost)) return true;
+  if (refererHost && hosts.includes(refererHost)) return true;
+
+  if (process.env.NODE_ENV === 'development') {
+    const dev = ['localhost', '127.0.0.1'];
+    if (originHost && dev.includes(originHost)) return true;
+    if (refererHost && dev.includes(refererHost)) return true;
+  }
+
+  if (hosts.length === 0 && !secret) {
+    return true;
+  }
+
+  return false;
+}
+
+export function catalogForbiddenResponse() {
+  return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+}
+
+export function getCatalogCorsHeaders(req: NextRequest): Record<string, string> {
+  const raw = req.headers.get('origin');
+  if (!raw) return {};
+  const h = parseHostname(raw);
+  if (!h || !allowedHosts().includes(h)) return {};
+  return {
+    'Access-Control-Allow-Origin': raw,
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type',
+    Vary: 'Origin',
+  };
+}
+
+================================================================================
+  Fim DOC_CATALOGO_IMPORTACAO_LOCAL_E_CODIGO.txt
+================================================================================

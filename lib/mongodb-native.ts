@@ -33,6 +33,8 @@ const INACTIVE_STATUS_VALUES = [
   'INACTIVE',
   /** Rascunhos / fila do agente de catálogo (não listar na vitrine). */
   'pending_review',
+  /** Importação rápida aguardando enriquecimento IA em background. */
+  'imported',
   'rejected',
 ];
 

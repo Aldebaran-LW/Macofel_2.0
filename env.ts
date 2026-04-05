@@ -5,14 +5,17 @@ export const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
 export const CATALOG_AGENT_GEMINI_MODEL =
   process.env.CATALOG_AGENT_GEMINI_MODEL?.trim() || '';
 
-/** Limite de produtos por importação (evita timeout). Padrão 50. */
+/** Limite de produtos por importação (evita timeout). Padrão 50; teto 500. */
 const parsedBatch = parseInt(process.env.MAX_CATALOG_BATCH ?? '', 10);
 export const MAX_CATALOG_BATCH = Number.isFinite(parsedBatch) && parsedBatch > 0
-  ? Math.min(100, parsedBatch)
+  ? Math.min(500, parsedBatch)
   : 50;
 
 /** Segredo para `/api/admin/catalog/process` (header `x-catalog-secret`). */
 export const CATALOG_INTERNAL_SECRET = process.env.CATALOG_INTERNAL_SECRET ?? '';
+
+/** Opcional: Vercel Cron envia `Authorization: Bearer <CRON_SECRET>` ao chamar rotas agendadas. */
+export const CRON_SECRET = process.env.CRON_SECRET?.trim() ?? '';
 
 /**
  * Se definida (ex.: https://seu-servico.onrender.com/api/import), o upload em

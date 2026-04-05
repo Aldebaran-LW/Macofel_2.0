@@ -12,7 +12,8 @@ async function main() {
   const pdfPath = process.argv[2] || 'e:/Relatorio de Produtos Codigo de Barras LW.pdf';
   const b = fs.readFileSync(pdfPath);
   const buf = new Uint8Array(b).buffer;
-  const lines = await extractPdfTextLines(buf);
+  const { lines, truncated } = await extractPdfTextLines(buf);
+  console.log('truncated', truncated);
   console.log('totalLines', lines.length);
   const withCode = lines.filter((l) => /^\d+\s/.test(l));
   console.log('linesStartingWithDigits', withCode.length);

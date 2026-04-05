@@ -1,6 +1,8 @@
 // lib/catalog-import-pipeline.ts
+import type { Collection, Document } from 'mongodb';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { connectToDatabase } from './mongodb-native';
+import mongoPrisma from '@/lib/mongodb';
 import {
   CATALOG_AGENT_GEMINI_MODEL,
   GEMINI_API_KEY,
@@ -82,10 +84,15 @@ function rowFromPdf(r: RelatorioProdutoPdfRow): Record<string, unknown> {
   };
 }
 
-/** Parsers reais devolvem `{ rows, warnings }`; aqui normalizamos para linhas genéricas. */
-async function loadRawRowsFromFile(file: File, fileName: string): Promise<unknown[]> {
+/**
+ * Mesma lógica que `loadRawRowsFromFile`, mas com `ArrayBuffer` (download Blob / buffer).
+ * Usada pela importação rápida (`saveProductsForReviewFast`).
+ */
+export async function parseCatalogSourceToRows(
+  ab: ArrayBuffer,
+  fileName: string
+): Promise<unknown[]> {
   const n = fileName.toLowerCase();
-  const ab = await file.arrayBuffer();
 
   if (n.endsWith('.xlsx') || n.endsWith('.xls')) {
     const { rows, warnings } = parseRelatorioEstoqueWorkbook(ab);
@@ -117,6 +124,12 @@ async function loadRawRowsFromFile(file: File, fileName: string): Promise<unknow
   }
 
   throw new Error('Formato não suportado. Use .xlsx, .pdf, .txt, .docx ou .json');
+}
+
+/** Parsers reais devolvem `{ rows, warnings }`; aqui normalizamos para linhas genéricas. */
+async function loadRawRowsFromFile(file: File, fileName: string): Promise<unknown[]> {
+  const ab = await file.arrayBuffer();
+  return parseCatalogSourceToRows(ab, fileName);
 }
 
 export type CatalogImportMeta = {
@@ -200,7 +213,7 @@ export async function processCatalogImport(
   }
 }
 
-function cleanImportRow(row: Record<string, unknown>) {
+export function cleanImportRow(row: Record<string, unknown>) {
   const name = String(row.name ?? row.Produto ?? '').trim();
   const pp = row.pricePrazo ?? row['Venda Prazo'];
   return {
@@ -248,6 +261,16 @@ function normalizeCategorySlug(text: string): string {
     if (category.includes(c)) return c;
   }
   return 'ferramentas';
+}
+
+async function resolveCategoryIdFromMacroSlug(macroSlug: string): Promise<string | null> {
+  const slug = String(macroSlug ?? '').trim();
+  if (!slug) return null;
+  const c = await mongoPrisma.category.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
+  return c?.id ?? null;
 }
 
 async function categorizeProduct(product: Record<string, unknown>) {
@@ -306,4 +329,127 @@ export async function processCatalogImportFromUrl(
   };
 
   return await processCatalogImport(file, name, meta);
+}
+
+function isLiveCatalogProduct(doc: Record<string, unknown>): boolean {
+  return typeof doc.status === 'boolean' && doc.status === true;
+}
+
+/**
+ * Uma passagem de Gemini + categorização sobre um documento já em `products`.
+ * Suporta `status: true` (catálogo ativo) ou `status: 'imported'` (rascunho).
+ */
+export async function applyGeminiEnrichmentToCatalogDocument(
+  col: Collection<Document>,
+  doc: Document
+): Promise<void> {
+  const _id = doc._id;
+  const raw = doc as Record<string, unknown>;
+  const live = isLiveCatalogProduct(raw);
+
+  try {
+    await col.updateOne({ _id }, { $set: { enrichmentStatus: 'running' } });
+
+    const cleaned = cleanImportRow(raw);
+    if (!String(cleaned.name ?? '').trim()) {
+      await col.updateOne(
+        { _id },
+        { $set: { enrichmentStatus: 'failed', review_notes: 'Sem nome para enriquecer' } }
+      );
+      return;
+    }
+
+    const subcategoriaGrupo = String(cleaned.category ?? '').trim();
+    const enriched = await enrichWithGemini(cleaned);
+    const categorized = (await categorizeProduct(enriched)) as Record<string, unknown>;
+    const macroSlug = String(
+      categorized.macroCategorySlug ?? categorized.category ?? ''
+    ).trim();
+
+    if (live) {
+      const categoryId = await resolveCategoryIdFromMacroSlug(macroSlug);
+      const setLive: Record<string, unknown> = {
+        name: categorized.name,
+        description: categorized.description,
+        price: categorized.price,
+        pricePrazo: categorized.pricePrazo,
+        stock: categorized.stock,
+        marca: categorized.marca || null,
+        subcategoria: subcategoriaGrupo || null,
+        enrichmentStatus: 'done',
+        updatedAt: new Date(),
+      };
+      if (categoryId) setLive.categoryId = categoryId;
+      await col.updateOne({ _id }, { $set: setLive });
+    } else {
+      await col.updateOne(
+        { _id },
+        {
+          $set: {
+            name: categorized.name,
+            codigo: categorized.codigo,
+            description: categorized.description,
+            price: categorized.price,
+            pricePrazo: categorized.pricePrazo,
+            stock: categorized.stock,
+            marca: categorized.marca,
+            slug: categorized.slug,
+            category: categorized.category,
+            imageUrl: categorized.imageUrl ?? null,
+            subcategoria: subcategoriaGrupo,
+            macroCategorySlug: macroSlug,
+            status: 'pending_review',
+            enrichmentStatus: 'done',
+            reviewed_at: null,
+            review_status: 'pending',
+            review_notes: null,
+          },
+        }
+      );
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[enrich-batch] linha:', msg);
+    await col.updateOne({ _id }, { $set: { enrichmentStatus: 'failed' } });
+  }
+}
+
+/**
+ * Enriquece documentos da importação rápida com o mesmo `catalog_import_batch_id`:
+ * - Rascunhos `status: 'imported'` → passam a `pending_review` (fluxo de aprovação).
+ * - Produtos já no catálogo (`status: true`) → mantêm-se ativos; atualiza descrição/preço/categoria via IA (sem mudar `slug`).
+ */
+export async function enrichImportedProductsForBatch(importId: string): Promise<void> {
+  if (!importId?.trim()) {
+    throw new Error('importId obrigatório');
+  }
+
+  const db = await connectToDatabase();
+  const col = db.collection('products');
+
+  const batchFilter = {
+    catalog_import_batch_id: importId,
+    enrichmentStatus: { $in: ['pending', 'running'] },
+    $or: [{ status: 'imported' }, { status: true }],
+  };
+
+  if (!GEMINI_API_KEY) {
+    console.error('[enrich-batch] GEMINI_API_KEY ausente');
+    await col.updateMany(batchFilter, { $set: { enrichmentStatus: 'failed' } });
+    return;
+  }
+
+  const docs = await col.find(batchFilter).limit(MAX_CATALOG_BATCH).toArray();
+
+  for (const doc of docs) {
+    await applyGeminiEnrichmentToCatalogDocument(col, doc);
+  }
+
+  if (docs.length === MAX_CATALOG_BATCH) {
+    setImmediate(() => {
+      enrichImportedProductsForBatch(importId).catch((e) =>
+        console.error('[enrich-batch] continuação do lote:', e)
+      );
+    });
+  }
 }

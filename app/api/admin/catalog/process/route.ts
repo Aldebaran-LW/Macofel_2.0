@@ -1,29 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth-options';
+import { isAdminDashboardRole } from '@/lib/permissions';
 import { CATALOG_INTERNAL_SECRET } from '@/env';
-import { processCatalogImportFromUrl } from '@/lib/catalog-import-pipeline';
+import { saveProductsForReviewFast } from '@/lib/catalog-pending-mongo';
+import {
+  enrichImportedProductsForBatch,
+  processCatalogImportFromUrl,
+} from '@/lib/catalog-import-pipeline';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get('x-catalog-secret');
-  if (!CATALOG_INTERNAL_SECRET || secret !== CATALOG_INTERNAL_SECRET) {
-    return NextResponse.json({ error: 'Acesso não autorizado' }, { status: 401 });
-  }
-
   try {
-    const body = await request.json();
-    const fileUrl = typeof body.fileUrl === 'string' ? body.fileUrl.trim() : '';
-    const fileName = typeof body.fileName === 'string' ? body.fileName.trim() : '';
-    const userId = typeof body.userId === 'string' ? body.userId : undefined;
+    const body = (await request.json()) as {
+      fileUrl?: string;
+      fileName?: string;
+      importType?: string;
+      userId?: string;
+    };
+    const { fileUrl, fileName, importType = 'full-catalog' } = body;
 
-    if (!fileUrl || !fileName) {
-      return NextResponse.json(
-        { error: 'fileUrl e fileName são obrigatórios' },
-        { status: 400 }
-      );
+    const session = await getServerSession(authOptions);
+    const isAdmin = isAdminDashboardRole((session?.user as { role?: string })?.role);
+    const hasSecret =
+      Boolean(CATALOG_INTERNAL_SECRET) &&
+      request.headers.get('x-catalog-secret') === CATALOG_INTERNAL_SECRET;
+
+    if (!isAdmin && !hasSecret) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    void processCatalogImportFromUrl(fileUrl, fileName, userId).catch((err) =>
+    const url = typeof fileUrl === 'string' ? fileUrl.trim() : '';
+    const name = typeof fileName === 'string' ? fileName.trim() : '';
+    if (!url || !name) {
+      return NextResponse.json({ error: 'fileUrl e fileName são obrigatórios' }, { status: 400 });
+    }
+
+    if (importType === 'full-catalog-with-background-enrich') {
+      const result = await saveProductsForReviewFast(url, name);
+
+      void enrichImportedProductsForBatch(result.importId).catch((err) =>
+        console.error('[catalog-process] enrich-background', err)
+      );
+
+      return NextResponse.json({
+        status: 'success',
+        message:
+          '✅ Importação rápida concluída! Enriquecimento IA iniciado em segundo plano.',
+        importId: result.importId,
+        processed: result.processed,
+        success: true,
+      });
+    }
+
+    const userId = hasSecret
+      ? typeof body.userId === 'string'
+        ? body.userId
+        : undefined
+      : (session?.user as { id?: string })?.id;
+
+    void processCatalogImportFromUrl(url, name, userId).catch((err) =>
       console.error('[catalog-process] Erro background:', err)
     );
 
@@ -33,7 +70,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : 'Erro interno';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 }
