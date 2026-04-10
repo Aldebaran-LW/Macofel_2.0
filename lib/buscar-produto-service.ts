@@ -326,8 +326,13 @@ async function fetchGoogleGeminiEnrichmentByBarcode(
   if (!googleKey || !cx || !geminiKey) return null;
   if (!isPlausibleGtinDigits(eanDigits)) return null;
 
+  const hint = (productNameHint ?? '').trim();
+  const hintToken = hint.split(/\s+/).find((t) => t && t.length >= 3) || '';
+  // Força busca por código (GTIN) mas adiciona contexto mínimo para melhorar o ranking.
+  const searchQuery = `EAN ${eanDigits}${hintToken ? ` produto ${hintToken}` : ''}`;
+
   const googleRes = await fetch(
-    `${GOOGLE_CSE}?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(eanDigits)}&num=10`,
+    `${GOOGLE_CSE}?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(searchQuery)}&num=10`,
     { next: { revalidate: 0 } }
   );
   if (!googleRes.ok) return null;
@@ -341,14 +346,14 @@ async function fetchGoogleGeminiEnrichmentByBarcode(
   });
   if (filtered.length === 0 && !mlContext) return null;
 
-  const hint = (productNameHint ?? '').trim() || 'não indicado';
+  const hintLabel = hint || 'não indicado';
   const geminiPrompt = `És um assistente que extrai dados de produto para catálogo (Brasil, materiais de construção).
 
 EAN/GTIN confirmado (tem de constar nos resultados abaixo — não inventes outro código):
 ${eanDigits}
 
 Nome no nosso cadastro (referência; pode não bater 100% com o título da loja):
-"${hint}"
+"${hintLabel}"
 
 Mercado Livre já validado por EAN (pode ser null):
 ${JSON.stringify(mlContext ?? null)}
@@ -387,7 +392,8 @@ Exemplo de formato (substitui valores):
   if (!converted) return null;
   const me = digitsOnly(String(parsed.matched_ean ?? converted.matched_ean ?? ''));
   if (me !== eanDigits) return null;
-  if (!converted.title?.trim()) converted.title = hint !== 'não indicado' ? hint : `EAN ${eanDigits}`;
+  if (!converted.title?.trim())
+    converted.title = hintLabel !== 'não indicado' ? hintLabel : `EAN ${eanDigits}`;
   return converted;
 }
 

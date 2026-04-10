@@ -20,6 +20,7 @@ import {
   Shield,
   Monitor,
   Download,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
@@ -169,6 +170,20 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
         >
           <Download className="h-5 w-5 shrink-0" />
           <span className="font-semibold">PDV Desktop</span>
+        </Link>
+
+        <Link
+          href="/admin/telegram"
+          onClick={nav}
+          className={cn(
+            'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-sky-700/35 bg-sky-950/25',
+            pathname === '/admin/telegram'
+              ? 'bg-sky-600 text-white border-sky-500'
+              : 'text-sky-100 hover:bg-sky-950/55'
+          )}
+        >
+          <Bot className="h-5 w-5 shrink-0" />
+          <span className="font-semibold">Telegram</span>
         </Link>
 
         {menuItems.map((item) => {

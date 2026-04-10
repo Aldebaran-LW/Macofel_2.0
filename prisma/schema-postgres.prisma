@@ -51,6 +51,8 @@ model User {
   sessions Session[]
   orders   Order[]
   cart     Cart?
+  telegramAccount  TelegramAccount?
+  telegramLinkCodes TelegramLinkCode[]
 
   @@map("users")
 }
@@ -175,4 +177,41 @@ model AuditLog {
 
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// Vínculo Telegram ↔ usuário (para comandos do bot).
+/// Guardamos IDs como String para evitar problemas de bigint/serialização no runtime.
+model TelegramAccount {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  telegramUserId String   @unique @map("telegram_user_id")
+  telegramChatId String?  @map("telegram_chat_id")
+  telegramUsername String? @map("telegram_username")
+  phoneE164      String?  @map("phone_e164")
+  linkedAt       DateTime @default(now()) @map("linked_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_accounts")
+  @@index([telegramUserId])
+}
+
+/// Código temporário (uso único) para vincular Telegram sem depender do telefone.
+/// Guardamos apenas o hash do código (sha256) por segurança.
+model TelegramLinkCode {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  codeHash   String   @unique @map("code_hash")
+  expiresAt  DateTime @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  usedByTelegramUserId String? @map("used_by_telegram_user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_link_codes")
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
 }

@@ -39,6 +39,7 @@ import {
   readJsonOrBodyLimitError,
 } from '@/lib/import-upload-limits';
 import { isMasterAdminRole } from '@/lib/permissions';
+import { normalizeValidGtin } from '@/lib/gtin-validate';
 
 interface Product {
   id: string;
@@ -91,6 +92,7 @@ export default function AdminProdutosPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const catalogAiFileRef = useRef<HTMLInputElement>(null);
+  const quickBarcodeRef = useRef<HTMLInputElement>(null);
   const [importCatalogAiUploading, setImportCatalogAiUploading] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -98,6 +100,8 @@ export default function AdminProdutosPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [quickBarcode, setQuickBarcode] = useState('');
+  const [quickLookupLoading, setQuickLookupLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -417,15 +421,20 @@ export default function AdminProdutosPage() {
       resetForm();
       setImagePreview(null);
     }
+    setQuickBarcode('');
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     resetForm();
+    setQuickBarcode('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent,
+    opts?: { keepOpen?: boolean; resetAfter?: boolean }
+  ) => {
     e.preventDefault();
 
     if (!formData.name || !formData.description || !formData.price || !formData.categoryId) {
@@ -465,8 +474,17 @@ export default function AdminProdutosPage() {
 
       if (res.ok) {
         toast.success(editingProduct ? 'Produto atualizado!' : 'Produto criado!');
-        handleCloseDialog();
-        bumpProductList();
+        if (opts?.keepOpen) {
+          bumpProductList();
+          if (opts?.resetAfter) {
+            resetForm();
+            setQuickBarcode('');
+            requestAnimationFrame(() => quickBarcodeRef.current?.focus());
+          }
+        } else {
+          handleCloseDialog();
+          bumpProductList();
+        }
       } else {
         const error = await res.json();
         toast.error(error.error || 'Erro ao salvar produto');
@@ -474,6 +492,89 @@ export default function AdminProdutosPage() {
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao salvar produto');
+    }
+  };
+
+  const lookupExistingProductByBarcode = async (eanDigits: string) => {
+    const p = new URLSearchParams();
+    p.set('q', eanDigits);
+    p.set('limit', '20');
+    p.set('page', '1');
+    const res = await fetch(`/api/admin/products?${p.toString()}`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const rows: Product[] = Array.isArray(data?.products) ? data.products : [];
+    const exact = rows.find((r) => String(r?.codBarra ?? '').replace(/\D/g, '') === eanDigits);
+    return exact ?? null;
+  };
+
+  const applyEnrichmentFromBuscarProduto = (enriched: any, eanDigits: string) => {
+    const title = typeof enriched?.title === 'string' ? enriched.title.trim() : '';
+    const photos: string[] = Array.isArray(enriched?.photos)
+      ? enriched.photos.filter((u: unknown) => typeof u === 'string')
+      : [];
+    const weightGrams =
+      typeof enriched?.weight_grams === 'number' && Number.isFinite(enriched.weight_grams)
+        ? enriched.weight_grams
+        : null;
+
+    setFormData((prev) => ({
+      ...prev,
+      codBarra: eanDigits,
+      name: prev.name.trim() ? prev.name : title || prev.name,
+      description: prev.description.trim()
+        ? prev.description
+        : title
+          ? title
+          : prev.description,
+      weight:
+        prev.weight.trim() !== '' || weightGrams == null
+          ? prev.weight
+          : String(Number((weightGrams / 1000).toFixed(3))),
+      imageUrl: prev.imageUrl.trim() ? prev.imageUrl : photos[0] || prev.imageUrl,
+    }));
+    if (photos[0]) setImagePreview(photos[0]);
+  };
+
+  const handleQuickBarcodeCommit = async () => {
+    if (quickLookupLoading) return;
+    const normalized = normalizeValidGtin(quickBarcode);
+    if (!normalized) {
+      toast.error('EAN/GTIN inválido. Confira os dígitos (inclui dígito verificador).');
+      return;
+    }
+
+    setQuickLookupLoading(true);
+    try {
+      const existing = await lookupExistingProductByBarcode(normalized);
+      if (existing) {
+        toast.message('Produto já existe — abrindo para editar.');
+        handleOpenDialog(existing);
+        requestAnimationFrame(() => quickBarcodeRef.current?.focus());
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, codBarra: normalized }));
+      const p = new URLSearchParams();
+      p.set('ean', normalized);
+      if (formData.name.trim()) p.set('nameHint', formData.name.trim());
+      const res = await fetch(`/api/buscar-produto?${p.toString()}`, { credentials: 'include' });
+      if (res.ok) {
+        const enriched = await res.json().catch(() => null);
+        if (enriched) {
+          applyEnrichmentFromBuscarProduto(enriched, normalized);
+          toast.success('EAN lido — campos preenchidos automaticamente (quando disponíveis).');
+        } else {
+          toast.message('EAN lido — sem dados de enriquecimento.');
+        }
+      } else {
+        toast.message('EAN lido — sem enriquecimento disponível (cadastre manualmente).');
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Falha ao processar o código de barras');
+    } finally {
+      setQuickLookupLoading(false);
     }
   };
 
@@ -1483,7 +1584,38 @@ export default function AdminProdutosPage() {
               {editingProduct ? 'Editar Produto' : 'Adicionar Novo Produto'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+            <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-2">
+              <p className="text-sm font-medium text-gray-900">Cadastro rápido (scanner)</p>
+              <p className="text-xs text-gray-600">
+                Leia o <strong>código de barras</strong> e pressione <strong>Enter</strong>. Se o produto já existir,
+                abrimos para editar; se não existir, tentamos preencher nome/peso/imagem automaticamente.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  ref={quickBarcodeRef}
+                  value={quickBarcode}
+                  onChange={(e) => setQuickBarcode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleQuickBarcodeCommit();
+                    }
+                  }}
+                  placeholder="EAN/GTIN (8/12/13/14 dígitos) — Enter para buscar"
+                  className="font-mono text-sm"
+                  aria-label="Leitura rápida de código de barras"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!quickBarcode.trim() || quickLookupLoading}
+                  onClick={() => void handleQuickBarcodeCommit()}
+                >
+                  {quickLookupLoading ? 'Processando…' : 'Aplicar'}
+                </Button>
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">
                 Nome do Produto <span className="text-red-500">*</span>
@@ -1762,6 +1894,22 @@ export default function AdminProdutosPage() {
                 <X className="h-4 w-4 mr-2" />
                 Cancelar
               </Button>
+              {!editingProduct ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={quickLookupLoading}
+                  onClick={(e) =>
+                    void handleSubmit(e as unknown as React.FormEvent, {
+                      keepOpen: true,
+                      resetAfter: true,
+                    })
+                  }
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar e cadastrar próximo
+                </Button>
+              ) : null}
               <Button type="submit" className="bg-red-600 hover:bg-red-700">
                 <Save className="h-4 w-4 mr-2" />
                 {editingProduct ? 'Salvar Alterações' : 'Criar Produto'}

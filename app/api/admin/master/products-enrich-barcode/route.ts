@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMasterAdminSession } from '@/lib/require-master-admin';
+import { normalizeValidGtin } from '@/lib/gtin-validate';
 import {
   applyBarcodeEnrichmentPatches,
   findProductsForBarcodeEnrichmentPreview,
@@ -103,15 +104,15 @@ export async function POST(req: NextRequest) {
 
   for (let i = 0; i < products.length; i++) {
     const p = products[i]!;
-    const digits = String(p.codBarra ?? '').replace(/\D/g, '');
-    if (digits.length < 8) {
+    const ean = normalizeValidGtin(p.codBarra ?? '');
+    if (!ean) {
       rows.push({
         ok: false,
         canApply: false,
         productId: p.id,
         productName: p.name,
         codBarra: p.codBarra,
-        reason: 'EAN inválido ou curto',
+        reason: 'GTIN/EAN inválido (formato ou dígito verificador)',
       });
       continue;
     }

@@ -13,6 +13,9 @@
 #   https://macofel-catalog-agent.onrender.com/api/import
 # Não fixe PORT aqui — a Render injeta $PORT.
 #
+# Bot Telegram (`telegram-bot/`): Web Service Node com GET / e /health para health check.
+# Plano grátis adormece sem tráfego HTTP — use ping externo (ex. UptimeRobot) ao URL público.
+#
 services:
   - type: web
     name: macofel-catalog-agent
@@ -43,3 +46,23 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: "3.11.0"
+
+  - type: web
+    name: macofel-telegram-bot
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: telegram-bot
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_INTEGRATION_KEY
+        sync: false
+      - key: MACOFEL_BASE_URL
+        sync: false

@@ -2,6 +2,7 @@ import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getBuscarProdutoInfo, getBuscarProdutoInfoByBarcode } from '@/lib/buscar-produto-service';
 import type { BuscarProdutoResponse } from '@/lib/buscar-produto-types';
+import { digitsOnlyGtin, normalizeValidGtin } from '@/lib/gtin-validate';
 
 /** Valores a gravar em `products` após pré-visualização aprovada. */
 export type BarcodeEnrichmentPatch = {
@@ -305,9 +306,14 @@ export async function findProductsForBarcodeEnrichmentPreview(params: {
   const db = await connectToDatabase();
   const and: object[] = [
     {
-      codBarra: { $exists: true, $nin: [null, ''] },
+      codBarra: { $exists: true, $type: 'string', $nin: [null, ''] },
     },
   ];
+
+  // Filtra já no Mongo para evitar gastar APIs com códigos claramente inválidos.
+  // Nota: validação final (checksum) ainda é feita na pré-visualização por `normalizeValidGtin`.
+  and.push({ codBarra: { $regex: /^\d{8,14}$/ } });
+  and.push({ $expr: { $in: [{ $strLenCP: '$codBarra' }, [8, 12, 13, 14]] } });
 
   if (params.onlyIfMissing) {
     and.push({
@@ -348,11 +354,20 @@ export async function findProductsForBarcodeEnrichmentPreview(params: {
     .project({ name: 1, codBarra: 1 })
     .toArray();
 
-  return docs.map((d) => ({
-    id: (d._id as ObjectId).toString(),
-    name: String(d.name ?? ''),
-    codBarra: d.codBarra != null && String(d.codBarra).trim() !== '' ? String(d.codBarra).trim() : null,
-  }));
+  return docs
+    .map((d) => {
+      const raw = d.codBarra != null && String(d.codBarra).trim() !== '' ? String(d.codBarra).trim() : null;
+      // Defesa extra: caso existam documentos antigos fora do filtro ideal (ou com dados inconsistentes).
+      const valid = raw ? normalizeValidGtin(raw) : null;
+      return {
+        id: (d._id as ObjectId).toString(),
+        name: String(d.name ?? ''),
+        codBarra: valid ? valid : raw ? digitsOnlyGtin(raw) : null,
+        _valid: Boolean(valid),
+      };
+    })
+    .filter((x) => x._valid)
+    .map(({ _valid, ...rest }) => rest);
 }
 
 /** Marca produtos como já passados pela pré-visualização do lote (evita repetir APIs no próximo lote). */
