@@ -1,0 +1,43 @@
+name: Enrich barcodes (scheduled)
+
+on:
+  schedule:
+    # Todos os dias às 03:20 UTC (ajuste se quiser).
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Quantidade máxima de produtos no lote"
+        required: false
+        default: "20"
+      dryRun:
+        description: "Se true, não grava no Mongo"
+        required: false
+        default: "false"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call Render job endpoint
+        env:
+          JOB_URL: ${{ secrets.ENRICH_BARCODES_JOB_URL }}
+          JOB_TOKEN: ${{ secrets.JOBS_API_TOKEN }}
+          LIMIT: ${{ github.event.inputs.limit || '20' }}
+          DRY_RUN: ${{ github.event.inputs.dryRun || 'false' }}
+        run: |
+          if [ -z "$JOB_URL" ]; then
+            echo "Missing secret ENRICH_BARCODES_JOB_URL"
+            exit 1
+          fi
+          if [ -z "$JOB_TOKEN" ]; then
+            echo "Missing secret JOBS_API_TOKEN"
+            exit 1
+          fi
+          echo "Calling job: $JOB_URL (limit=$LIMIT, dryRun=$DRY_RUN)"
+          curl -sS -X POST "$JOB_URL" \
+            -H "Authorization: Bearer $JOB_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "{\"limit\": $LIMIT, \"dryRun\": $DRY_RUN}"
+

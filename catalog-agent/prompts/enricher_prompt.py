@@ -9,6 +9,10 @@ Regras obrigatórias:
 - Destaque características técnicas (resistência, tempo de secagem, rendimento)
 - Tom profissional, confiável e útil
 - Nunca invente informações técnicas que não estejam no input
+
+REGRAS CRÍTICAS (precisão acima de tudo):
+- Se o "Código" do input for um GTIN/EAN, ele deve corresponder ao mesmo produto descrito. Se houver inconsistência evidente, responda exatamente: INSUFFICIENT_DATA
+- Se não houver dados suficientes no input para afirmar especificações (peso, medidas, composição, norma), não invente: responda apenas com o que foi fornecido.
 """
 
 ENRICHER_USER_PROMPT = """
