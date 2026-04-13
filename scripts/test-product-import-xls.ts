@@ -68,7 +68,9 @@ async function main() {
   }
 
   const raw = fs.readFileSync(resolved);
-  const { rows, warnings } = parseRelatorioEstoqueWorkbook(toArrayBuffer(raw));
+  const { rows, warnings } = parseRelatorioEstoqueWorkbook(toArrayBuffer(raw), {
+    fileName: path.basename(resolved),
+  });
 
   console.log('Ficheiro:', resolved);
   console.log('Linhas parseadas:', rows.length);

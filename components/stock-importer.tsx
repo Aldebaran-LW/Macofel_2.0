@@ -458,7 +458,22 @@ export default function StockImporter({ showSubnav = true }: StockImporterProps)
         const text = await file.text();
         allItems.push(...parseCsvText(text));
       } else if (ext === 'xlsx' || ext === 'xls') {
-        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        let wb: XLSX.WorkBook;
+        try {
+          wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        } catch (readErr) {
+          const m = readErr instanceof Error ? readErr.message : String(readErr);
+          if (
+            ext === 'xls' &&
+            (/0xfd|truncated|labelsst/i.test(m) || /record.*0x/i.test(m))
+          ) {
+            throw new Error(
+              `${m}\n\nEste .xls vem com BIFF inválido (comum em exportações antigas). ` +
+                'Abra no Excel ou LibreOffice, guarde como .xlsx e volte a importar — ou use a importação de catálogo no servidor (API admin), que tenta converter automaticamente.'
+            );
+          }
+          throw readErr instanceof Error ? readErr : new Error(String(readErr));
+        }
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
         for (const r of rows) {

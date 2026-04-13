@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { rows, warnings } = parseRelatorioEstoqueWorkbook(buf);
+    const { rows, warnings } = parseRelatorioEstoqueWorkbook(buf, { fileName: fname });
     if (rows.length === 0) {
       return NextResponse.json(
         { error: 'Nenhuma linha de produto encontrada', warnings },

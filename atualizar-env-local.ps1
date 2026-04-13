@@ -77,6 +77,16 @@ PDV_API_KEY="macofel-pdv-dev-compartilhada-altere-em-producao"
 # ALLOWED_CATALOG_API_HOSTS="loja.macofelparapua.com,macofelparapua.com"
 
 # ============================================
+# Importação Excel .xls (opcional — só no servidor Node com LibreOffice)
+# ============================================
+# Alguns .xls do LW falham no SheetJS; a API tenta converter com LibreOffice ou Excel COM (Windows).
+# Na Vercel não há LibreOffice: guarde como .xlsx ou use VPS/Render com soffice instalado.
+# Exemplo Windows (descomente e ajuste o caminho):
+# MACOFEL_SOFFICE="C:\Program Files\LibreOffice\program\soffice.com"
+# Alternativa: pasta raiz da instalação (com subpasta program):
+# MACOFEL_LIBREOFFICE_HOME="C:\Program Files\LibreOffice"
+
+# ============================================
 # INSTRUÇÕES PARA VERCEL
 # ============================================
 # 1. Acesse: https://vercel.com

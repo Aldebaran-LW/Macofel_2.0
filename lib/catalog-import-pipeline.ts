@@ -97,7 +97,7 @@ export async function parseCatalogSourceToRows(
   const n = fileName.toLowerCase();
 
   if (n.endsWith('.xlsx') || n.endsWith('.xls')) {
-    const { rows, warnings } = parseRelatorioEstoqueWorkbook(ab);
+    const { rows, warnings } = parseRelatorioEstoqueWorkbook(ab, { fileName });
     for (const w of warnings) console.warn('[catalog-import]', w);
     return rows.map(rowFromRelatorioEstoque);
   }

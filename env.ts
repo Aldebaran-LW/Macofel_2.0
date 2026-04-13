@@ -27,3 +27,16 @@ export const RENDER_CATALOG_AGENT_URL =
 /** Opcional: mesmo valor que RENDER_CATALOG_WEBHOOK_SECRET no Render; envia header X-Catalog-Webhook-Secret. */
 export const RENDER_CATALOG_WEBHOOK_SECRET =
   process.env.RENDER_CATALOG_WEBHOOK_SECRET?.trim() ?? '';
+
+/**
+ * Caminho completo do `soffice.com` / `soffice.exe` (LibreOffice).
+ * Usado na importação de relatórios `.xls` quando o SheetJS falha (ex.: LABELSST truncado).
+ * Na Vercel não há LibreOffice — use `.xlsx` ou um servidor com Node + LibreOffice.
+ */
+export const MACOFEL_SOFFICE = process.env.MACOFEL_SOFFICE?.trim() ?? '';
+
+/**
+ * Pasta raiz da instalação LibreOffice (com subpasta `program`), alternativa a `MACOFEL_SOFFICE`.
+ */
+export const MACOFEL_LIBREOFFICE_HOME =
+  process.env.MACOFEL_LIBREOFFICE_HOME?.trim() ?? '';

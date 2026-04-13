@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { rows, warnings } = parseRelatorioEstoqueWorkbook(buf);
+    const { rows, warnings } = parseRelatorioEstoqueWorkbook(buf, { fileName: fname });
     const sample = rows.slice(0, MAX_PREVIEW).map((r) => ({
       code: r.code,
       name: r.name,

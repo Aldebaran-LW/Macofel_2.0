@@ -60,6 +60,21 @@ function rowAsArray(row: unknown): string[] {
   return row.map((c) => String(c ?? '').trim());
 }
 
+/** OLE compound — típico de .xls BIFF sem depender de módulos só Node. */
+function bufferLooksLikeOleXls(buf: Buffer): boolean {
+  return (
+    buf.length >= 8 &&
+    buf[0] === 0xd0 &&
+    buf[1] === 0xcf &&
+    buf[2] === 0x11 &&
+    buf[3] === 0xe0 &&
+    buf[4] === 0xa1 &&
+    buf[5] === 0xb1 &&
+    buf[6] === 0x1a &&
+    buf[7] === 0xe1
+  );
+}
+
 /** Índice da linha de cabeçalho (Produto, Grupo, Marca, Estoque…); -1 se não encontrar. */
 export function findRelatorioEstoqueHeaderRowIndex(rows: string[][]): number {
   for (let i = 0; i < rows.length; i++) {
@@ -344,14 +359,46 @@ export function parseRelatorioEstoqueFromSheetRows(
   return { rows: out, warnings };
 }
 
-export function parseRelatorioEstoqueWorkbook(buffer: ArrayBuffer): {
+export function parseRelatorioEstoqueWorkbook(
+  buffer: ArrayBuffer,
+  opts?: { fileName?: string }
+): {
   rows: RelatorioEstoqueRow[];
   warnings: string[];
 } {
   const warnings: string[] = [];
   const out: RelatorioEstoqueRow[] = [];
 
-  const wb = XLSX.read(buffer, { type: 'array' });
+  const fname = opts?.fileName?.toLowerCase() ?? '';
+  let wb: XLSX.WorkBook;
+  try {
+    wb = XLSX.read(buffer, { type: 'array' });
+  } catch (directErr) {
+    const msg = directErr instanceof Error ? directErr.message : String(directErr);
+    const node = typeof process !== 'undefined' && process.versions?.node != null;
+    const buf = Buffer.from(buffer);
+    const mightBeLegacyXls = fname.endsWith('.xls') || (node && bufferLooksLikeOleXls(buf));
+
+    if (!node || !mightBeLegacyXls) {
+      throw directErr instanceof Error ? directErr : new Error(String(directErr));
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { readWorkbookWithLegacyXlsFallback } = require('./xls-legacy-convert') as typeof import('./xls-legacy-convert');
+      wb = readWorkbookWithLegacyXlsFallback(buf, opts?.fileName);
+    } catch (fallbackErr) {
+      const tail =
+        fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      const vercelHint =
+        process.env.VERCEL === '1' || process.env.NEXT_PUBLIC_VERCEL_ENV
+          ? '\n\n(Vercel: não há LibreOffice nas funções serverless. Guarde o ficheiro como .xlsx no Excel/LibreOffice, ou importe a partir de um servidor com Node + LibreOffice / use o servidor dedicado de import.)'
+          : '';
+      throw new Error(
+        `${msg}\n\nConversão automática (.xls → leitura via LibreOffice/Excel) não concluída:\n${tail}${vercelHint}`
+      );
+    }
+  }
   for (const sheetName of wb.SheetNames) {
     const sheet = wb.Sheets[sheetName];
     if (!sheet) continue;

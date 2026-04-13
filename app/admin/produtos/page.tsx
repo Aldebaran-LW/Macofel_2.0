@@ -1279,7 +1279,9 @@ export default function AdminProdutosPage() {
           <div className="space-y-3 text-sm text-gray-600">
             <p>
               <strong>Excel:</strong> relatório de estoque (.xls / .xlsx) — código, nome, marca, quantidades e
-              valores. Ficheiros grandes:{' '}
+              valores. Com LibreOffice no servidor (variável <code className="text-[10px]">MACOFEL_SOFFICE</code> no{' '}
+              <code className="text-[10px]">.env</code>), muitos <code className="text-[10px]">.xls</code> problemáticos
+              do LW são convertidos automaticamente. Ficheiros grandes:{' '}
               <code className="text-[10px] bg-gray-100 px-1 rounded">
                 npx tsx scripts/split-xls-relatorio.ts &quot;ficheiro.xls&quot; 10 &quot;E:\Produtos exel&quot;
               </code>{' '}
@@ -1309,7 +1311,11 @@ export default function AdminProdutosPage() {
               <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
                 Alojamento Vercel: o pedido HTTP fica limitado a cerca de <strong>4 MB</strong>. PDFs ou Excel
                 maiores falham com erro de tamanho — use <strong>servidor dedicado</strong> (Excel), divida o
-                ficheiro, ou aloje a app num VPS/Render com limite maior.
+                ficheiro, ou aloje a app num VPS/Render com limite maior. Relatórios <strong>.xls</strong> do LW
+                que dão erro tipo «LABELSST» / «0xfd» no painel: a conversão automática precisa de LibreOffice no
+                servidor — na Vercel não existe; <strong>guarde como .xlsx</strong> e volte a importar, ou use
+                importação num servidor próprio com LibreOffice (<code className="text-[10px]">MACOFEL_SOFFICE</code> /{' '}
+                <code className="text-[10px]">MACOFEL_LIBREOFFICE_HOME</code> no <code className="text-[10px]">.env</code>).
               </p>
             ) : null}
             {importRemoteAvailable ? (
