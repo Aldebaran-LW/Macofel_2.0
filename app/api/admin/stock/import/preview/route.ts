@@ -8,7 +8,9 @@ import { connectToDatabase } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
-type Source = 'csv' | 'xlsx' | 'xml' | 'unknown';
+type Source = 'csv' | 'xlsx' | 'xml' | 'pdf' | 'unknown';
+
+type StockApplyMode = 'add' | 'set';
 
 type RawItem = {
   externalCode?: string | null;
@@ -21,6 +23,8 @@ type PreviewRequest = {
   preventDuplicate?: boolean;
   documentText?: string | null; // recomendado para XML (NF-e) -> hash
   items?: RawItem[];
+  /** Como o estoque será aplicado — usado para pré-calcular alterações. */
+  mode?: StockApplyMode;
 };
 
 function normStr(v: unknown) {
@@ -34,6 +38,12 @@ function safeNumber(v: unknown) {
   const n = typeof v === 'number' ? v : Number(v);
   if (!Number.isFinite(n)) return null;
   return n;
+}
+
+function toIntStock(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n);
 }
 
 function computeHash(text: string) {
@@ -53,6 +63,7 @@ export async function POST(req: NextRequest) {
   const source: Source = (body?.source as Source) ?? 'unknown';
   const preventDuplicate = body?.preventDuplicate === true;
   const documentText = typeof body?.documentText === 'string' ? body.documentText : null;
+  const mode: StockApplyMode = body?.mode === 'set' ? 'set' : 'add';
   const rawItems = Array.isArray(body?.items) ? body.items : [];
 
   const items = rawItems
@@ -190,17 +201,107 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Agrega quantidades por produto (igual à rota de apply) e prevê stock final
+  const agg = new Map<
+    string,
+    { productName: string; mergedQty: number; lineCount: number }
+  >();
+  for (const r of resolved) {
+    const prev = agg.get(r.productId);
+    if (!prev) {
+      agg.set(r.productId, {
+        productName: r.productName,
+        mergedQty: r.quantity,
+        lineCount: 1,
+      });
+      continue;
+    }
+    if (mode === 'set') {
+      agg.set(r.productId, {
+        productName: r.productName,
+        mergedQty: r.quantity,
+        lineCount: prev.lineCount + 1,
+      });
+    } else {
+      agg.set(r.productId, {
+        productName: r.productName,
+        mergedQty: prev.mergedQty + r.quantity,
+        lineCount: prev.lineCount + 1,
+      });
+    }
+  }
+
+  const oids = Array.from(agg.keys())
+    .map((id) => {
+      try {
+        return new ObjectId(id);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean) as ObjectId[];
+
+  const stockById = new Map<string, number>();
+  if (oids.length) {
+    const prods = await products
+      .find({ _id: { $in: oids } }, { projection: { stock: 1 } })
+      .toArray();
+    for (const p of prods) {
+      stockById.set(String((p as { _id: ObjectId })._id), toIntStock((p as { stock?: unknown }).stock));
+    }
+  }
+
+  const willUpdate: Array<{
+    productId: string;
+    productName: string;
+    currentStock: number;
+    projectedStock: number;
+    delta: number;
+    lineCount: number;
+  }> = [];
+
+  const unchanged: Array<{
+    productId: string;
+    productName: string;
+    currentStock: number;
+    projectedStock: number;
+    lineCount: number;
+  }> = [];
+
+  for (const [productId, row] of agg) {
+    const currentStock = stockById.get(productId) ?? 0;
+    const projectedStock =
+      mode === 'set' ? Math.round(row.mergedQty) : currentStock + Math.round(row.mergedQty);
+    const base = {
+      productId,
+      productName: row.productName,
+      currentStock,
+      projectedStock,
+      lineCount: row.lineCount,
+    };
+    if (projectedStock !== currentStock) {
+      willUpdate.push({ ...base, delta: projectedStock - currentStock });
+    } else {
+      unchanged.push(base);
+    }
+  }
+
   return NextResponse.json({
     source,
     documentHash,
+    mode,
     totals: {
       received: rawItems.length,
       valid: items.length,
       resolved: resolved.length,
       conflicts: conflicts.length,
+      willUpdate: willUpdate.length,
+      unchanged: unchanged.length,
     },
     resolved,
     conflicts,
+    willUpdate,
+    unchanged,
   });
 }
 

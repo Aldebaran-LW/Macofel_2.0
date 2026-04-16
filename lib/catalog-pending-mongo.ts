@@ -1,7 +1,11 @@
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { MAX_CATALOG_BATCH } from '@/env';
-import { parseCatalogSourceToRows, cleanImportRow } from '@/lib/catalog-import-pipeline';
+import {
+  cleanImportRow,
+  fetchCatalogRowWebTitle,
+  parseCatalogSourceToRows,
+} from '@/lib/catalog-import-pipeline';
 import { promoteCatalogDraftById } from '@/lib/catalog-draft-promote';
 
 /** Alinhado a catalog-agent/tools/mongodb_tools.py — coleção products, revisão por string status. */
@@ -93,6 +97,17 @@ export async function saveProductsForReviewFast(fileUrl: string, fileName: strin
     const ex = c ? byCodigo.get(c) : undefined;
     const normalized = cleanImportRow(row);
 
+    const resolveWebTitle =
+      Boolean(c) &&
+      (!ex ||
+        ex.status === true ||
+        ex.status === 'imported' ||
+        ex.status === 'pending_review');
+    const fromFile =
+      typeof row.web_title === 'string' && row.web_title.trim() ? String(row.web_title).trim() : null;
+    const webTitle =
+      fromFile ?? (resolveWebTitle ? await fetchCatalogRowWebTitle(normalized) : null);
+
     if (ex) {
       const exStatus = ex.status;
 
@@ -118,6 +133,7 @@ export async function saveProductsForReviewFast(fileUrl: string, fileName: strin
               catalog_import_source_url: fileUrl,
               catalog_import_file_name: fileName,
               updatedAt: now,
+              web_title: webTitle,
             },
           }
         );
@@ -152,6 +168,7 @@ export async function saveProductsForReviewFast(fileUrl: string, fileName: strin
               review_status: 'pending',
               review_notes: null,
               updatedAt: now,
+              web_title: webTitle,
             },
           }
         );
@@ -196,6 +213,7 @@ export async function saveProductsForReviewFast(fileUrl: string, fileName: strin
       reviewed_at: null,
       review_status: 'pending',
       review_notes: null,
+      web_title: webTitle,
     });
   }
 

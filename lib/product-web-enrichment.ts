@@ -63,7 +63,7 @@ export async function enrichExistingProductIfSparse(
 
   const db = await connectToDatabase();
   const doc = await db.collection('products').findOne(
-    { _id: oid },
+    { _id: oid, status: true },
     { projection: { weight: 1, imageUrl: 1, dimensionsCm: 1, imageUrls: 1 } }
   );
   if (!doc) return { updated: false, fields: [] };
@@ -295,7 +295,10 @@ export async function enrichProductFromBarcodeMatch(
 
 export type EanEnrichmentBatchCatalog = 'active' | 'inactive' | 'all';
 
-/** Lista candidatos ao lote Master (Mongo nativo: `eanEnrichmentCheckedAt` pode ainda não existir no documento). */
+/**
+ * Lista candidatos ao lote Master (Mongo nativo: `eanEnrichmentCheckedAt` pode ainda não existir no documento).
+ * Use `catalog: 'active'` em jobs/crons; `all` só no painel Master quando quiser incluir inativos.
+ */
 export async function findProductsForBarcodeEnrichmentPreview(params: {
   limit: number;
   skip: number;

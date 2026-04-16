@@ -31,6 +31,7 @@ async def run_catalog_import(file_path: str) -> int:
     print(f"Iniciando processamento de {len(to_process)} produtos...")
 
     processed_products: list = []
+    skipped = 0
     for raw in to_process:
         result = await catalog_pipeline.ainvoke(
             {
@@ -42,10 +43,14 @@ async def run_catalog_import(file_path: str) -> int:
         ep = result.get("enriched_product")
         if ep:
             processed_products.append(ep)
+        else:
+            skipped += 1
 
     saved_count = await save_products_for_review(processed_products)
 
     print(f"Concluído. {saved_count} produtos salvos como 'pending_review'.")
+    if skipped:
+        print(f"  → {skipped} ignorados (enrichment_insufficient_data / title_mismatch / sem enriched_product).")
     print("  → Aprovação humana: criar/usar fluxo no admin (ex.: /admin/master/).")
 
     return saved_count

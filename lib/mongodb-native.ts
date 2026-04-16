@@ -64,6 +64,18 @@ export async function connectToDatabase(): Promise<Db> {
   return cachedDb;
 }
 
+/**
+ * Fecha o `MongoClient` singleton. Usar em scripts CLI/testes para o processo Node terminar.
+ * Não chamar no meio de pedidos Next.js em produção (partilha o mesmo cliente).
+ */
+export async function disconnectMongoNativeClient(): Promise<void> {
+  if (client) {
+    await client.close().catch(() => {});
+    client = null;
+    cachedDb = null;
+  }
+}
+
 export async function getProducts(filters?: {
   search?: string;
   categorySlug?: string;

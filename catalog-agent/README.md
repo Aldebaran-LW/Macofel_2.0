@@ -29,8 +29,10 @@ pip install -r requirements.txt
 
 ## Uso
 
-1. Crie `catalog-agent/data/import_products.json` com uma lista de objetos (campos usados no prompt: `name`, `codigo`, `description`, `price`, `category`, etc.).
-2. Execute:
+1. Crie `catalog-agent/data/import_products.json` com uma lista de objetos (campos usados no prompt: `name`, `codigo`, `description`, `price`, `category`, `marca`, etc.).
+2. **Opcional — `web_title`:** se o pipeline TypeScript (ou outro passo) já tiver o título validado na web (ex.: ML/Google por EAN), inclua `"web_title": "..."` no objeto. O enriquecedor compara com o nome interno; se for incompatível, **não** gera descrição nem grava `pending_review` para esse item. Na importação **rápida** do catálogo (Next → `saveProductsForReviewFast`), o campo `web_title` é preenchido automaticamente por EAN quando as APIs estão configuradas, ou pode vir do ficheiro se a coluna existir no relatório.
+3. **Memória de colunas (relatórios):** no app Next, importações de **estoque** CSV/XLSX usam a coleção Mongo `import_patterns` (fingerprint + `mapping`). O agente Python aqui consome **JSON** já normalizado — o mapeamento de colunas cruas é responsabilidade da etapa anterior.
+4. Execute:
 
 ```bash
 cd catalog-agent
