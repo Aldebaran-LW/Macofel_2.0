@@ -43,7 +43,7 @@ const nextConfig = {
       ],
     },
   },
-  /** Defesa em profundidade (CHECKLIST_SEGURANCA Fase 4) — sem CSP estrita para não quebrar o app legacy. */
+  /** Defesa em profundidade (docs/referencias/CHECKLIST_SEGURANCA.md Fase 4) — sem CSP estrita para não quebrar o app legacy. */
   async headers() {
     return [
       {

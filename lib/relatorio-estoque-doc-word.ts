@@ -69,6 +69,27 @@ function normLine(s: string): string {
 }
 
 /**
+ * No TXT vertical (Relatório de Produtos), linha em branco = coluna sem dado.
+ * Gravamos «—» no ficheiro para ficar visível; na importação trata-se como célula vazia
+ * (números → NaN, não confundir com zero).
+ */
+export const IMPORT_EMPTY_VERTICAL_CELL = '—';
+
+function normalizeLwVerticalSlot(s: string): string {
+  const t = stripBom(s).trim();
+  if (
+    t === '' ||
+    t === IMPORT_EMPTY_VERTICAL_CELL ||
+    t === '-' ||
+    /^n\/?d$/iu.test(t) ||
+    /^\(vazio\)$/iu.test(t)
+  ) {
+    return '';
+  }
+  return t;
+}
+
+/**
  * RTF «Relatório de Produtos» exportado em texto: cada campo numa linha (Código, Produto, …, Status),
  * não uma linha por produto como no Excel.
  */
@@ -115,9 +136,10 @@ export function mapVerticalLwProdutosVals(vals: string[]): {
 } {
   if (vals.length === 0) return { stock: 0, vlCusto: 0, vlVenda: 0, vlVendaPrazo: 0 };
 
-  const estRaw = parseBrDecimal(vals[vals.length - 1]!);
+  const slots = vals.map(normalizeLwVerticalSlot);
+  const estRaw = parseBrDecimal(slots[slots.length - 1]!);
   const stock = Number.isFinite(estRaw) ? Math.round(estRaw) : 0;
-  const mid = vals.slice(0, -1);
+  const mid = slots.slice(0, -1);
   const L = mid.length;
 
   let peso = 0;
@@ -125,7 +147,7 @@ export function mapVerticalLwProdutosVals(vals: string[]): {
   let vv = 0;
   let vp = 0;
 
-  const p = (i: number) => parseBrDecimal((mid[i] ?? '0').trim() || '0');
+  const p = (i: number) => parseBrDecimal(mid[i] ?? '');
 
   if (L === 6) {
     peso = p(2);
@@ -199,14 +221,14 @@ export function mapVerticalLwProdutosVals(vals: string[]): {
       vp = p(3);
     }
   } else if (L > 0 && L < 4) {
-    const slots = [0, 0, 0, 0, 0, 0];
+    const slotNums = [0, 0, 0, 0, 0, 0];
     for (let j = 0; j < L; j++) {
-      slots[6 - L + j] = p(j);
+      slotNums[6 - L + j] = p(j);
     }
-    peso = slots[2];
-    custo = slots[3];
-    vv = slots[4];
-    vp = slots[5];
+    peso = slotNums[2];
+    custo = slotNums[3];
+    vv = slotNums[4];
+    vp = slotNums[5];
   } else if (L > 6) {
     const tail = mid.slice(-6);
     peso = parseBrDecimal(tail[2]!);
@@ -214,8 +236,7 @@ export function mapVerticalLwProdutosVals(vals: string[]): {
     vv = parseBrDecimal(tail[4]!);
     vp = parseBrDecimal(tail[5]!);
   } else {
-    const v = [...vals];
-    v.pop();
+    const v = [...mid];
     vp = v.length >= 1 ? parseBrDecimal(v.pop()!) : NaN;
     vv = v.length >= 1 ? parseBrDecimal(v.pop()!) : NaN;
     custo = v.length >= 1 ? parseBrDecimal(v.pop()!) : NaN;
@@ -233,19 +254,20 @@ export function mapVerticalLwProdutosVals(vals: string[]): {
  * Converte texto vertical (código → nome → valores até ATIVO/INATIVO) numa matriz 1 linha cabeçalho + N linhas dados.
  */
 export function verticalRelatorioProdutosTxtToMatrix(text: string): string[][] {
-  const lines = stripBom(text)
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+  /** Manter linhas vazias: cada linha = uma coluna no RTF vertical (~10 campos + status). */
+  const lines = stripBom(text).split(/\r?\n/).map((l) => l.trim());
 
   let dataStart = -1;
   for (let i = 1; i < lines.length; i++) {
-    const cur = normLine(lines[i]);
-    const prev = normLine(lines[i - 1]);
-    if (cur === 'status' && prev.includes('estoque')) {
-      dataStart = i + 1;
-      break;
+    if (normLine(lines[i]) !== 'status') continue;
+    for (let k = i - 1; k >= Math.max(0, i - 8); k--) {
+      const nk = normLine(lines[k]);
+      if (nk && nk.includes('estoque')) {
+        dataStart = i + 1;
+        break;
+      }
     }
+    if (dataStart >= 0) break;
   }
   if (dataStart < 0) return [];
 
@@ -266,7 +288,8 @@ export function verticalRelatorioProdutosTxtToMatrix(text: string): string[][] {
 
     const vals: string[] = [];
     while (i < lines.length && !isVerticalStatusLine(lines[i])) {
-      vals.push(stripBom(lines[i]).trim());
+      const cell = stripBom(lines[i]).trim();
+      vals.push(cell === '' ? IMPORT_EMPTY_VERTICAL_CELL : cell);
       i += 1;
     }
     if (i >= lines.length) break;
@@ -347,11 +370,17 @@ async function matricesFromDoc(buffer: ArrayBuffer): Promise<string[][][]> {
   return m.length ? [m] : [];
 }
 
-async function matricesFromRtf(buffer: ArrayBuffer): Promise<string[][][]> {
+async function matricesFromRtf(
+  buffer: ArrayBuffer
+): Promise<{ matrices: string[][][]; lwVendaVistaUnit: boolean }> {
   const raw = Buffer.from(buffer).toString('latin1');
   const text = await rtfToText(raw);
+  if (isVerticalRelatorioProdutosTxt(text)) {
+    const m = verticalRelatorioProdutosTxtToMatrix(text);
+    return { matrices: m.length ? [m] : [], lwVendaVistaUnit: true };
+  }
   const m = plainTextToMatrix(text);
-  return m.length ? [m] : [];
+  return { matrices: m.length ? [m] : [], lwVendaVistaUnit: false };
 }
 
 function matricesFromTxt(buffer: ArrayBuffer): { matrices: string[][][]; lwVendaVistaUnit: boolean } {
@@ -391,7 +420,9 @@ export async function parseRelatorioEstoqueWordLike(
     matrices = tx.matrices;
     lwVendaVistaUnit = tx.lwVendaVistaUnit;
   } else {
-    matrices = await matricesFromRtf(buffer);
+    const rtf = await matricesFromRtf(buffer);
+    matrices = rtf.matrices;
+    lwVendaVistaUnit = rtf.lwVendaVistaUnit;
   }
 
   const base = path.basename(fileName, path.extname(fileName)) || 'documento';

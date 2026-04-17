@@ -68,3 +68,10 @@ next-env.d.ts
 
 # Git config (local configuration)
 .gitconfig
+
+# Binários / cache de Python copiados por engano para scripts/ (não versionar)
+/scripts/**/*.exe
+/scripts/__pycache__/
+
+# Resíduos de instalação Python na raiz (ex. man pages de pacotes)
+/share/

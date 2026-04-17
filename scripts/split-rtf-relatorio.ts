@@ -9,7 +9,8 @@
  * - pasta_saída: opcional; predefinido = pasta do ficheiro de entrada
  *
  * Cada parte repete o cabeçalho (linhas até «Status») + um bloco de linhas de dados no layout vertical
- * do RTF (uma linha por campo). O import no admin converte isso automaticamente para o formato tipo Excel.
+ * do RTF (uma linha por campo). Linhas em branco mantêm-se (coluna sem dado, ~10 colunas alinhadas).
+ * O import no admin converte isso automaticamente para o formato tipo Excel.
  * Importe cada `*_part01.txt` … no painel (aceita .txt).
  */
 import fs from 'fs';
@@ -76,8 +77,7 @@ async function main() {
 
   const headerIdx = findHeaderLineIndex(allLines);
   const preamble = headerIdx >= 0 ? allLines.slice(0, headerIdx + 1) : [];
-  const dataLines =
-    headerIdx >= 0 ? allLines.slice(headerIdx + 1).filter((l) => l.trim().length > 0) : allLines.filter((l) => l.trim().length > 0);
+  const dataLines = headerIdx >= 0 ? allLines.slice(headerIdx + 1) : allLines;
 
   if (dataLines.length === 0) {
     console.error('Nenhuma linha de dados após o cabeçalho. Verifique o RTF.');

@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
  * Lista últimas vendas PDV sincronizadas. Exige a mesma PDV_API_KEY que o POST.
  *
  * Segurança: expõe metadados de vendas a quem tem a chave — tratar como endpoint
- * operacional; restringir rotação da chave e acesso (ver CHECKLIST_SEGURANCA.md Fase 3).
+ * operacional; restringir rotação da chave e acesso (ver docs/referencias/CHECKLIST_SEGURANCA.md Fase 3).
  */
 export async function GET(req: NextRequest) {
   const cors = getCatalogCorsHeaders(req);
