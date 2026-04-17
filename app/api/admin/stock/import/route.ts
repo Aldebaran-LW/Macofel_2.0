@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
   const mode: ImportMode = isValidMode(body?.mode) ? body.mode : 'add';
   const source = typeof body?.source === 'string' ? body.source : 'unknown';
   const documentHash = typeof body?.documentHash === 'string' ? body.documentHash : null;
-  const enrichProducts = body?.enrichProducts !== false;
+  /** Enriquecimento inline desativado por defeito — usar fila em `/api/admin/catalog/enrichment-queue/kick`. */
+  const enrichProducts = body?.enrichProducts === true;
   const items: ImportItem[] = Array.isArray(body?.items) ? body.items : [];
   const mappingsToUpsert: Array<{ externalCode: string; productId: string; source?: string }> = Array.isArray(
     body?.mappingsToUpsert

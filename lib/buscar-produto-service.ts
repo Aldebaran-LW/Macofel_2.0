@@ -23,8 +23,53 @@ function textContainsEan(blob: string, eanDigits: string): boolean {
   return digitsOnly(blob).includes(eanDigits);
 }
 
+/** Título + snippet + link + metadados CSE (muitas vezes o EAN só aparece em pagemap/metatags). */
+function cseItemTextBlob(it: Record<string, unknown>): string {
+  const title = typeof it.title === 'string' ? it.title : '';
+  const snippet = typeof it.snippet === 'string' ? it.snippet : '';
+  const link = typeof it.link === 'string' ? it.link : '';
+  let extra = '';
+  const pm = it.pagemap;
+  if (pm && typeof pm === 'object') {
+    try {
+      extra = JSON.stringify(pm);
+    } catch {
+      extra = '';
+    }
+  }
+  return `${title} ${snippet} ${link} ${extra}`;
+}
+
+function filterCseItemsByEan(
+  items: Record<string, unknown>[],
+  eanDigits: string
+): Record<string, unknown>[] {
+  return items.filter((it) => textContainsEan(cseItemTextBlob(it), eanDigits));
+}
+
+function mergeCseItemsByLink(
+  a: Record<string, unknown>[],
+  b: Record<string, unknown>[]
+): Record<string, unknown>[] {
+  const m = new Map<string, Record<string, unknown>>();
+  for (const it of [...a, ...b]) {
+    const k = typeof it.link === 'string' && it.link ? it.link : `__${m.size}`;
+    if (!m.has(k)) m.set(k, it);
+  }
+  return [...m.values()];
+}
+
+/** True quando Google CSE + Gemini estão definidos (caminho completo de enriquecimento por EAN). */
+export function hasBarcodeWebLookupApisConfigured(): boolean {
+  return Boolean(
+    process.env.GOOGLE_API_KEY?.trim() &&
+      process.env.GOOGLE_CSE_ID?.trim() &&
+      process.env.GEMINI_API_KEY?.trim()
+  );
+}
+
 function hasApiAccessConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID && process.env.GEMINI_API_KEY);
+  return hasBarcodeWebLookupApisConfigured();
 }
 
 type MlAttribute = {
@@ -225,7 +270,7 @@ async function fetchMercadoLivre(query: string): Promise<BuscarProdutoResponse |
 async function fetchMercadoLivreByValidatedBarcode(eanDigits: string): Promise<BuscarProdutoResponse | null> {
   if (!isPlausibleGtinDigits(eanDigits)) return null;
   const mlRes = await fetch(
-    `${MLB_SEARCH}?q=${encodeURIComponent(eanDigits)}&limit=15`,
+    `${MLB_SEARCH}?q=${encodeURIComponent(eanDigits)}&limit=20`,
     {
       next: { revalidate: 0 },
       headers: {
@@ -314,39 +359,109 @@ Formato:
   return converted;
 }
 
-/** Google CSE com o próprio EAN; só passa ao Gemini resultados em que o EAN aparece no título ou snippet. */
+async function fetchCustomSearchItems(
+  q: string,
+  num: number
+): Promise<Record<string, unknown>[]> {
+  const googleKey = process.env.GOOGLE_API_KEY;
+  const cx = process.env.GOOGLE_CSE_ID;
+  if (!googleKey || !cx) return [];
+  const googleRes = await fetch(
+    `${GOOGLE_CSE}?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(q)}&num=${num}`,
+    { next: { revalidate: 0 } }
+  );
+  if (!googleRes.ok) {
+    if (process.env.BUSCAR_PRODUTO_DEBUG === '1') {
+      const t = await googleRes.text().catch(() => '');
+      console.warn(`[buscar-produto] CSE HTTP ${googleRes.status}:`, t.slice(0, 400));
+    }
+    return [];
+  }
+  const googleData = (await googleRes.json()) as {
+    items?: Record<string, unknown>[];
+    error?: { message?: string; code?: number };
+  };
+  if (googleData.error && process.env.BUSCAR_PRODUTO_DEBUG === '1') {
+    console.warn('[buscar-produto] CSE error field:', googleData.error);
+  }
+  return Array.isArray(googleData.items) ? googleData.items : [];
+}
+
+export type GoogleCustomSearchProbeResult =
+  | { ok: true; httpStatus: number }
+  | { ok: false; httpStatus: number; message: string };
+
+/** Um pedido mínimo à CSE para validar chave + API ativa (evita falso "OK" só com .env preenchido). */
+export async function probeGoogleCustomSearchApi(): Promise<GoogleCustomSearchProbeResult> {
+  const googleKey = process.env.GOOGLE_API_KEY?.trim();
+  const cx = process.env.GOOGLE_CSE_ID?.trim();
+  if (!googleKey || !cx) {
+    return { ok: false, httpStatus: 0, message: 'GOOGLE_API_KEY ou GOOGLE_CSE_ID em falta.' };
+  }
+  const url = `${GOOGLE_CSE}?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent('macofel-cse-probe')}&num=1`;
+  const res = await fetch(url, { next: { revalidate: 0 } });
+  const status = res.status;
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    let message = text.slice(0, 400);
+    try {
+      const j = JSON.parse(text) as { error?: { message?: string } };
+      if (j.error?.message) message = j.error.message;
+    } catch {
+      /* manter message */
+    }
+    return { ok: false, httpStatus: status, message };
+  }
+  if (!text.trim()) {
+    return { ok: false, httpStatus: status, message: 'Resposta CSE vazia.' };
+  }
+  let j: { error?: { message?: string } };
+  try {
+    j = JSON.parse(text) as { error?: { message?: string } };
+  } catch {
+    return { ok: false, httpStatus: status, message: 'Resposta CSE inválida (não JSON).' };
+  }
+  if (j.error?.message) return { ok: false, httpStatus: status, message: j.error.message };
+  return { ok: true, httpStatus: status };
+}
+
+/** Google CSE com o próprio EAN; só passa ao Gemini resultados em que o EAN aparece no blob CSE (incl. pagemap). */
 async function fetchGoogleGeminiEnrichmentByBarcode(
   eanDigits: string,
   productNameHint: string | null,
   mlContext: BuscarProdutoResponse | null
 ): Promise<BuscarProdutoResponse | null> {
-  const googleKey = process.env.GOOGLE_API_KEY;
-  const cx = process.env.GOOGLE_CSE_ID;
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!googleKey || !cx || !geminiKey) return null;
+  if (!process.env.GOOGLE_API_KEY?.trim() || !process.env.GOOGLE_CSE_ID?.trim() || !geminiKey) {
+    return null;
+  }
   if (!isPlausibleGtinDigits(eanDigits)) return null;
 
   const hint = (productNameHint ?? '').trim();
   const hintToken = hint.split(/\s+/).find((t) => t && t.length >= 3) || '';
-  // Força busca por código (GTIN) mas adiciona contexto mínimo para melhorar o ranking.
   const searchQuery = `EAN ${eanDigits}${hintToken ? ` produto ${hintToken}` : ''}`;
 
-  const googleRes = await fetch(
-    `${GOOGLE_CSE}?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(searchQuery)}&num=10`,
-    { next: { revalidate: 0 } }
-  );
-  if (!googleRes.ok) return null;
-  const googleData = (await googleRes.json()) as { items?: Record<string, unknown>[] };
-  const items = Array.isArray(googleData.items) ? googleData.items : [];
-  const filtered = items.filter((it) => {
-    const title = typeof it.title === 'string' ? it.title : '';
-    const snippet = typeof it.snippet === 'string' ? it.snippet : '';
-    const link = typeof it.link === 'string' ? it.link : '';
-    return textContainsEan(`${title} ${snippet} ${link}`, eanDigits);
-  });
+  let items = await fetchCustomSearchItems(searchQuery, 10);
+  let filtered = filterCseItemsByEan(items, eanDigits);
+
+  if (filtered.length === 0) {
+    const altDigits = await fetchCustomSearchItems(eanDigits, 10);
+    items = mergeCseItemsByLink(items, altDigits);
+    filtered = filterCseItemsByEan(items, eanDigits);
+  }
+  if (filtered.length === 0) {
+    const altSite = await fetchCustomSearchItems(`${eanDigits} site:mercadolivre.com.br`, 8);
+    items = mergeCseItemsByLink(items, altSite);
+    filtered = filterCseItemsByEan(items, eanDigits);
+  }
+
   if (filtered.length === 0 && !mlContext) return null;
 
   const hintLabel = hint || 'não indicado';
+  const filterNote =
+    filtered.length > 0
+      ? 'cada resultado contém o EAN/GTIN no título, resumo, link ou metadados (pagemap)'
+      : 'lista vazia no Google — usa só o contexto ML abaixo, se existir';
   const geminiPrompt = `És um assistente que extrai dados de produto para catálogo (Brasil, materiais de construção).
 
 EAN/GTIN confirmado (tem de constar nos resultados abaixo — não inventes outro código):
@@ -358,14 +473,14 @@ Nome no nosso cadastro (referência; pode não bater 100% com o título da loja)
 Mercado Livre já validado por EAN (pode ser null):
 ${JSON.stringify(mlContext ?? null)}
 
-Resultados Google Custom Search (já filtrados — cada um contém o EAN no título ou resumo):
+Resultados Google Custom Search (${filterNote}):
 ${JSON.stringify({ items: filtered })}
 
-Se a lista Google estiver vazia mas o contexto ML acima existir, podes basear-te só no ML e usar matched_ean "${eanDigits}".
+Se a lista Google estiver vazia mas o contexto ML acima existir, baseia-te só no ML e define matched_ean exatamente "${eanDigits}" e um título fiel ao anúncio ML.
 
 Regras:
 - Responde APENAS com JSON válido (sem markdown).
-- matched_ean: usa a string "${eanDigits}" quando houver evidência clara do produto; se não houver evidência, usa null e deixa photos vazio.
+- matched_ean: string "${eanDigits}" quando houver evidência (Google ou ML acima); se não houver evidência nenhuma, usa null.
 - photos: só URLs http(s) que apareçam nos resultados ou no contexto ML; nunca inventar.
 - dimensions_cm: "a × l × p" em cm ou null; weight_grams inteiro em gramas ou null; price_reference BRL ou null.
 - source exatamente: "google_gemini_ean"
@@ -381,7 +496,13 @@ Exemplo de formato (substitui valores):
       generationConfig: { temperature: 0.15 },
     }),
   });
-  if (!geminiRes.ok) return null;
+  if (!geminiRes.ok) {
+    if (process.env.BUSCAR_PRODUTO_DEBUG === '1') {
+      const t = await geminiRes.text().catch(() => '');
+      console.warn(`[buscar-produto] Gemini HTTP ${geminiRes.status}:`, t.slice(0, 400));
+    }
+    return null;
+  }
   const geminiData = (await geminiRes.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
@@ -391,7 +512,15 @@ Exemplo de formato (substitui valores):
   const converted = toResponseFromGemini(parsed, 'google_gemini_ean');
   if (!converted) return null;
   const me = digitsOnly(String(parsed.matched_ean ?? converted.matched_ean ?? ''));
-  if (me !== eanDigits) return null;
+  const mlEanOk =
+    mlContext != null && digitsOnly(String(mlContext.matched_ean ?? '')) === eanDigits;
+  if (me !== eanDigits) {
+    if (mlEanOk && converted.title?.trim()) {
+      converted.matched_ean = eanDigits;
+    } else {
+      return null;
+    }
+  }
   if (!converted.title?.trim())
     converted.title = hintLabel !== 'não indicado' ? hintLabel : `EAN ${eanDigits}`;
   return converted;

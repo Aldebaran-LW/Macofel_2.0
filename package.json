@@ -24,7 +24,13 @@
     "test:pdv-connections": "node scripts/test-pdv-connections.mjs",
     "catalog:archive-products": "tsx --require dotenv/config scripts/archive-catalog-products.ts",
     "catalog:restore-products": "tsx --require dotenv/config scripts/restore-catalog-products.ts",
-    "test:product-import-xls": "tsx scripts/test-product-import-xls.ts"
+    "test:product-import-xls": "tsx scripts/test-product-import-xls.ts",
+    "test:catalog-enrichment": "tsx --require dotenv/config scripts/test-catalog-enrichment-one.ts",
+    "catalog:count-barcodes": "tsx --require dotenv/config scripts/count-products-barcodes.ts",
+    "catalog:enrich-active-ean": "tsx --require dotenv/config scripts/enrich-active-by-valid-ean.ts",
+    "catalog:reset-enrich-pending": "tsx --require dotenv/config scripts/reset-active-enrichment-pending.ts",
+    "test:ai-studio-enrich": "tsx --require dotenv/config scripts/test-ai-studio-enrich-local.ts",
+    "test:ollama-enrich": "tsx --require dotenv/config scripts/test-ollama-enrich-local.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

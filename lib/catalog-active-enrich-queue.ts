@@ -31,7 +31,7 @@ export async function markActiveProductsForShortDescriptionEnrichment(options?: 
 
   const baseFilter: Record<string, unknown> = {
     status: true,
-    enrichmentStatus: { $nin: ['pending', 'running'] },
+    enrichmentStatus: { $nin: ['pending', 'running', 'done'] },
     $expr: {
       $lt: [
         { $strLenCP: { $toString: { $ifNull: ['$description', ''] } } },
@@ -79,7 +79,7 @@ export async function markActiveProductsForEnrichmentAll(options?: {
 
   const filter: Record<string, unknown> = {
     status: true,
-    enrichmentStatus: { $nin: ['pending', 'running'] },
+    enrichmentStatus: { $nin: ['pending', 'running', 'done'] },
   };
   if (requireValidBarcode) {
     filter.codBarra = { $exists: true, $nin: [null, ''] };
@@ -143,7 +143,8 @@ export async function enrichActiveCatalogPendingProducts(options?: {
           $set: {
             enrichmentStatus: 'skipped',
             enrichment_notes:
-              'Fila: removido — sem EAN válido (use marcação com requireValidBarcode ou corrija codBarra).',
+              'Fila: removido — sem EAN válido (checksum GS1). Corrija o campo codBarra ou use apenas produtos com GTIN válido na fila.',
+            ean_web_match: 'invalid_checksum',
             updatedAt: new Date(),
           },
         }
