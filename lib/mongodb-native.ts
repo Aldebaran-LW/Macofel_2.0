@@ -15,8 +15,18 @@ function ensureDatabaseName(uri: string): string {
   return uri;
 }
 
+/** Mesmo critério que o Prisma Mongo: nome do path da URI (…/nomeBase?…). Evita admin vazio com catálogo cheio. */
+function databaseNameFromMongoUri(connectionUri: string): string {
+  if (!connectionUri) return 'test';
+  const withoutQuery = connectionUri.split('?')[0] ?? connectionUri;
+  const i = withoutQuery.lastIndexOf('/');
+  if (i < 0 || i >= withoutQuery.length - 1) return 'test';
+  const name = withoutQuery.slice(i + 1).trim();
+  return name || 'test';
+}
+
 const uri = ensureDatabaseName(process.env.MONGODB_URI || '');
-const dbName = 'test'; // Banco onde populamos os produtos
+const dbName = databaseNameFromMongoUri(uri);
 
 let client: MongoClient | null = null;
 let cachedDb: Db | null = null;
