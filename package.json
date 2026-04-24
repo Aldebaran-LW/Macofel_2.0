@@ -33,7 +33,8 @@
     "test:ollama-enrich": "tsx --require dotenv/config scripts/test-ollama-enrich-local.ts",
     "mongo:swap-test-macofel:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mongodb-swap-test-macofel.ps1 -DryRun",
     "mongo:swap-test-macofel": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mongodb-swap-test-macofel.ps1",
-    "mongo:normalize-product-status": "tsx scripts/normalize-product-status-boolean.ts"
+    "mongo:normalize-product-status": "tsx scripts/normalize-product-status-boolean.ts",
+    "mongo:sync": "tsx scripts/sync-mongodb.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"
