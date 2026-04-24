@@ -56,8 +56,14 @@ next-env.d.ts
 *.env.*
 !PDV.env.example
 
+# Exportações de enriquecimento (dados do catálogo — não commitar)
+/exports/*
+!/exports/README.md
+
 # Backups locais do catálogo MongoDB (não commitar)
 /temp/
+/mongo-backup-swap-*/
+/mongo-backup-manual/
 
 # Instalador PDV (binários grandes — copiar para public/downloads no deploy)
 /public/downloads/*.exe
@@ -75,3 +81,18 @@ next-env.d.ts
 
 # Resíduos de instalação Python na raiz (ex. man pages de pacotes)
 /share/
+
+# Pipeline de enriquecimento Macofel (local — saídas e credenciais Abacus)
+/Macofel_Enriquecimento/.env
+/Macofel_Enriquecimento/**/.abacus.donotdelete
+/Macofel_Enriquecimento/macofel_enriched_products*.json
+/Macofel_Enriquecimento/macofel_enrichment_report*.html
+/Macofel_Enriquecimento/buscas_arquivadas/
+/Macofel_Enriquecimento/Uploads/enrichment-input.catalog.json
+/Macofel_Enriquecimento/Uploads/enrichment-ai-knowledge-draft.json
+/Macofel_Enriquecimento/Uploads/test-secondary-ai-draft.json
+/Macofel_Enriquecimento/Uploads/test-secondary-ai-draft.html
+/Macofel_Enriquecimento/Uploads/enrichment-from-draft-report.json
+/Macofel_Enriquecimento/blocked_fetch_domains.json
+/Macofel_Enriquecimento/Lib/
+/Macofel_Enriquecimento/Scripts/
