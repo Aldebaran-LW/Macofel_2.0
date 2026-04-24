@@ -30,7 +30,9 @@
     "catalog:enrich-active-ean": "tsx --require dotenv/config scripts/enrich-active-by-valid-ean.ts",
     "catalog:reset-enrich-pending": "tsx --require dotenv/config scripts/reset-active-enrichment-pending.ts",
     "test:ai-studio-enrich": "tsx --require dotenv/config scripts/test-ai-studio-enrich-local.ts",
-    "test:ollama-enrich": "tsx --require dotenv/config scripts/test-ollama-enrich-local.ts"
+    "test:ollama-enrich": "tsx --require dotenv/config scripts/test-ollama-enrich-local.ts",
+    "mongo:swap-test-macofel:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mongodb-swap-test-macofel.ps1 -DryRun",
+    "mongo:swap-test-macofel": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mongodb-swap-test-macofel.ps1"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"
