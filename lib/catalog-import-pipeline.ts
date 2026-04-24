@@ -460,103 +460,87 @@ export async function applyGeminiEnrichmentToCatalogDocument(
   if (live) {
     const ean = normalizeValidGtin(raw.codBarra ?? cleaned.codBarra);
     if (!ean) {
+      // Sem EAN válido: prossegue com fallback Gemini (só descrição pelo nome).
       await col.updateOne(
         { _id },
         {
           $set: {
-            enrichmentStatus: 'skipped',
-            enrichment_notes:
-              'Enriquecimento: EAN ausente, formato inválido ou dígito de controlo incorreto.',
             ean_web_match: 'invalid_checksum',
-            updatedAt: new Date(),
-          },
-        }
-      );
-      return;
-    }
-
-    let info: Awaited<ReturnType<typeof getBuscarProdutoInfoByBarcode>> = null;
-    try {
-      info = await getBuscarProdutoInfoByBarcode(ean, cleaned.name);
-    } catch {
-      info = null;
-    }
-    if (!info?.title?.trim()) {
-      const apis = hasBarcodeWebLookupApisConfigured();
-      let notes: string;
-      let eanMatch: string;
-      if (!apis) {
-        notes =
-          'Enriquecimento: o GTIN é válido (GS1), mas a pesquisa por EAN está incompleta — faltam GOOGLE_API_KEY e GOOGLE_CSE_ID no .env (Custom Search), além de GEMINI_API_KEY. ' +
-          'Sem o Google CSE, o sistema não confirma o EAN na web e não enriquece; após configurar, volte a enfileirar estes produtos.';
-        eanMatch = 'api_incomplete';
-      } else {
-        const probe = await getCseProbeOnce();
-        if (!probe.ok) {
-          const detail = probe.message ? ` Google: ${probe.message}` : '';
-          notes =
-            'Enriquecimento: o GTIN é válido, mas a Google Custom Search API recusou o acesso (HTTP ' +
-            probe.httpStatus +
-            ').' +
-            detail +
-            ' Verifique faturação do projeto, restrições da chave "API - Buscas" e se a Custom Search API está ativa no mesmo projeto. Enquanto a CSE falhar, só o Mercado Livre valida o EAN; sem anúncio no ML, não há título web.';
-          eanMatch = 'api_incomplete';
-        } else {
-          notes =
-            'Enriquecimento: o GTIN passa no checksum GS1, mas não foi encontrado anúncio/snippet com este EAN (Mercado Livre / Google). ' +
-            'Pode ser código de barras trocado no cadastro ou produto sem presença nas fontes.';
-          eanMatch = 'no_listing';
-        }
-      }
-      await col.updateOne(
-        { _id },
-        {
-          $set: {
-            enrichmentStatus: 'skipped',
-            enrichment_notes: notes,
-            ean_web_match: eanMatch,
-            updatedAt: new Date(),
-          },
-        }
-      );
-      return;
-    }
-
-    const coherent = await geminiBarcodeCoherence(
-      cleaned.name,
-      cleaned.description,
-      info.title.trim(),
-      ean
-    );
-    if (!coherent) {
-      await col.updateOne(
-        { _id },
-        {
-          $set: {
-            enrichmentStatus: 'skipped',
             enrichment_notes:
-              'Enriquecimento: o EAN foi encontrado na web, mas o título do anúncio não condiz com o nome/descrição da loja. ' +
-              'É provável que o código de barras no cadastro não seja deste produto — corrija o EAN ou o nome e volte a enfileirar.',
-            ean_web_match: 'incoherent',
+              'Descrição gerada pelo Gemini com base no nome do produto (sem EAN válido no cadastro). Imagem, peso e medidas não foram preenchidos automaticamente.',
             updatedAt: new Date(),
           },
         }
       );
-      return;
+      // barcodeCtx e barcodeWebMedia ficam undefined/null → enrichWithGemini usa só o nome.
+    } else {
+      // EAN válido: tenta buscar dados na web (ML + Google).
+      let info: Awaited<ReturnType<typeof getBuscarProdutoInfoByBarcode>> = null;
+      try {
+        info = await getBuscarProdutoInfoByBarcode(ean, cleaned.name);
+      } catch {
+        info = null;
+      }
+
+      if (!info?.title?.trim()) {
+        // Web não devolveu dados — fallback: continua com Gemini usando só o nome.
+        let eanMatchFallback = 'no_listing';
+        if (!hasBarcodeWebLookupApisConfigured()) {
+          eanMatchFallback = 'api_incomplete';
+        } else {
+          const probe = await getCseProbeOnce();
+          if (!probe.ok) eanMatchFallback = 'api_incomplete';
+        }
+        await col.updateOne(
+          { _id },
+          {
+            $set: {
+              ean_web_match: eanMatchFallback,
+              enrichment_notes:
+                'Descrição gerada pelo Gemini com base no nome do produto (EAN não confirmado na web — ML/Google indisponíveis). Imagem, peso e medidas não foram preenchidos automaticamente.',
+              updatedAt: new Date(),
+            },
+          }
+        );
+        // barcodeCtx e barcodeWebMedia ficam undefined/null → enrichWithGemini usa só o nome.
+      } else {
+        // Web devolveu título: valida coerência antes de enriquecer.
+        const coherent = await geminiBarcodeCoherence(
+          cleaned.name,
+          cleaned.description,
+          info.title.trim(),
+          ean
+        );
+        if (!coherent) {
+          await col.updateOne(
+            { _id },
+            {
+              $set: {
+                enrichmentStatus: 'skipped',
+                enrichment_notes:
+                  'Enriquecimento: o EAN foi encontrado na web, mas o título do anúncio não condiz com o nome/descrição da loja. ' +
+                  'É provável que o código de barras no cadastro não seja deste produto — corrija o EAN ou o nome e volte a enfileirar.',
+                ean_web_match: 'incoherent',
+                updatedAt: new Date(),
+              },
+            }
+          );
+          return;
+        }
+
+        barcodeCtx = {
+          ean,
+          apiTitle: info.title.trim(),
+          source: info.source,
+        };
+
+        barcodeWebMedia = {
+          photos: Array.isArray(info.photos) ? info.photos.filter((u) => /^https?:\/\//i.test(u)) : [],
+          weight_grams: info.weight_grams ?? null,
+          dimensions_cm: info.dimensions_cm ?? null,
+        };
+      }
     }
-
-    barcodeCtx = {
-      ean,
-      apiTitle: info.title.trim(),
-      source: info.source,
-    };
-
-    // Captura fotos/peso/dimensões obtidos pela mesma chamada de API para salvar junto à descrição.
-    barcodeWebMedia = {
-      photos: Array.isArray(info.photos) ? info.photos.filter((u) => /^https?:\/\//i.test(u)) : [],
-      weight_grams: info.weight_grams ?? null,
-      dimensions_cm: info.dimensions_cm ?? null,
-    };
   }
 
     const subcategoriaGrupo = String(cleaned.category ?? '').trim();
@@ -577,8 +561,12 @@ export async function applyGeminiEnrichmentToCatalogDocument(
         marca: categorized.marca || null,
         subcategoria: subcategoriaGrupo || null,
         enrichmentStatus: 'done',
-        enrichment_notes: null,
-        ean_web_match: 'ok',
+        // Se barcodeCtx existe = EAN validado na web → 'ok'. Caso contrário mantém o
+        // ean_web_match já gravado (ex.: 'no_listing' / 'api_incomplete') e regista que
+        // a descrição veio do fallback Gemini-nome.
+        ...(barcodeCtx
+          ? { ean_web_match: 'ok', enrichment_notes: null }
+          : {}),
         updatedAt: new Date(),
       };
       if (categoryId) setLive.categoryId = categoryId;
