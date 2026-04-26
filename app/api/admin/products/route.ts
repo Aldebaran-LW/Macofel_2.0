@@ -5,60 +5,11 @@ import { isAdminDashboardRole } from '@/lib/permissions';
 import mongoPrisma from '@/lib/mongodb';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 import { applyExtraFieldsFromEnrichment } from '@/lib/product-web-enrichment';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- cliente gerado em node_modules/.prisma-mongodb
-// @ts-ignore
-import type { Prisma } from '../../../../node_modules/.prisma-mongodb';
+import { listAdminProductsFromMongo } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
 
-function buildAdminProductWhere(searchParams: URLSearchParams): Prisma.ProductWhereInput {
-  const and: Prisma.ProductWhereInput[] = [];
-  const q = (searchParams.get('q') ?? '').trim();
-  if (q) {
-    and.push({
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { slug: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-        { codigo: { contains: q, mode: 'insensitive' } },
-        { codBarra: { contains: q, mode: 'insensitive' } },
-        { marca: { contains: q, mode: 'insensitive' } },
-        { category: { name: { contains: q, mode: 'insensitive' } } },
-      ],
-    });
-  }
-
-  const categoryId = searchParams.get('categoryId');
-  if (categoryId && categoryId !== 'all') {
-    and.push({ categoryId });
-  }
-
-  const catalog = searchParams.get('catalog') ?? 'all';
-  if (catalog === 'active') and.push({ status: true });
-  if (catalog === 'inactive') and.push({ status: false });
-
-  const stock = searchParams.get('stock') ?? 'all';
-  if (stock === 'in_stock') and.push({ stock: { gt: 0 } });
-  if (stock === 'out') and.push({ stock: { lte: 0 } });
-
-  const featured = searchParams.get('featured') ?? 'all';
-  if (featured === 'yes') and.push({ featured: true });
-  if (featured === 'no') and.push({ featured: false });
-
-  const marca = (searchParams.get('marca') ?? '').trim();
-  if (marca) {
-    and.push({ marca: { equals: marca, mode: 'insensitive' } });
-  }
-
-  const subcategoria = (searchParams.get('subcategoria') ?? '').trim();
-  if (subcategoria) {
-    and.push({ subcategoria: { equals: subcategoria, mode: 'insensitive' } });
-  }
-
-  return and.length ? { AND: and } : {};
-}
-
-/** Lista produtos para o painel (sem passar pelo guard do catálogo público). Inclui inativos. Paginação: page, limit (máx. 200). */
+/** Lista produtos para o painel (driver nativo MongoDB: tolera `status` string legado). Paginação: page, limit (máx. 200). */
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -67,59 +18,11 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)));
-    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
-    const skip = (page - 1) * limit;
-
-    const where = buildAdminProductWhere(searchParams);
-
-    const [total, products] = await Promise.all([
-      mongoPrisma.product.count({ where }),
-      mongoPrisma.product.findMany({
-        where,
-        take: limit,
-        skip,
-        orderBy: { updatedAt: 'desc' },
-        include: { category: true },
-      }),
-    ]);
-
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    const mapped = products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      price: p.price,
-      stock: p.stock,
-      minStock: p.minStock,
-      weight: p.weight,
-      imageUrl: p.imageUrl,
-      categoryId: p.categoryId,
-      featured: p.featured,
-      codigo: p.codigo ?? null,
-      cost: p.cost ?? null,
-      pricePrazo: p.pricePrazo ?? null,
-      unidade: p.unidade ?? null,
-      codBarra: p.codBarra ?? null,
-      marca: p.marca ?? null,
-      subcategoria: (p as any).subcategoria ?? null,
-      origin: (p as any).origin ?? null,
-      status: p.status,
-      category: p.category
-        ? { id: p.category.id, name: p.category.name }
-        : { id: p.categoryId, name: '—' },
-    }));
+    const { products, pagination } = await listAdminProductsFromMongo(searchParams);
 
     return NextResponse.json({
-      products: mapped,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-      },
+      products,
+      pagination,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

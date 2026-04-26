@@ -4,7 +4,8 @@
 generator client {
   provider      = "prisma-client-js"
   output        = "../node_modules/.prisma-mongodb"
-  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+  // native = dev local; rhel-openssl-3.0.x = Vercel/serverless Linux x64; musl-arm64 = Render ARM Alpine (catalog-agent)
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {

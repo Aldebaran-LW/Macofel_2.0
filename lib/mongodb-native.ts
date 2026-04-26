@@ -317,6 +317,179 @@ export async function getProducts(filters?: {
   };
 }
 
+const escapeMongoRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Lista produtos para o painel admin (mesma base que o dashboard / vitrine).
+ * Usa o driver nativo para tolerar `status` e outros campos em formatos mistos
+ * (ex.: importações com `status: "imported"`), que quebram o `findMany` do Prisma.
+ */
+export async function listAdminProductsFromMongo(searchParams: URLSearchParams): Promise<{
+  products: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    price: number;
+    stock: number;
+    minStock: number | null;
+    weight: number | null;
+    imageUrl: string | null;
+    categoryId: string;
+    featured: boolean;
+    codigo: string | null;
+    cost: number | null;
+    pricePrazo: number | null;
+    unidade: string | null;
+    codBarra: string | null;
+    marca: string | null;
+    subcategoria: string | null;
+    origin: string | null;
+    status: boolean;
+    category: { id: string; name: string };
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}> {
+  const db = await connectToDatabase();
+  const productsCollection = db.collection('products');
+  const categoriesCollection = db.collection('categories');
+
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)));
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+  const skip = (page - 1) * limit;
+
+  const and: Record<string, unknown>[] = [];
+
+  const q = (searchParams.get('q') ?? '').trim();
+  if (q) {
+    const rx = new RegExp(escapeMongoRegex(q), 'i');
+    const matchingCats = await categoriesCollection
+      .find({ name: { $regex: escapeMongoRegex(q), $options: 'i' } })
+      .project({ _id: 1 })
+      .toArray();
+    const categoryClauses: Record<string, unknown>[] = [];
+    for (const c of matchingCats) {
+      categoryClauses.push({ categoryId: c._id });
+      categoryClauses.push({ categoryId: c._id.toString() });
+    }
+    and.push({
+      $or: [
+        { name: rx },
+        { slug: rx },
+        { description: rx },
+        { codigo: rx },
+        { codBarra: rx },
+        { marca: rx },
+        ...categoryClauses,
+      ],
+    });
+  }
+
+  const categoryId = searchParams.get('categoryId');
+  if (categoryId && categoryId !== 'all' && ObjectId.isValid(categoryId)) {
+    const oid = new ObjectId(categoryId);
+    and.push({ $or: [{ categoryId: oid }, { categoryId: categoryId }] });
+  }
+
+  const catalog = searchParams.get('catalog') ?? 'all';
+  if (catalog === 'active') and.push({ status: true });
+  if (catalog === 'inactive') and.push({ status: false });
+
+  const stock = searchParams.get('stock') ?? 'all';
+  if (stock === 'in_stock') and.push({ stock: { $gt: 0 } });
+  if (stock === 'out') and.push({ stock: { $lte: 0 } });
+
+  const featured = searchParams.get('featured') ?? 'all';
+  if (featured === 'yes') and.push({ featured: true });
+  if (featured === 'no') and.push({ featured: false });
+
+  const marca = (searchParams.get('marca') ?? '').trim();
+  if (marca) {
+    and.push({ marca: { $regex: `^${escapeMongoRegex(marca)}$`, $options: 'i' } });
+  }
+
+  const subcategoria = (searchParams.get('subcategoria') ?? '').trim();
+  if (subcategoria) {
+    and.push({ subcategoria: { $regex: `^${escapeMongoRegex(subcategoria)}$`, $options: 'i' } });
+  }
+
+  const query = and.length ? { $and: and } : {};
+
+  const [total, docs] = await Promise.all([
+    productsCollection.countDocuments(query),
+    productsCollection.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).toArray(),
+  ]);
+
+  const categoryIds: ObjectId[] = [];
+  for (const product of docs as any[]) {
+    const cid = product.categoryId;
+    if (cid instanceof ObjectId) categoryIds.push(cid);
+    else if (typeof cid === 'string' && cid.trim() && ObjectId.isValid(cid)) {
+      categoryIds.push(new ObjectId(cid));
+    }
+  }
+  const uniqueCategoryIds = Array.from(
+    new Map(categoryIds.map((id) => [id.toString(), id])).values()
+  );
+  const categories = uniqueCategoryIds.length
+    ? await categoriesCollection.find({ _id: { $in: uniqueCategoryIds } }).toArray()
+    : [];
+  const categoryById = new Map(categories.map((c: any) => [c._id.toString(), c]));
+
+  const products = (docs as any[]).map((p) => {
+    const cid = p.categoryId;
+    let cat: any = null;
+    if (cid instanceof ObjectId) cat = categoryById.get(cid.toString());
+    else if (typeof cid === 'string' && cid.trim() && ObjectId.isValid(cid)) {
+      cat = categoryById.get(cid) ?? null;
+    }
+
+    const statusRaw = p.status;
+    const statusBool = statusRaw === false ? false : true;
+
+    return {
+      id: p._id.toString(),
+      name: String(p.name ?? ''),
+      slug: String(p.slug ?? ''),
+      description: String(p.description ?? ''),
+      price: typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : Number(p.price) || 0,
+      stock: typeof p.stock === 'number' && Number.isFinite(p.stock) ? Math.trunc(p.stock) : Number(p.stock) || 0,
+      minStock:
+        typeof p.minStock === 'number' && Number.isFinite(p.minStock) ? Math.trunc(p.minStock) : null,
+      weight: typeof p.weight === 'number' && Number.isFinite(p.weight) ? p.weight : p.weight ?? null,
+      imageUrl: p.imageUrl ?? null,
+      categoryId: cid instanceof ObjectId ? cid.toString() : typeof cid === 'string' ? cid : '',
+      featured: Boolean(p.featured),
+      codigo: p.codigo != null ? String(p.codigo) : null,
+      cost: typeof p.cost === 'number' && Number.isFinite(p.cost) ? p.cost : null,
+      pricePrazo:
+        typeof p.pricePrazo === 'number' && Number.isFinite(p.pricePrazo) ? p.pricePrazo : null,
+      unidade: p.unidade != null ? String(p.unidade) : null,
+      codBarra: p.codBarra != null ? String(p.codBarra) : null,
+      marca: p.marca != null ? String(p.marca) : null,
+      subcategoria: p.subcategoria != null ? String(p.subcategoria) : null,
+      origin: p.origin != null ? String(p.origin) : null,
+      status: statusBool,
+      category: cat
+        ? { id: cat._id.toString(), name: String(cat.name ?? '') }
+        : {
+            id: cid instanceof ObjectId ? cid.toString() : typeof cid === 'string' ? cid : '',
+            name: '—',
+          },
+    };
+  });
+
+  return {
+    products,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  };
+}
+
 export async function getProductFilterOptions(filters?: {
   search?: string;
   categorySlug?: string;
