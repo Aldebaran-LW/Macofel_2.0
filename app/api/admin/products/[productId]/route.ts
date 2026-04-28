@@ -64,6 +64,27 @@ function parsePriceInput(v: unknown): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
+function normalizeImageUrl(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  if (s.startsWith('/')) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  return null;
+}
+
+function normalizeImageUrls(v: unknown): string[] | null {
+  if (v == null) return null;
+  if (!Array.isArray(v)) return null;
+  const out: string[] = [];
+  for (const item of v) {
+    const u = normalizeImageUrl(item);
+    if (u) out.push(u);
+  }
+  // dedupe mantendo ordem
+  const uniq = Array.from(new Set(out));
+  return uniq;
+}
+
 // Atualizar produto
 export async function PATCH(
   req: NextRequest,
@@ -90,6 +111,7 @@ export async function PATCH(
       minStock,
       weight,
       imageUrl,
+      imageUrls: imageUrlsBody,
       categoryId,
       featured,
       codigo,
@@ -147,6 +169,10 @@ export async function PATCH(
     if (minStock !== undefined) updateData.minStock = parseInt(minStock) || 0;
     if (weight !== undefined) updateData.weight = weight ? parseFloat(String(weight)) : null;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
+    if (imageUrlsBody !== undefined) {
+      const normalized = normalizeImageUrls(imageUrlsBody);
+      if (normalized) (updateData as any).imageUrls = normalized;
+    }
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';
     // Mesmos campos extra do model Product (import LW / painel).
@@ -192,6 +218,17 @@ export async function PATCH(
         !(updateData.imageUrl ?? current?.imageUrl) ||
         !dimensionsCm?.trim() ||
         imageUrls.length === 0);
+
+    // Se vier uma lista de imagens mas nenhuma "principal", escolher a primeira
+    const incomingUrls = normalizeImageUrls(imageUrlsBody);
+    if (
+      updateData.imageUrl === undefined &&
+      incomingUrls &&
+      incomingUrls.length > 0 &&
+      !(current?.imageUrl && String(current.imageUrl).trim())
+    ) {
+      updateData.imageUrl = incomingUrls[0];
+    }
 
     const extraMongo: Record<string, unknown> = {};
     if (needsAutoFill && lookupName) {

@@ -51,6 +51,7 @@ interface Product {
   minStock?: number;
   weight?: number | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   categoryId: string;
   featured: boolean;
   codigo?: string | null;
@@ -110,6 +111,7 @@ export default function AdminProdutosPage() {
     minStock: '',
     weight: '',
     imageUrl: '',
+    imageUrls: [] as string[],
     categoryId: '',
     featured: false,
     codigo: '',
@@ -357,6 +359,7 @@ export default function AdminProdutosPage() {
       minStock: '',
       weight: '',
       imageUrl: '',
+      imageUrls: [],
       categoryId: '',
       featured: false,
       codigo: '',
@@ -372,47 +375,79 @@ export default function AdminProdutosPage() {
     setImagePreview(null);
   };
 
+  const removeImageFromGallery = (url: string) => {
+    setFormData((prev) => {
+      const nextUrls = prev.imageUrls.filter((u) => u !== url);
+      const nextPrimary = prev.imageUrl === url ? (nextUrls[0] ?? '') : prev.imageUrl;
+      return { ...prev, imageUrls: nextUrls, imageUrl: nextPrimary };
+    });
+    setImagePreview((prev) => {
+      if (!prev) return prev;
+      if (prev !== url) return prev;
+      const next = formData.imageUrls.filter((u) => u !== url)[0] ?? null;
+      return next;
+    });
+  };
+
+  const setPrimaryImage = (url: string) => {
+    setFormData((prev) => ({ ...prev, imageUrl: url }));
+    setImagePreview(url);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validar tipo
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor, selecione um arquivo de imagem');
-      return;
-    }
-
-    // Validar tamanho (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. Tamanho máximo: 5MB');
-      return;
-    }
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
     setUploadingImage(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      let okCount = 0;
+      for (const file of files) {
+        // Validar tipo
+        if (!file.type.startsWith('image/')) {
+          toast.error(`Arquivo inválido (${file.name}). Selecione uma imagem.`);
+          continue;
+        }
+        // Validar tamanho (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`Arquivo muito grande (${file.name}). Máx: 5MB`);
+          continue;
+        }
 
-      const res = await fetch('/api/admin/products/upload-image', {
-        method: 'POST',
-        body: formData,
-      });
+        const fd = new FormData();
+        fd.append('file', file);
 
-      if (res.ok) {
-        const data = await res.json();
-        setFormData((prev) => ({ ...prev, imageUrl: data.imageUrl }));
-        setImagePreview(data.imageUrl);
-        toast.success('Imagem enviada com sucesso!');
-      } else {
-        const error = await res.json();
-        toast.error(error.error || 'Erro ao fazer upload da imagem');
+        const res = await fetch('/api/admin/products/upload-image', {
+          method: 'POST',
+          body: fd,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const url = normalizeImageUrlInput(String(data.imageUrl ?? ''));
+          if (!url) continue;
+          okCount += 1;
+          setFormData((prev) => {
+            const nextUrls = Array.from(new Set([...(prev.imageUrls ?? []), url]));
+            return {
+              ...prev,
+              imageUrls: nextUrls,
+              imageUrl: prev.imageUrl?.trim() ? prev.imageUrl : url,
+            };
+          });
+          setImagePreview((prev) => prev ?? url);
+        } else {
+          const error = await res.json().catch(() => ({}));
+          toast.error(error?.error || `Erro ao fazer upload (${file.name})`);
+        }
       }
+      if (okCount > 0) toast.success(`${okCount} imagem(ns) enviada(s) com sucesso!`);
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
       toast.error('Erro ao fazer upload da imagem');
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 
@@ -427,6 +462,11 @@ export default function AdminProdutosPage() {
         minStock: String(product.minStock ?? 0),
         weight: product.weight?.toString() || '',
         imageUrl: product.imageUrl || '',
+        imageUrls: Array.isArray(product.imageUrls)
+          ? product.imageUrls.filter((u) => typeof u === 'string' && u.trim())
+          : product.imageUrl
+            ? [product.imageUrl]
+            : [],
         categoryId: product.categoryId,
         featured: product.featured,
         codigo: product.codigo ?? '',
@@ -485,6 +525,9 @@ export default function AdminProdutosPage() {
           minStock: formData.minStock || '0',
           weight: formData.weight || null,
           imageUrl: normalizeImageUrlInput(formData.imageUrl) || null,
+          imageUrls: Array.isArray(formData.imageUrls)
+            ? formData.imageUrls.map((u) => normalizeImageUrlInput(u)).filter(Boolean)
+            : [],
           categoryId: formData.categoryId,
           featured: formData.featured,
           codigo: formData.codigo.trim() || null,
@@ -1856,6 +1899,38 @@ export default function AdminProdutosPage() {
                 </div>
               )}
 
+              {/* Galeria de imagens (miniaturas) */}
+              {formData.imageUrls.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {formData.imageUrls.map((u) => (
+                    <div
+                      key={u}
+                      className={`relative h-14 w-14 rounded-md overflow-hidden border ${
+                        formData.imageUrl === u ? 'border-red-500' : 'border-gray-200'
+                      } bg-gray-50`}
+                      title={formData.imageUrl === u ? 'Imagem principal' : 'Clique para definir como principal'}
+                    >
+                      <button
+                        type="button"
+                        className="absolute inset-0"
+                        onClick={() => setPrimaryImage(u)}
+                        aria-label="Definir como imagem principal"
+                      />
+                      <Image src={u} alt="Miniatura" fill className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImageFromGallery(u)}
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-white border border-gray-200 text-gray-700 text-xs flex items-center justify-center shadow"
+                        aria-label="Remover imagem"
+                        title="Remover"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Upload de arquivo */}
               <div className="mb-2">
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -1879,6 +1954,7 @@ export default function AdminProdutosPage() {
                     type="file"
                     className="hidden"
                     accept="image/*"
+                    multiple
                     onChange={handleImageUpload}
                     disabled={uploadingImage}
                   />
@@ -1900,7 +1976,13 @@ export default function AdminProdutosPage() {
                 value={formData.imageUrl}
                 onChange={(e) => {
                   const normalized = normalizeImageUrlInput(e.target.value);
-                  setFormData({ ...formData, imageUrl: normalized });
+                  setFormData((prev) => {
+                    const nextUrls =
+                      normalized && isValidImageUrlInput(normalized)
+                        ? Array.from(new Set([...(prev.imageUrls ?? []), normalized]))
+                        : prev.imageUrls;
+                    return { ...prev, imageUrl: normalized, imageUrls: nextUrls };
+                  });
                   setImagePreview(normalized || null);
                 }}
                 placeholder="https://exemplo.com/imagem.jpg ou /api/images/..."
