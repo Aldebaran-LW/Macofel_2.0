@@ -13,6 +13,7 @@ import {
   Upload,
   FileText,
   Filter,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -204,6 +205,10 @@ export default function AdminProdutosPage() {
   const [pageSize, setPageSize] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [sortKey, setSortKey] = useState<
+    'updatedAt' | 'name' | 'codigo' | 'marca' | 'category' | 'price' | 'stock'
+  >('updatedAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   /** Força novo GET quando importámos/alterámos sem mudar página (ex.: já na página 1). */
   const [listNonce, setListNonce] = useState(0);
 
@@ -223,6 +228,8 @@ export default function AdminProdutosPage() {
     filterMarca,
     filterSubcategoria,
     pageSize,
+    sortKey,
+    sortDir,
   ]);
 
   const filtersActive =
@@ -255,6 +262,8 @@ export default function AdminProdutosPage() {
     if (filterFeatured !== 'all') p.set('featured', filterFeatured);
     if (filterMarca.trim()) p.set('marca', filterMarca.trim());
     if (filterSubcategoria.trim()) p.set('subcategoria', filterSubcategoria.trim());
+    if (sortKey) p.set('sort', sortKey);
+    if (sortDir) p.set('dir', sortDir);
     return p.toString();
   }, [
     listPage,
@@ -266,7 +275,49 @@ export default function AdminProdutosPage() {
     filterFeatured,
     filterMarca,
     filterSubcategoria,
+    sortKey,
+    sortDir,
   ]);
+
+  const toggleSort = (
+    key: 'name' | 'codigo' | 'marca' | 'category' | 'price' | 'stock'
+  ) => {
+    setSortKey((prev) => {
+      if (prev !== key) {
+        setSortDir('asc');
+        return key;
+      }
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      return prev;
+    });
+  };
+
+  const SortHeader = ({
+    label,
+    k,
+  }: {
+    label: string;
+    k: 'name' | 'codigo' | 'marca' | 'category' | 'price' | 'stock';
+  }) => {
+    const active = sortKey === k;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(k)}
+        className="inline-flex items-center gap-1 text-left"
+        title="Clique para ordenar"
+      >
+        <span>{label}</span>
+        <ArrowUpDown
+          className={`h-3.5 w-3.5 ${active ? 'text-gray-900' : 'text-gray-400'}`}
+          aria-hidden
+        />
+        {active ? (
+          <span className="sr-only">{sortDir === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}</span>
+        ) : null}
+      </button>
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -1081,22 +1132,22 @@ export default function AdminProdutosPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Produto
+                  <SortHeader label="Produto" k="name" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Cód.
+                  <SortHeader label="Cód." k="codigo" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Marca
+                  <SortHeader label="Marca" k="marca" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Categoria
+                  <SortHeader label="Categoria" k="category" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Preço
+                  <SortHeader label="Preço" k="price" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Estoque
+                  <SortHeader label="Estoque" k="stock" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Catálogo

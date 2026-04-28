@@ -113,10 +113,11 @@ export async function getProducts(filters?: {
 
   // Filtro de busca
   if (filters?.search) {
+    const safe = escapeMongoRegex(filters.search.trim());
     query.$or = [
-      { name: { $regex: filters.search, $options: 'i' } },
-      { description: { $regex: filters.search, $options: 'i' } },
-      { slug: { $regex: filters.search, $options: 'i' } },
+      { name: { $regex: safe, $options: 'i' } },
+      { description: { $regex: safe, $options: 'i' } },
+      { slug: { $regex: safe, $options: 'i' } },
     ];
   }
 
@@ -358,6 +359,22 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
   const skip = (page - 1) * limit;
 
+  const sortParam = (searchParams.get('sort') ?? '').trim();
+  const dirParam = (searchParams.get('dir') ?? '').trim().toLowerCase();
+  const dir: 1 | -1 = dirParam === 'asc' ? 1 : -1;
+  const allowedSort: Record<string, string> = {
+    updatedAt: 'updatedAt',
+    name: 'name',
+    codigo: 'codigo',
+    marca: 'marca',
+    price: 'price',
+    stock: 'stock',
+    category: 'category', // especial (lookup)
+  };
+  const sortKey = Object.prototype.hasOwnProperty.call(allowedSort, sortParam)
+    ? sortParam
+    : 'updatedAt';
+
   const and: Record<string, unknown>[] = [];
 
   const q = (searchParams.get('q') ?? '').trim();
@@ -415,10 +432,58 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
 
   const query = and.length ? { $and: and } : {};
 
-  const [total, docs] = await Promise.all([
-    productsCollection.countDocuments(query),
-    productsCollection.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).toArray(),
-  ]);
+  const totalPromise = productsCollection.countDocuments(query);
+  const docsPromise =
+    sortKey === 'category'
+      ? productsCollection
+          .aggregate([
+            { $match: query },
+            {
+              $addFields: {
+                _catId: {
+                  $cond: [
+                    { $eq: [{ $type: '$categoryId' }, 'objectId'] },
+                    '$categoryId',
+                    {
+                      $convert: {
+                        input: '$categoryId',
+                        to: 'objectId',
+                        onError: null,
+                        onNull: null,
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              $lookup: {
+                from: 'categories',
+                localField: '_catId',
+                foreignField: '_id',
+                as: '_cat',
+              },
+            },
+            { $unwind: { path: '$_cat', preserveNullAndEmptyArrays: true } },
+            {
+              $addFields: {
+                _categorySort: { $toLower: { $ifNull: ['$_cat.name', ''] } },
+              },
+            },
+            { $sort: { _categorySort: dir, _id: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            { $project: { _cat: 0, _catId: 0, _categorySort: 0 } },
+          ])
+          .toArray()
+      : productsCollection
+          .find(query)
+          .sort({ [allowedSort[sortKey]]: dir, _id: -1 } as any)
+          .skip(skip)
+          .limit(limit)
+          .toArray();
+
+  const [total, docs] = await Promise.all([totalPromise, docsPromise]);
 
   const categoryIds: ObjectId[] = [];
   for (const product of docs as any[]) {
@@ -517,10 +582,11 @@ export async function getProductFilterOptions(filters?: {
   const query: any = {};
 
   if (filters?.search) {
+    const safe = escapeMongoRegex(filters.search.trim());
     query.$or = [
-      { name: { $regex: filters.search, $options: 'i' } },
-      { description: { $regex: filters.search, $options: 'i' } },
-      { slug: { $regex: filters.search, $options: 'i' } },
+      { name: { $regex: safe, $options: 'i' } },
+      { description: { $regex: safe, $options: 'i' } },
+      { slug: { $regex: safe, $options: 'i' } },
     ];
   }
 
