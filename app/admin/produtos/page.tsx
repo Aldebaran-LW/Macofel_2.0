@@ -124,6 +124,28 @@ export default function AdminProdutosPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const normalizeImageUrlInput = (raw: string) => {
+    const v = raw.trim();
+    if (!v) return '';
+    if (v.startsWith('/')) return v;
+    if (v.startsWith('http://') || v.startsWith('https://')) return v;
+    // Permitir colar "api/images/..." sem barra inicial
+    if (v.startsWith('api/')) return `/${v}`;
+    return v;
+  };
+
+  const isValidImageUrlInput = (raw: string) => {
+    const v = raw.trim();
+    if (!v) return true;
+    if (v.startsWith('/')) return true;
+    try {
+      const u = new URL(v);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importUpsert, setImportUpsert] = useState(true);
@@ -441,6 +463,10 @@ export default function AdminProdutosPage() {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
+    if (!isValidImageUrlInput(formData.imageUrl)) {
+      toast.error('URL da imagem inválida (use http(s):// ou um caminho /api/...)');
+      return;
+    }
 
     try {
       const url = editingProduct
@@ -458,7 +484,7 @@ export default function AdminProdutosPage() {
           stock: formData.stock || '0',
           minStock: formData.minStock || '0',
           weight: formData.weight || null,
-          imageUrl: formData.imageUrl || null,
+          imageUrl: normalizeImageUrlInput(formData.imageUrl) || null,
           categoryId: formData.categoryId,
           featured: formData.featured,
           codigo: formData.codigo.trim() || null,
@@ -486,8 +512,10 @@ export default function AdminProdutosPage() {
           bumpProductList();
         }
       } else {
-        const error = await res.json();
-        toast.error(error.error || 'Erro ao salvar produto');
+        const error = await res.json().catch(() => ({}));
+        const msg = String(error?.error || 'Erro ao salvar produto');
+        const details = error?.details ? ` — ${String(error.details)}` : '';
+        toast.error(`${msg}${details}`);
       }
     } catch (error) {
       console.error('Erro:', error);
@@ -1868,14 +1896,16 @@ export default function AdminProdutosPage() {
               </div>
 
               <Input
-                type="url"
+                type="text"
                 value={formData.imageUrl}
                 onChange={(e) => {
-                  setFormData({ ...formData, imageUrl: e.target.value });
-                  setImagePreview(e.target.value || null);
+                  const normalized = normalizeImageUrlInput(e.target.value);
+                  setFormData({ ...formData, imageUrl: normalized });
+                  setImagePreview(normalized || null);
                 }}
-                placeholder="https://exemplo.com/imagem.jpg"
+                placeholder="https://exemplo.com/imagem.jpg ou /api/images/..."
                 className="mt-2"
+                inputMode="url"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Cole uma URL de imagem ou faça upload de um arquivo acima

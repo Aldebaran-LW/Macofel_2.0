@@ -9,6 +9,62 @@ import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 
 export const dynamic = 'force-dynamic';
 
+async function readProductFromMongo(productId: string) {
+  const db = await connectToDatabase();
+  const products = db.collection('products');
+  const categories = db.collection('categories');
+  const oid = new ObjectId(productId);
+  const p: any = await products.findOne({ _id: oid });
+  if (!p) return null;
+
+  const cid = p.categoryId;
+  let cat: any = null;
+  if (cid instanceof ObjectId) cat = await categories.findOne({ _id: cid });
+  else if (typeof cid === 'string' && cid.trim() && ObjectId.isValid(cid)) {
+    cat = await categories.findOne({ _id: new ObjectId(cid) });
+  }
+
+  const statusRaw = p.status;
+  const statusBool = statusRaw === false ? false : true;
+
+  return {
+    id: p._id.toString(),
+    name: String(p.name ?? ''),
+    slug: String(p.slug ?? ''),
+    description: String(p.description ?? ''),
+    price: typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : Number(p.price) || 0,
+    stock: typeof p.stock === 'number' && Number.isFinite(p.stock) ? Math.trunc(p.stock) : Number(p.stock) || 0,
+    minStock:
+      typeof p.minStock === 'number' && Number.isFinite(p.minStock) ? Math.trunc(p.minStock) : null,
+    weight: typeof p.weight === 'number' && Number.isFinite(p.weight) ? p.weight : p.weight ?? null,
+    imageUrl: p.imageUrl ?? null,
+    categoryId: cid instanceof ObjectId ? cid.toString() : typeof cid === 'string' ? cid : '',
+    featured: Boolean(p.featured),
+    codigo: p.codigo != null ? String(p.codigo) : null,
+    cost: typeof p.cost === 'number' && Number.isFinite(p.cost) ? p.cost : null,
+    pricePrazo: typeof p.pricePrazo === 'number' && Number.isFinite(p.pricePrazo) ? p.pricePrazo : null,
+    unidade: p.unidade != null ? String(p.unidade) : null,
+    codBarra: p.codBarra != null ? String(p.codBarra) : null,
+    marca: p.marca != null ? String(p.marca) : null,
+    subcategoria: p.subcategoria != null ? String(p.subcategoria) : null,
+    origin: p.origin != null ? String(p.origin) : null,
+    status: statusBool,
+    category: cat ? { id: cat._id.toString(), name: String(cat.name ?? '') } : { id: '', name: '—' },
+  };
+}
+
+function parsePriceInput(v: unknown): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v ?? '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/[^\d,.-]/g, '');
+  if (!s) return NaN;
+  const normalized = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? n : NaN;
+}
+
 // Atualizar produto
 export async function PATCH(
   req: NextRequest,
@@ -73,7 +129,13 @@ export async function PATCH(
         .replace(/(^-|-$)/g, '');
     }
     if (description !== undefined) updateData.description = description;
-    if (price !== undefined) updateData.price = parseFloat(price);
+    if (price !== undefined) {
+      const priceNum = parsePriceInput(price);
+      if (!Number.isFinite(priceNum)) {
+        return NextResponse.json({ error: 'Preço inválido' }, { status: 400 });
+      }
+      updateData.price = priceNum;
+    }
     if (stock !== undefined) updateData.stock = parseInt(stock);
     if (minStock !== undefined) updateData.minStock = parseInt(minStock) || 0;
     if (weight !== undefined) updateData.weight = weight ? parseFloat(String(weight)) : null;
@@ -85,11 +147,11 @@ export async function PATCH(
       updateData.codigo = codigo != null && String(codigo).trim() !== '' ? String(codigo).trim() : null;
     }
     if (cost !== undefined) {
-      const c = cost === '' || cost == null ? null : parseFloat(String(cost));
+      const c = cost === '' || cost == null ? null : parsePriceInput(cost);
       updateData.cost = c != null && Number.isFinite(c) ? c : null;
     }
     if (pricePrazo !== undefined) {
-      const pp = pricePrazo === '' || pricePrazo == null ? null : parseFloat(String(pricePrazo));
+      const pp = pricePrazo === '' || pricePrazo == null ? null : parsePriceInput(pricePrazo);
       updateData.pricePrazo = pp != null && Number.isFinite(pp) ? pp : null;
     }
     if (unidade !== undefined) {
@@ -147,24 +209,37 @@ export async function PATCH(
       }
     }
 
-    const product = await mongoPrisma.product.update({
-      where: { id: params?.productId },
-      data: updateData as any,
-      include: { category: true },
-    });
+    // Alguns produtos legados têm campos com tipos fora do schema Prisma (ex.: status string),
+    // o que pode quebrar o update do Prisma. Fazemos "best effort" via Prisma e fallback no Mongo nativo.
+    try {
+      const product = await mongoPrisma.product.update({
+        where: { id: params?.productId },
+        data: updateData as any,
+        include: { category: true },
+      });
 
-    if (Object.keys(extraMongo).length > 0) {
-      try {
-        const db = await connectToDatabase();
-        await db
-          .collection('products')
-          .updateOne({ _id: new ObjectId(params?.productId) }, { $set: extraMongo });
-      } catch {
-        // não falha o PATCH
+      if (Object.keys(extraMongo).length > 0) {
+        try {
+          const db = await connectToDatabase();
+          await db
+            .collection('products')
+            .updateOne({ _id: new ObjectId(params?.productId) }, { $set: extraMongo });
+        } catch {
+          // não falha o PATCH
+        }
       }
-    }
 
-    return NextResponse.json(product);
+      return NextResponse.json(product);
+    } catch (e: any) {
+      const db = await connectToDatabase();
+      const $set: Record<string, unknown> = { ...updateData, ...(Object.keys(extraMongo).length ? extraMongo : {}) };
+      await db.collection('products').updateOne({ _id: new ObjectId(params?.productId) }, { $set });
+      const normalized = await readProductFromMongo(params?.productId);
+      if (!normalized) {
+        return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
+      }
+      return NextResponse.json(normalized);
+    }
   } catch (error: any) {
     console.error('Erro:', error);
     return NextResponse.json(
