@@ -3,7 +3,6 @@ import { ObjectId } from 'mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
-import mongoPrisma from '@/lib/mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 
@@ -77,6 +76,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
+    const productId = params?.productId;
+    if (!productId || !ObjectId.isValid(productId)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    }
+
     const body = await req.json();
     const {
       name,
@@ -99,24 +103,27 @@ export async function PATCH(
     } = body;
 
     const updateData: Record<string, unknown> = {};
-    const current = await mongoPrisma.product.findUnique({
-      where: { id: params?.productId },
-      select: { name: true, weight: true, imageUrl: true },
-    });
 
-    let dimensionsCm: string | null = null;
-    let imageUrls: string[] = [];
-    try {
-      const db = await connectToDatabase();
-      const raw = await db.collection('products').findOne(
-        { _id: new ObjectId(params?.productId) },
-        { projection: { dimensionsCm: 1, imageUrls: 1 } }
-      );
-      dimensionsCm = raw?.dimensionsCm != null ? String(raw.dimensionsCm) : null;
-      imageUrls = raw && Array.isArray(raw.imageUrls) ? raw.imageUrls.map(String) : [];
-    } catch {
-      // ignora — enriquecimento continua só com campos Prisma
+    const db = await connectToDatabase();
+    const productsCol = db.collection('products');
+
+    const currentRaw: any = await productsCol.findOne(
+      { _id: new ObjectId(productId) },
+      { projection: { name: 1, weight: 1, imageUrl: 1, dimensionsCm: 1, imageUrls: 1 } }
+    );
+    if (!currentRaw) {
+      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }
+
+    const current = {
+      name: currentRaw?.name != null ? String(currentRaw.name) : '',
+      weight: currentRaw?.weight ?? null,
+      imageUrl: currentRaw?.imageUrl ?? null,
+    };
+    const dimensionsCm: string | null =
+      currentRaw?.dimensionsCm != null ? String(currentRaw.dimensionsCm) : null;
+    const imageUrls: string[] =
+      currentRaw && Array.isArray(currentRaw.imageUrls) ? currentRaw.imageUrls.map(String) : [];
 
     if (name !== undefined) {
       updateData.name = name;
@@ -209,37 +216,21 @@ export async function PATCH(
       }
     }
 
-    // Alguns produtos legados têm campos com tipos fora do schema Prisma (ex.: status string),
-    // o que pode quebrar o update do Prisma. Fazemos "best effort" via Prisma e fallback no Mongo nativo.
-    try {
-      const product = await mongoPrisma.product.update({
-        where: { id: params?.productId },
-        data: updateData as any,
-        include: { category: true },
-      });
-
-      if (Object.keys(extraMongo).length > 0) {
-        try {
-          const db = await connectToDatabase();
-          await db
-            .collection('products')
-            .updateOne({ _id: new ObjectId(params?.productId) }, { $set: extraMongo });
-        } catch {
-          // não falha o PATCH
-        }
-      }
-
-      return NextResponse.json(product);
-    } catch (e: any) {
-      const db = await connectToDatabase();
-      const $set: Record<string, unknown> = { ...updateData, ...(Object.keys(extraMongo).length ? extraMongo : {}) };
-      await db.collection('products').updateOne({ _id: new ObjectId(params?.productId) }, { $set });
-      const normalized = await readProductFromMongo(params?.productId);
-      if (!normalized) {
-        return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
-      }
-      return NextResponse.json(normalized);
+    const $set: Record<string, unknown> = {
+      ...updateData,
+      ...(Object.keys(extraMongo).length ? extraMongo : {}),
+      updatedAt: new Date(),
+    };
+    const result = await productsCol.updateOne({ _id: new ObjectId(productId) }, { $set });
+    if (result.matchedCount <= 0) {
+      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }
+
+    const normalized = await readProductFromMongo(productId);
+    if (!normalized) {
+      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
+    }
+    return NextResponse.json(normalized);
   } catch (error: any) {
     console.error('Erro:', error);
     return NextResponse.json(
@@ -261,9 +252,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
-    await mongoPrisma.product.delete({
-      where: { id: params?.productId },
-    });
+    const productId = params?.productId;
+    if (!productId || !ObjectId.isValid(productId)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    }
+
+    const db = await connectToDatabase();
+    const res = await db.collection('products').deleteOne({ _id: new ObjectId(productId) });
+    if (res.deletedCount <= 0) {
+      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
