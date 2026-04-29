@@ -409,8 +409,14 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
   }
 
   const catalog = searchParams.get('catalog') ?? 'all';
-  if (catalog === 'active') and.push({ status: true });
-  if (catalog === 'inactive') and.push({ status: false });
+  /**
+   * IMPORTANTE: alinhar "ativo/inativo" do admin com a vitrine:
+   * - Vitrine esconde quaisquer valores em `INACTIVE_STATUS_VALUES` (inclui strings legadas/pipeline).
+   * - Admin "Só ativos": mesmos critérios da vitrine (status NOT IN ...).
+   * - Admin "Só inativos": status IN ... (inclui pending_review/imported/rejected etc.).
+   */
+  if (catalog === 'active') and.push({ status: { $nin: INACTIVE_STATUS_VALUES } });
+  if (catalog === 'inactive') and.push({ status: { $in: INACTIVE_STATUS_VALUES } });
 
   const stock = searchParams.get('stock') ?? 'all';
   if (stock === 'in_stock') and.push({ stock: { $gt: 0 } });
@@ -509,8 +515,8 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
       cat = categoryById.get(cid) ?? null;
     }
 
-    const statusRaw = p.status;
-    const statusBool = statusRaw === false ? false : true;
+    // Mesma semântica do catálogo público: qualquer valor "inativo" (inclui strings) deve ser tratado como oculto.
+    const statusBool = !isInactiveProductStatus(p.status);
 
     return {
       id: p._id.toString(),
@@ -552,6 +558,85 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
       total,
       totalPages: Math.max(1, Math.ceil(total / limit)),
     },
+  };
+}
+
+/**
+ * Opções de filtros (admin): valores distintos para `marca` e `subcategoria`.
+ * Usa a mesma semântica de filtros do admin (categoryId, catalog, stock, featured, q),
+ * mas não aplica os filtros de marca/subcategoria em si (para não "auto-restringir" o dropdown).
+ */
+export async function getAdminProductFilterOptionsFromMongo(
+  searchParams: URLSearchParams
+): Promise<{
+  marcas: string[];
+  subcategorias: string[];
+}> {
+  const db = await connectToDatabase();
+  const productsCollection = db.collection('products');
+  const categoriesCollection = db.collection('categories');
+
+  const and: Record<string, unknown>[] = [];
+
+  const q = (searchParams.get('q') ?? '').trim();
+  if (q) {
+    const rx = new RegExp(escapeMongoRegex(q), 'i');
+    const matchingCats = await categoriesCollection
+      .find({ name: { $regex: escapeMongoRegex(q), $options: 'i' } })
+      .project({ _id: 1 })
+      .toArray();
+    const categoryClauses: Record<string, unknown>[] = [];
+    for (const c of matchingCats) {
+      categoryClauses.push({ categoryId: c._id });
+      categoryClauses.push({ categoryId: c._id.toString() });
+    }
+    and.push({
+      $or: [
+        { name: rx },
+        { slug: rx },
+        { description: rx },
+        { codigo: rx },
+        { codBarra: rx },
+        { marca: rx },
+        ...categoryClauses,
+      ],
+    });
+  }
+
+  const categoryId = searchParams.get('categoryId');
+  if (categoryId && categoryId !== 'all' && ObjectId.isValid(categoryId)) {
+    const oid = new ObjectId(categoryId);
+    and.push({ $or: [{ categoryId: oid }, { categoryId: categoryId }] });
+  }
+
+  const catalog = searchParams.get('catalog') ?? 'all';
+  if (catalog === 'active') and.push({ status: { $nin: INACTIVE_STATUS_VALUES } });
+  if (catalog === 'inactive') and.push({ status: { $in: INACTIVE_STATUS_VALUES } });
+
+  const stock = searchParams.get('stock') ?? 'all';
+  if (stock === 'in_stock') and.push({ stock: { $gt: 0 } });
+  if (stock === 'out') and.push({ stock: { $lte: 0 } });
+
+  const featured = searchParams.get('featured') ?? 'all';
+  if (featured === 'yes') and.push({ featured: true });
+  if (featured === 'no') and.push({ featured: false });
+
+  const query = and.length ? { $and: and } : {};
+
+  const [marcasRaw, subcatsRaw] = await Promise.all([
+    productsCollection.distinct('marca', query),
+    productsCollection.distinct('subcategoria', query),
+  ]);
+
+  const clean = (arr: any[]) =>
+    arr
+      .map((x) => String(x ?? '').trim())
+      .filter((x) => x.length > 0 && x !== '—' && x !== '-')
+      .sort((a, b) => a.localeCompare(b, 'pt', { sensitivity: 'base' }));
+
+  return {
+    marcas: clean(marcasRaw as any[]),
+    subcategorias: clean(subcatsRaw as any[]),
   };
 }
 
@@ -1311,6 +1396,8 @@ export type QuoteRequestStatus = 'pending' | 'viewed' | 'answered' | 'archived';
 /** Resposta do cliente à proposta enviada pelo admin */
 export type QuoteClientDecision = 'pending' | 'accepted' | 'rejected';
 
+export type QuoteRequestFollowUpStatus = 'new' | 'claimed' | 'contacted' | 'in_progress' | 'done';
+
 export type { QuoteProposalStored } from './quote-proposal-totals';
 
 export type QuoteRequestInsert = {
@@ -1343,6 +1430,12 @@ function normalizeQuoteRequest(doc: any) {
     shippingCityState: doc.shippingCityState != null ? String(doc.shippingCityState) : null,
     requestShippingQuote: doc.requestShippingQuote === true,
     requestPixDiscount: doc.requestPixDiscount === true,
+    followUpStatus: normalizeFollowUpStatus(doc.followUpStatus),
+    assignedToUserId: doc.assignedToUserId != null ? String(doc.assignedToUserId) : null,
+    assignedToName: doc.assignedToName != null ? String(doc.assignedToName) : null,
+    assignedAt: doc.assignedAt ?? null,
+    contactedAt: doc.contactedAt ?? null,
+    followUpNotes: doc.followUpNotes != null ? String(doc.followUpNotes).slice(0, 4000) : null,
     proposal: normalizeQuoteProposalDoc(doc.proposal),
     proposalSentAt: doc.proposalSentAt ?? null,
     clientDecision: normalizeClientDecision(doc.clientDecision, doc.proposalSentAt),
@@ -1351,6 +1444,15 @@ function normalizeQuoteRequest(doc: any) {
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
   };
+}
+
+function normalizeFollowUpStatus(raw: any): QuoteRequestFollowUpStatus {
+  return raw === 'claimed' ||
+    raw === 'contacted' ||
+    raw === 'in_progress' ||
+    raw === 'done'
+    ? raw
+    : 'new';
 }
 
 function normalizeQuoteProposalDoc(raw: any): QuoteProposalStored | null {
@@ -1451,6 +1553,141 @@ export async function getQuoteRequestById(id: string) {
   const doc = await col.findOne({ _id: oid });
   if (!doc) return null;
   return normalizeQuoteRequest(doc);
+}
+
+export async function claimQuoteRequest(params: {
+  id: string;
+  actorUserId: string;
+  actorName: string;
+  /** Se true, sobrescreve responsável atual */
+  force?: boolean;
+}): Promise<{ ok: boolean; alreadyClaimed?: boolean; notFound?: boolean }> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(params.id);
+  } catch {
+    return { ok: false, notFound: true };
+  }
+
+  const now = new Date();
+  const filter: any = { _id: oid };
+  if (!params.force) {
+    filter.$or = [{ assignedToUserId: { $exists: false } }, { assignedToUserId: null }];
+  }
+
+  const res = await col.updateOne(filter, {
+    $set: {
+      followUpStatus: 'claimed',
+      assignedToUserId: params.actorUserId,
+      assignedToName: params.actorName,
+      assignedAt: now,
+      updatedAt: now,
+    },
+  });
+
+  if (res.matchedCount <= 0) {
+    const existing = await col.findOne({ _id: oid }, { projection: { assignedToUserId: 1 } });
+    if (!existing) return { ok: false, notFound: true };
+    return { ok: false, alreadyClaimed: true };
+  }
+
+  return { ok: true };
+}
+
+export async function releaseQuoteRequest(params: {
+  id: string;
+  actorUserId: string;
+  /** Se true, libera mesmo se outro responsável */
+  force?: boolean;
+}): Promise<{ ok: boolean; notFound?: boolean; forbidden?: boolean }> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(params.id);
+  } catch {
+    return { ok: false, notFound: true };
+  }
+
+  const now = new Date();
+  const filter: any = { _id: oid };
+  if (!params.force) {
+    filter.assignedToUserId = params.actorUserId;
+  }
+
+  const res = await col.updateOne(filter, {
+    $set: { followUpStatus: 'new', updatedAt: now },
+    $unset: { assignedToUserId: '', assignedToName: '', assignedAt: '' },
+  });
+
+  if (res.matchedCount > 0) return { ok: true };
+
+  const existing = await col.findOne({ _id: oid }, { projection: { assignedToUserId: 1 } });
+  if (!existing) return { ok: false, notFound: true };
+  return { ok: false, forbidden: true };
+}
+
+export async function markQuoteRequestContacted(params: {
+  id: string;
+  actorUserId: string;
+  actorName: string;
+}): Promise<{ ok: boolean; notFound?: boolean }> {
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(params.id);
+  } catch {
+    return { ok: false, notFound: true };
+  }
+
+  const now = new Date();
+  const res = await col.updateOne(
+    { _id: oid },
+    {
+      $set: {
+        followUpStatus: 'contacted',
+        contactedAt: now,
+        // Se ninguém assumiu ainda, registra quem marcou.
+        assignedToUserId: params.actorUserId,
+        assignedToName: params.actorName,
+        assignedAt: now,
+        updatedAt: now,
+      },
+    }
+  );
+  if (res.matchedCount <= 0) return { ok: false, notFound: true };
+  return { ok: true };
+}
+
+export async function appendQuoteRequestFollowUpNote(params: {
+  id: string;
+  note: string;
+}): Promise<{ ok: boolean; notFound?: boolean }> {
+  const note = String(params.note ?? '').trim().slice(0, 4000);
+  if (!note) return { ok: true };
+  const db = await connectToDatabase();
+  const col = db.collection('quote_requests');
+  let oid: ObjectId;
+  try {
+    oid = new ObjectId(params.id);
+  } catch {
+    return { ok: false, notFound: true };
+  }
+  const now = new Date();
+  const res = await col.updateOne(
+    { _id: oid },
+    {
+      $set: {
+        followUpNotes: note,
+        updatedAt: now,
+      },
+    }
+  );
+  if (res.matchedCount <= 0) return { ok: false, notFound: true };
+  return { ok: true };
 }
 
 export async function updateQuoteRequestStatus(

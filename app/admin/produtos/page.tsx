@@ -69,6 +69,9 @@ interface Product {
 interface Category {
   id: string;
   name: string;
+  slug?: string;
+  parentId?: string | null;
+  isRoot?: boolean;
 }
 
 /** Pré-visualização de importação de catálogo (resposta JSON da API). */
@@ -200,6 +203,12 @@ export default function AdminProdutosPage() {
   const [filterFeatured, setFilterFeatured] = useState<'all' | 'yes' | 'no'>('all');
   const [filterMarca, setFilterMarca] = useState('');
   const [filterSubcategoria, setFilterSubcategoria] = useState('');
+  const [filterOptionsAdmin, setFilterOptionsAdmin] = useState<{
+    marcas: string[];
+    subcategorias: string[];
+  }>({ marcas: [], subcategorias: [] });
+  const [filterOptionsAdminLoading, setFilterOptionsAdminLoading] = useState(false);
+  const filterOptionsReqSeq = useRef(0);
 
   const [listPage, setListPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -216,6 +225,42 @@ export default function AdminProdutosPage() {
     const t = setTimeout(() => setDebouncedSearch(filterSearch.trim()), 400);
     return () => clearTimeout(t);
   }, [filterSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const seq = ++filterOptionsReqSeq.current;
+    (async () => {
+      setFilterOptionsAdminLoading(true);
+      try {
+        const p = new URLSearchParams();
+        if (debouncedSearch) p.set('q', debouncedSearch);
+        if (filterCategoryId !== 'all') p.set('categoryId', filterCategoryId);
+        if (filterCatalog !== 'all') p.set('catalog', filterCatalog);
+        if (filterStock !== 'all') p.set('stock', filterStock);
+        if (filterFeatured !== 'all') p.set('featured', filterFeatured);
+        const res = await fetch(`/api/admin/products/filters?${p.toString()}`, {
+          credentials: 'include',
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (seq !== filterOptionsReqSeq.current) return;
+        setFilterOptionsAdmin({
+          marcas: Array.isArray(data?.marcas) ? data.marcas : [],
+          subcategorias: Array.isArray(data?.subcategorias) ? data.subcategorias : [],
+        });
+      } catch {
+        // ignore
+      } finally {
+        if (cancelled) return;
+        if (seq !== filterOptionsReqSeq.current) return;
+        setFilterOptionsAdminLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedSearch, filterCategoryId, filterCatalog, filterStock, filterFeatured]);
 
   useEffect(() => {
     setListPage(1);
@@ -393,7 +438,12 @@ export default function AdminProdutosPage() {
       const res = await fetch('/api/categories');
       if (res.ok) {
         const data = await res.json();
-        setCategories(data ?? []);
+        const rows: Category[] = Array.isArray(data) ? data : [];
+        // No filtro do admin, queremos apenas as 6 categorias macro (raízes).
+        const roots = rows.filter((c) => c?.isRoot === true || !c?.parentId);
+        // Ordenação estável por nome
+        roots.sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR'));
+        setCategories(roots);
       }
     } catch (error) {
       console.error('Erro:', error);
@@ -1057,23 +1107,43 @@ export default function AdminProdutosPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Subcategoria</label>
-            <Input
-              value={filterSubcategoria}
-              onChange={(e) => setFilterSubcategoria(e.target.value)}
-              placeholder="Ex.: Conexões PVC"
-              className="h-9"
-              aria-label="Filtrar por subcategoria"
-            />
+            <Select
+              value={filterSubcategoria.trim() ? filterSubcategoria : '__all__'}
+              onValueChange={(v) => setFilterSubcategoria(v === '__all__' ? '' : v)}
+              disabled={filterOptionsAdminLoading}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todas</SelectItem>
+                {filterOptionsAdmin.subcategorias.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Marca</label>
-            <Input
-              value={filterMarca}
-              onChange={(e) => setFilterMarca(e.target.value)}
-              placeholder="Ex.: Tigre"
-              className="h-9"
-              aria-label="Filtrar por marca"
-            />
+            <Select
+              value={filterMarca.trim() ? filterMarca : '__all__'}
+              onValueChange={(v) => setFilterMarca(v === '__all__' ? '' : v)}
+              disabled={filterOptionsAdminLoading}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todas</SelectItem>
+                {filterOptionsAdmin.marcas.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Catálogo</label>
@@ -1124,6 +1194,11 @@ export default function AdminProdutosPage() {
             </Select>
           </div>
         </div>
+        {filterOptionsAdminLoading ? (
+          <p className="mt-2 text-[11px] text-gray-500">
+            Carregando marcas e subcategorias desta categoria…
+          </p>
+        ) : null}
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
