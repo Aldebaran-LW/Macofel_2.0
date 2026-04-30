@@ -27,7 +27,8 @@ export const dynamic = 'force-dynamic';
 async function getFeaturedProducts() {
   try {
     const result = await getProducts({ featured: true, limit: 8 });
-    return result.products ?? [];
+    // Home: mostrar apenas produtos com foto (ativo já é filtrado em getProducts).
+    return (result.products ?? []).filter((p: any) => Boolean(p?.imageUrl));
   } catch {
     return [];
   }
@@ -36,7 +37,7 @@ async function getFeaturedProducts() {
 async function getRecentProducts() {
   try {
     const result = await getProducts({ limit: 8 });
-    return result.products ?? [];
+    return (result.products ?? []).filter((p: any) => Boolean(p?.imageUrl));
   } catch {
     return [];
   }
@@ -90,8 +91,9 @@ async function ProductsByCategory() {
         // Tentar cada slug possível até encontrar produtos
         for (const slug of possibleSlugs) {
           const result = await getProducts({ categorySlug: slug, limit: 8 });
-          if (result.products && result.products.length > 0) {
-            products = result.products;
+          const withPhoto = (result.products ?? []).filter((p: any) => Boolean(p?.imageUrl));
+          if (withPhoto.length > 0) {
+            products = withPhoto;
             break;
           }
         }
@@ -380,6 +382,7 @@ export default async function HomePageDecarStyle() {
       <ServiceBadges />
       <CategoryCards />
       <FeaturedProducts />
+      <ProductsByCategory />
       <StoreFooter />
       <StoreWhatsAppFloat />
     </div>

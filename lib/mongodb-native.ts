@@ -271,6 +271,15 @@ export async function getProducts(filters?: {
     ) {
       category = categoryById.get(product.categoryId) ?? null;
     }
+    const rawImageUrls = Array.isArray(product.imageUrls) ? product.imageUrls : [];
+    const cleanImageUrls = rawImageUrls
+      .map((u: unknown) => (typeof u === 'string' ? u.trim() : ''))
+      .filter((u: string) => u.length > 0);
+    const primaryImageUrl =
+      (typeof product.imageUrl === 'string' ? product.imageUrl.trim() : '') ||
+      cleanImageUrls[0] ||
+      null;
+
     return {
       id: product._id.toString(),
       name: product.name,
@@ -282,8 +291,8 @@ export async function getProducts(filters?: {
       minStock: product.minStock ?? null,
       weight: product.weight ?? null,
       dimensionsCm: product.dimensionsCm ?? null,
-      imageUrl: product.imageUrl,
-      imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
+      imageUrl: primaryImageUrl,
+      imageUrls: cleanImageUrls,
       featured: product.featured,
       onSale: Boolean(product.onSale ?? product.promocao ?? product.promotion),
       marca: product.marca ?? null,
@@ -828,8 +837,18 @@ export async function getProductBySlug(slug: string) {
     minStock: product.minStock ?? null,
     weight: product.weight ?? null,
     dimensionsCm: product.dimensionsCm ?? null,
-    imageUrl: product.imageUrl,
-    imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
+    imageUrl:
+      (typeof product.imageUrl === 'string' ? product.imageUrl.trim() : '') ||
+      (Array.isArray(product.imageUrls)
+        ? product.imageUrls
+            .map((u: unknown) => (typeof u === 'string' ? u.trim() : ''))
+            .filter((u: string) => u.length > 0)[0] ?? null
+        : null),
+    imageUrls: Array.isArray(product.imageUrls)
+      ? product.imageUrls
+          .map((u: unknown) => (typeof u === 'string' ? u.trim() : ''))
+          .filter((u: string) => u.length > 0)
+      : [],
     featured: product.featured,
     categoryId: product.categoryId,
     category: category
