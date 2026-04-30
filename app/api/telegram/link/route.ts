@@ -94,10 +94,47 @@ export async function POST(req: NextRequest) {
   if (!phoneE164) return badRequest('Telefone inválido (não consegui normalizar)');
 
   // Procura por usuário com phone compatível.
-  // Ideal: armazenar phone sempre em E.164. Aqui tentamos casar com valor já salvo.
+  // Ideal: armazenar phone sempre em E.164. Na prática, dados legados podem estar sem +55,
+  // com máscara, ou só dígitos. Aqui tentamos casar com algumas variações seguras.
+  const phoneDigits = phoneRaw.replace(/\D/g, '');
+  const phoneDigitsLocal =
+    phoneDigits.startsWith('55') && (phoneDigits.length === 12 || phoneDigits.length === 13)
+      ? phoneDigits.slice(2)
+      : phoneDigits;
+  const last11 = phoneDigitsLocal.slice(-11);
+  const last10 = phoneDigitsLocal.slice(-10);
+  const last9 = phoneDigitsLocal.slice(-9);
+  const last8 = phoneDigitsLocal.slice(-8);
+
+  const or: Array<{ phone: any }> = [];
+  const pushEq = (v: string | null | undefined) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (!s) return;
+    or.push({ phone: s });
+  };
+  const pushContains = (v: string | null | undefined) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (!s) return;
+    // `contains` ajuda a casar telefones com máscara (ex.: "(18) 98805-7343").
+    or.push({ phone: { contains: s } });
+  };
+
+  // 1) matches exatos (mais confiáveis)
+  pushEq(phoneE164);
+  pushEq(phoneRaw);
+  pushEq(phoneDigits);
+  pushEq(phoneDigitsLocal);
+  pushEq(`+${phoneDigits}`);
+
+  // 2) matches por substring (para valores com máscara / espaços / etc.)
+  pushContains(last11);
+  pushContains(last10);
+  pushContains(last9);
+  pushContains(last8);
+
   const candidates = await prisma.user.findMany({
     where: {
-      OR: [{ phone: phoneE164 }, { phone: phoneRaw }],
+      OR: or,
     },
     select: { id: true, email: true, role: true, phone: true },
     take: 3,
