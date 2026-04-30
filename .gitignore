@@ -25,6 +25,9 @@ lib/site-packages/
 # misc
 .DS_Store
 *.pem
+desktop.ini
+**/desktop.ini
+Thumbs.db
 
 # debug
 npm-debug.log*
@@ -83,6 +86,7 @@ next-env.d.ts
 /share/
 
 # Pipeline de enriquecimento Macofel (local — saídas e credenciais Abacus)
+/Macofel_Enriquecimento/
 /Macofel_Enriquecimento/.env
 /Macofel_Enriquecimento/**/.abacus.donotdelete
 /Macofel_Enriquecimento/macofel_enriched_products*.json
@@ -96,3 +100,6 @@ next-env.d.ts
 /Macofel_Enriquecimento/blocked_fetch_domains.json
 /Macofel_Enriquecimento/Lib/
 /Macofel_Enriquecimento/Scripts/
+
+# Uploads temporários (Google Drive sync / Cursor)
+/.tmp.driveupload/
