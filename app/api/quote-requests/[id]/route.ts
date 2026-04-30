@@ -3,6 +3,10 @@ import { getAuthUserFromRequest } from '@/lib/get-authenticated-user-id';
 import {
   getQuoteRequestById,
   updateQuoteRequestStatus,
+  claimQuoteRequest,
+  releaseQuoteRequest,
+  markQuoteRequestContacted,
+  appendQuoteRequestFollowUpNote,
   saveQuoteRequestProposalDraft,
   sendQuoteRequestProposalToClient,
   setQuoteRequestClientDecision,
@@ -112,6 +116,57 @@ export async function PATCH(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
+    if (body?.claim === true) {
+      const name = (auth.name || auth.email || auth.userId).trim();
+      const r = await claimQuoteRequest({
+        id,
+        actorUserId: auth.userId,
+        actorName: name,
+        force: body?.force === true,
+      });
+      if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      if (r.alreadyClaimed) {
+        return NextResponse.json(
+          { error: 'Já está em atendimento por outra pessoa' },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body?.release === true) {
+      const r = await releaseQuoteRequest({
+        id,
+        actorUserId: auth.userId,
+        force: body?.force === true,
+      });
+      if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      if (r.forbidden) {
+        return NextResponse.json(
+          { error: 'Só o responsável pode liberar (ou use force)' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body?.markContacted === true) {
+      const name = (auth.name || auth.email || auth.userId).trim();
+      const r = await markQuoteRequestContacted({
+        id,
+        actorUserId: auth.userId,
+        actorName: name,
+      });
+      if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (typeof body?.followUpNote === 'string') {
+      const r = await appendQuoteRequestFollowUpNote({ id, note: body.followUpNote });
+      if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      return NextResponse.json({ ok: true });
+    }
+
     if (body?.sendProposalToClient === true && body?.proposal) {
       const ok = await sendQuoteRequestProposalToClient(id, body.proposal);
       if (!ok) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
@@ -140,7 +195,10 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: 'Informe status, saveProposalDraft ou sendProposalToClient' },
+      {
+        error:
+          'Informe status, claim, release, markContacted, followUpNote, saveProposalDraft ou sendProposalToClient',
+      },
       { status: 400 }
     );
   } catch (e: any) {

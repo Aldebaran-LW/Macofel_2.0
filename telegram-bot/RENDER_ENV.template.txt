@@ -1,0 +1,12 @@
+# Variáveis de Ambiente (Render) — Serviço: telegram-bot
+#
+# Cole aqui as variáveis do painel da Render.
+# Dica: mantenha os nomes exatamente como estão.
+#
+# Obrigatórias
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_INTEGRATION_KEY=
+MACOFEL_BASE_URL=
+#
+# Opcional (Render injeta PORT automaticamente)
+PORT=
