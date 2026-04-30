@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -116,6 +116,8 @@ function CatalogoContent() {
   });
   const [addingId, setAddingId] = useState<string | null>(null);
   const [wishedIds, setWishedIds] = useState<Set<string>>(new Set());
+  const productsReqSeq = useRef(0);
+  const filtersReqSeq = useRef(0);
 
   useEffect(() => { fetchCategories(); }, []);
 
@@ -214,6 +216,7 @@ function CatalogoContent() {
   };
 
   const fetchProducts = async () => {
+    const seq = ++productsReqSeq.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: '12' });
@@ -234,6 +237,7 @@ function CatalogoContent() {
 
       const res = await fetch(`/api/products?${params}`);
       const data = await res.json();
+      if (seq !== productsReqSeq.current) return;
       if (res.ok) {
         setProducts(data?.products ?? []);
         setTotalPages(data?.pagination?.totalPages ?? 1);
@@ -243,14 +247,17 @@ function CatalogoContent() {
         setProducts([]);
       }
     } catch {
+      if (seq !== productsReqSeq.current) return;
       toast.error('Erro de conexão');
       setProducts([]);
     } finally {
+      if (seq !== productsReqSeq.current) return;
       setLoading(false);
     }
   };
 
   const fetchFilterOptions = async () => {
+    const seq = ++filtersReqSeq.current;
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
@@ -263,6 +270,7 @@ function CatalogoContent() {
       const res = await fetch(`/api/products/filters?${params}`);
       if (!res.ok) return;
       const data = await res.json();
+      if (seq !== filtersReqSeq.current) return;
       setFilterOptions({
         marcas: Array.isArray(data?.marcas) ? data.marcas : [],
         materiais: Array.isArray(data?.materiais) ? data.materiais : [],
@@ -278,8 +286,8 @@ function CatalogoContent() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setSearch(searchInput.trim());
     setPage(1);
-    fetchProducts();
   };
 
   const clearFilters = () => {
@@ -870,7 +878,7 @@ function CatalogoContent() {
                 {search && (
                   <span className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full">
                     Busca: "{search}"
-                    <button onClick={() => { setSearch(''); setPage(1); fetchProducts(); }}>
+                    <button onClick={() => { setSearch(''); setPage(1); }}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -985,7 +993,7 @@ function CatalogoContent() {
                 {(minPrice || maxPrice) && (
                   <span className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full">
                     R$ {minPrice || '0'} — R$ {maxPrice || '∞'}
-                    <button onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1); fetchProducts(); }}>
+                    <button onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1); }}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
