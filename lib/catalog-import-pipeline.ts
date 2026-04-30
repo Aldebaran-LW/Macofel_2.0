@@ -283,6 +283,7 @@ type BarcodeWebMedia = {
   photos: string[];
   weight_grams: number | null;
   dimensions_cm: string | null;
+  ncm: string | null;
 };
 
 async function geminiBarcodeCoherence(
@@ -538,6 +539,7 @@ export async function applyGeminiEnrichmentToCatalogDocument(
           photos: Array.isArray(info.photos) ? info.photos.filter((u) => /^https?:\/\//i.test(u)) : [],
           weight_grams: info.weight_grams ?? null,
           dimensions_cm: info.dimensions_cm ?? null,
+          ncm: info.ncm ?? null,
         };
       }
     }
@@ -583,6 +585,7 @@ export async function applyGeminiEnrichmentToCatalogDocument(
         const missingUrls =
           !Array.isArray(existingDoc.imageUrls) ||
           (existingDoc.imageUrls as unknown[]).length === 0;
+        const missingNcm = !existingDoc.ncm || !String(existingDoc.ncm).trim();
 
         if (missingImg && barcodeWebMedia.photos.length > 0) {
           setLive.imageUrl = barcodeWebMedia.photos[0];
@@ -597,6 +600,9 @@ export async function applyGeminiEnrichmentToCatalogDocument(
         }
         if (missingDims && barcodeWebMedia.dimensions_cm) {
           setLive.dimensionsCm = barcodeWebMedia.dimensions_cm;
+        }
+        if (missingNcm && barcodeWebMedia.ncm) {
+          setLive.ncm = barcodeWebMedia.ncm;
         }
       }
 
@@ -615,6 +621,7 @@ export async function applyGeminiEnrichmentToCatalogDocument(
                 : [],
               weight_grams: draftInfo.weight_grams ?? null,
               dimensions_cm: draftInfo.dimensions_cm ?? null,
+              ncm: draftInfo.ncm ?? null,
             };
           }
         } catch {
@@ -654,6 +661,9 @@ export async function applyGeminiEnrichmentToCatalogDocument(
         }
         if (draftMedia.dimensions_cm) {
           setDraft.dimensionsCm = draftMedia.dimensions_cm;
+        }
+        if (draftMedia.ncm) {
+          setDraft.ncm = draftMedia.ncm;
         }
       }
 

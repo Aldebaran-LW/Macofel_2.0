@@ -18,6 +18,11 @@ function digitsOnly(s: string): string {
   return String(s ?? '').replace(/\D/g, '');
 }
 
+function normalizeNcm(raw: unknown): string | null {
+  const d = digitsOnly(String(raw ?? ''));
+  return d.length === 8 ? d : null;
+}
+
 function textContainsEan(blob: string, eanDigits: string): boolean {
   if (!eanDigits) return false;
   return digitsOnly(blob).includes(eanDigits);
@@ -167,6 +172,7 @@ function toResponseFromGemini(
   const dimRaw = obj.dimensions_cm;
   const dimensions_cm =
     typeof dimRaw === 'string' && dimRaw.trim() ? dimRaw.trim().replace(/x/gi, ' × ') : null;
+  const ncm = normalizeNcm((obj as Record<string, unknown>).ncm);
   let price_reference: number | null = null;
   if (typeof obj.price_reference === 'number' && Number.isFinite(obj.price_reference)) {
     price_reference = obj.price_reference;
@@ -181,6 +187,7 @@ function toResponseFromGemini(
     photos,
     weight_grams,
     dimensions_cm,
+    ncm,
     price_reference,
     source: sourceLabel,
     ml_url: typeof obj.ml_url === 'string' ? obj.ml_url : null,
@@ -332,11 +339,12 @@ Regras:
 - photos: só URLs http(s) que pareçam imagens de produto.
 - dimensions_cm: string "altura × largura × comprimento" em cm (ex.: "20 × 15 × 30").
 - weight_grams: número inteiro em gramas ou null.
+- ncm: string com 8 dígitos (sem pontuação) ou null.
 - price_reference: preço de referência em BRL (número) ou null.
 - source deve ser exatamente: "google_gemini"
 
 Formato:
-{"title":"...","weight_grams":null,"dimensions_cm":null,"photos":[],"price_reference":null,"source":"google_gemini"}`;
+{"title":"...","weight_grams":null,"dimensions_cm":null,"ncm":null,"photos":[],"price_reference":null,"source":"google_gemini"}`;
 
   const geminiRes = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
     method: 'POST',
@@ -483,10 +491,11 @@ Regras:
 - matched_ean: string "${eanDigits}" quando houver evidência (Google ou ML acima); se não houver evidência nenhuma, usa null.
 - photos: só URLs http(s) que apareçam nos resultados ou no contexto ML; nunca inventar.
 - dimensions_cm: "a × l × p" em cm ou null; weight_grams inteiro em gramas ou null; price_reference BRL ou null.
+- ncm: string com 8 dígitos (sem pontuação) ou null.
 - source exatamente: "google_gemini_ean"
 
 Exemplo de formato (substitui valores):
-{"title":"Nome do produto","matched_ean":"${eanDigits}","weight_grams":null,"dimensions_cm":null,"photos":[],"price_reference":null,"source":"google_gemini_ean"}`;
+{"title":"Nome do produto","matched_ean":"${eanDigits}","weight_grams":null,"dimensions_cm":null,"ncm":null,"photos":[],"price_reference":null,"source":"google_gemini_ean"}`;
 
   const geminiRes = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
     method: 'POST',
@@ -546,6 +555,7 @@ function mergePreferMl(
     photos: ml.photos.length ? ml.photos : gem.photos,
     weight_grams: ml.weight_grams ?? gem.weight_grams,
     dimensions_cm: ml.dimensions_cm ?? gem.dimensions_cm,
+    ncm: ml.ncm ?? gem.ncm ?? null,
     price_reference: ml.price_reference ?? gem.price_reference,
     source:
       ml.photos.length && ml.weight_grams != null && ml.dimensions_cm

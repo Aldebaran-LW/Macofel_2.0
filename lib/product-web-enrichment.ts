@@ -10,6 +10,7 @@ export type BarcodeEnrichmentPatch = {
   imageUrls?: string[];
   weight?: number;
   dimensionsCm?: string;
+  ncm?: string;
 };
 
 export type BarcodeEnrichmentPreviewRow = {
@@ -64,7 +65,7 @@ export async function enrichExistingProductIfSparse(
   const db = await connectToDatabase();
   const doc = await db.collection('products').findOne(
     { _id: oid, status: true },
-    { projection: { weight: 1, imageUrl: 1, dimensionsCm: 1, imageUrls: 1 } }
+    { projection: { weight: 1, imageUrl: 1, dimensionsCm: 1, imageUrls: 1, ncm: 1 } }
   );
   if (!doc) return { updated: false, fields: [] };
 
@@ -72,8 +73,9 @@ export async function enrichExistingProductIfSparse(
   const needImg = !doc.imageUrl || !String(doc.imageUrl).trim();
   const needDim = !doc.dimensionsCm || !String(doc.dimensionsCm).trim();
   const needUrls = !Array.isArray(doc.imageUrls) || doc.imageUrls.length === 0;
+  const needNcm = !doc.ncm || !String(doc.ncm).trim();
 
-  if (!needWeight && !needImg && !needDim && !needUrls) {
+  if (!needWeight && !needImg && !needDim && !needUrls && !needNcm) {
     return { updated: false, fields: [] };
   }
 
@@ -97,6 +99,9 @@ export async function enrichExistingProductIfSparse(
   }
   if (needUrls && info.photos?.length) {
     $set.imageUrls = info.photos;
+  }
+  if (needNcm && info.ncm) {
+    $set.ncm = info.ncm;
   }
 
   const fields = Object.keys($set);
@@ -175,6 +180,9 @@ export async function previewBarcodeEnrichmentForProduct(
   if (info.dimensions_cm) {
     patch.dimensionsCm = info.dimensions_cm;
   }
+  if (info.ncm) {
+    patch.ncm = info.ncm;
+  }
 
   const canApply = Object.keys(patch).length > 0;
   return {
@@ -204,6 +212,10 @@ function patchToSet(patch: BarcodeEnrichmentPatch): Record<string, unknown> | nu
   }
   if (patch.dimensionsCm && String(patch.dimensionsCm).trim()) {
     $set.dimensionsCm = String(patch.dimensionsCm).trim();
+  }
+  if (patch.ncm && String(patch.ncm).trim()) {
+    const digits = String(patch.ncm).replace(/\D/g, '');
+    if (digits.length === 8) $set.ncm = digits;
   }
   return Object.keys($set).length ? $set : null;
 }
@@ -327,6 +339,8 @@ export async function findProductsForBarcodeEnrichmentPreview(params: {
         { weight: { $exists: false } },
         { dimensionsCm: { $in: [null, ''] } },
         { dimensionsCm: { $exists: false } },
+        { ncm: { $in: [null, ''] } },
+        { ncm: { $exists: false } },
       ],
     });
   }

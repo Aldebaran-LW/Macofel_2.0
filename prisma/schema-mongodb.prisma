@@ -64,6 +64,8 @@ model Product {
   categoryId   String   @db.ObjectId
   /// Texto livre (ex.: dimensões para envio); enriquecimento ML/Gemini pode preencher.
   dimensionsCm String?
+  /// NCM (8 dígitos) para fiscal/nota. Pode ser preenchido por enriquecimento via EAN.
+  ncm         String?
   /// Última pré-visualização do enriquecimento por EAN (Master); evita repetir o lote até pedires «incluir já consultados».
   eanEnrichmentCheckedAt DateTime?
   createdAt    DateTime @default(now())
@@ -78,6 +80,7 @@ model Product {
   @@index([subcategoria])
   @@index([origin])
   @@index([eanEnrichmentCheckedAt])
+  @@index([ncm])
 }
 
 model HeroImage {
