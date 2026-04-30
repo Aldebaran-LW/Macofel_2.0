@@ -51,6 +51,15 @@ export default function MasterEquipePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(defaultCreateForm);
   const [creating, setCreating] = useState(false);
+  const [editUser, setEditUser] = useState<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    pdvUserName: string;
+    phone: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const [pdvEdit, setPdvEdit] = useState<{
     id: string;
     email: string;
@@ -168,6 +177,37 @@ export default function MasterEquipePage() {
     }
   };
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/master/users/${editUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: editUser.email.trim(),
+          firstName: editUser.firstName.trim(),
+          lastName: editUser.lastName.trim(),
+          pdvUserName: editUser.pdvUserName.trim(),
+          phone: editUser.phone,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof data?.error === 'string' ? data.error : 'Erro ao guardar');
+        return;
+      }
+      toast.success('Funcionário atualizado');
+      setEditUser(null);
+      void load();
+    } catch {
+      toast.error('Erro de rede');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -220,6 +260,7 @@ export default function MasterEquipePage() {
                   <th className="px-4 py-3 font-semibold text-gray-700">User Name (PDV)</th>
                   <th className="px-4 py-3 font-semibold text-gray-700">Role</th>
                   <th className="px-4 py-3 font-semibold text-gray-700">Criado em</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -275,6 +316,26 @@ export default function MasterEquipePage() {
                         dateStyle: 'short',
                         timeStyle: 'short',
                       })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1 text-amber-800 hover:bg-amber-50"
+                        title="Editar cadastro"
+                        onClick={() =>
+                          setEditUser({
+                            id: u.id,
+                            email: u.email ?? '',
+                            firstName: u.firstName ?? '',
+                            lastName: u.lastName ?? '',
+                            pdvUserName: u.pdvUserName ?? '',
+                            phone: u.phone ?? '',
+                          })
+                        }
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -412,6 +473,80 @@ export default function MasterEquipePage() {
                 </Button>
                 <Button type="submit" disabled={pdvSaving}>
                   {pdvSaving ? 'A guardar…' : 'Guardar'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editUser} onOpenChange={(o) => !o && setEditUser(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar funcionário</DialogTitle>
+          </DialogHeader>
+          {editUser && (
+            <form onSubmit={handleEditSubmit} className="space-y-3">
+              <div>
+                <Label htmlFor="edit-email">Email (login no site)</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  required
+                  autoComplete="off"
+                  value={editUser.email}
+                  onChange={(e) => setEditUser((s) => (s ? { ...s, email: e.target.value } : s))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-pdv">User Name (login no PDV)</Label>
+                <Input
+                  id="edit-pdv"
+                  required
+                  placeholder="ex: lucas"
+                  autoComplete="off"
+                  className="font-mono"
+                  value={editUser.pdvUserName}
+                  onChange={(e) => setEditUser((s) => (s ? { ...s, pdvUserName: e.target.value } : s))}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Único na empresa. 2–32 caracteres: letras minúsculas, números, _ e -
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="edit-fn">Nome</Label>
+                  <Input
+                    id="edit-fn"
+                    required
+                    value={editUser.firstName}
+                    onChange={(e) => setEditUser((s) => (s ? { ...s, firstName: e.target.value } : s))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-ln">Sobrenome</Label>
+                  <Input
+                    id="edit-ln"
+                    required
+                    value={editUser.lastName}
+                    onChange={(e) => setEditUser((s) => (s ? { ...s, lastName: e.target.value } : s))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-phone">Telefone (opcional)</Label>
+                <Input
+                  id="edit-phone"
+                  value={editUser.phone}
+                  onChange={(e) => setEditUser((s) => (s ? { ...s, phone: e.target.value } : s))}
+                />
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => setEditUser(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={editSaving}>
+                  {editSaving ? 'A guardar…' : 'Guardar'}
                 </Button>
               </DialogFooter>
             </form>
