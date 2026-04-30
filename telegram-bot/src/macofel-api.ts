@@ -1,5 +1,18 @@
 export type LinkMode = 'code' | 'phone';
 
+export type TelegramMeResponse =
+  | { linked: false }
+  | {
+      linked: true;
+      user: { id: string; email: string; role: string; name: string };
+      telegram: {
+        telegramUserId: string;
+        telegramChatId: string | null;
+        telegramUsername: string | null;
+        phoneE164: string | null;
+      };
+    };
+
 export type LinkBody =
   | {
       mode: 'code';
@@ -31,6 +44,24 @@ export async function postTelegramLink(
     body: JSON.stringify(body),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
+}
+
+export async function getTelegramMe(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string
+): Promise<{ ok: boolean; status: number; data: TelegramMeResponse | Record<string, unknown> }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/api/telegram/me?telegramUserId=${encodeURIComponent(
+    telegramUserId
+  )}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Telegram-Key': integrationKey,
+    },
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
   return { ok: res.ok, status: res.status, data };
 }
 

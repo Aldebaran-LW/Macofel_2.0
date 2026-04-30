@@ -2,7 +2,7 @@ import 'dotenv/config';
 import http from 'node:http';
 import { Bot, InlineKeyboard, Keyboard, session } from 'grammy';
 import type { Context, SessionFlavor } from 'grammy';
-import { postTelegramLink, formatApiError } from './macofel-api.js';
+import { getTelegramMe, postTelegramLink, formatApiError } from './macofel-api.js';
 
 /** Render (e similares) injeta PORT — o Web Service precisa de um listener HTTP. */
 function startHealthServerIfPortSet(): void {
@@ -79,7 +79,44 @@ function mainMenuKeyboard(): InlineKeyboard {
     .text('Cancelar', 'cancel');
 }
 
+function opsMenuKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('Estoque', 'ops:stock')
+    .text('Produtos', 'ops:products')
+    .row()
+    .text('Orçamentos', 'ops:quotes')
+    .text('Vendas', 'ops:sales')
+    .row()
+    .text('Ajuda', 'help')
+    .text('Cancelar', 'cancel');
+}
+
 async function sendWelcome(ctx: BotContext) {
+  const telegramUserId = String(ctx.from?.id ?? '').trim();
+  if (!telegramUserId) {
+    await ctx.reply('Não consegui identificar seu usuário do Telegram. Tente novamente.');
+    return;
+  }
+
+  const me = await getTelegramMe(baseUrl!, integrationKey!, telegramUserId);
+  const linked = me.ok && (me.data as any)?.linked === true;
+
+  if (linked) {
+    const name = (me.data as any)?.user?.name ?? '';
+    await ctx.reply(
+      [
+        'Macofel: menu',
+        name ? `Olá, ${name}.` : null,
+        '',
+        'Escolha uma opção:',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      { reply_markup: opsMenuKeyboard() }
+    );
+    return;
+  }
+
   await ctx.reply(
     [
       'Macofel: vincular conta',
@@ -207,7 +244,7 @@ bot.on('message:text', async (ctx) => {
     await ctx.reply('Conta vinculada com sucesso.', {
       reply_markup: { remove_keyboard: true },
     });
-    await ctx.reply('O que você quer fazer agora?', { reply_markup: mainMenuKeyboard() });
+    await sendWelcome(ctx);
     return;
   }
 
@@ -243,11 +280,39 @@ bot.on('message:contact', async (ctx) => {
     await ctx.reply('Conta vinculada pelo telefone com sucesso.', {
       reply_markup: { remove_keyboard: true },
     });
-    await ctx.reply('O que você quer fazer agora?', { reply_markup: mainMenuKeyboard() });
+    await sendWelcome(ctx);
     return;
   }
   await ctx.reply(formatApiError(data, status), {
     reply_markup: { remove_keyboard: true },
+  });
+});
+
+bot.callbackQuery('ops:stock', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply('Estoque: em breve.\n\n(Próximo passo: Entrada / Baixa / Consultar)', {
+    reply_markup: opsMenuKeyboard(),
+  });
+});
+
+bot.callbackQuery('ops:products', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply('Produtos: em breve.\n\n(Próximo passo: Novo / Buscar / Alterar)', {
+    reply_markup: opsMenuKeyboard(),
+  });
+});
+
+bot.callbackQuery('ops:quotes', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply('Orçamentos: em breve.\n\n(Próximo passo: Novos / Assumir / Marcar contato)', {
+    reply_markup: opsMenuKeyboard(),
+  });
+});
+
+bot.callbackQuery('ops:sales', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply('Vendas: em breve.\n\n(Próximo passo: Alertas e resumo)', {
+    reply_markup: opsMenuKeyboard(),
   });
 });
 
