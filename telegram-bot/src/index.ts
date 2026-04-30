@@ -46,13 +46,13 @@ requireEnv();
 
 startHealthServerIfPortSet();
 
-const bot = new Bot(token!);
-
 type SessionData = {
   awaiting?: 'code';
 };
 
 type BotContext = Context & SessionFlavor<SessionData>;
+
+const bot = new Bot<BotContext>(token!);
 
 bot.use(
   session({
@@ -93,12 +93,12 @@ async function sendWelcome(ctx: BotContext) {
   );
 }
 
-bot.command('start', async (ctx: BotContext) => {
+bot.command('start', async (ctx) => {
   ctx.session.awaiting = undefined;
   await sendWelcome(ctx);
 });
 
-bot.command('entrar', async (ctx: BotContext) => {
+bot.command('entrar', async (ctx) => {
   const keyboard = new Keyboard().requestContact('Partilhar o meu número').resized();
   await ctx.reply(
     'Toque no botão abaixo para partilhar o número associado à sua conta Telegram. ' +
@@ -108,7 +108,7 @@ bot.command('entrar', async (ctx: BotContext) => {
 });
 
 /** /vincular ABCD-EFGH ou /vincular ABCDEFGH */
-bot.command('vincular', async (ctx: BotContext) => {
+bot.command('vincular', async (ctx) => {
   const text = ctx.message?.text?.trim() ?? '';
   const arg = text.split(/\s+/).slice(1).join(' ').trim();
   if (!arg) {
@@ -133,12 +133,12 @@ bot.command('vincular', async (ctx: BotContext) => {
   await ctx.reply(formatApiError(data, status));
 });
 
-bot.command('cancelar', async (ctx: BotContext) => {
+bot.command('cancelar', async (ctx) => {
   ctx.session.awaiting = undefined;
   await ctx.reply('Teclado removido.', { reply_markup: { remove_keyboard: true } });
 });
 
-bot.callbackQuery('help', async (ctx: BotContext) => {
+bot.callbackQuery('help', async (ctx) => {
   ctx.session.awaiting = undefined;
   await ctx.answerCallbackQuery();
   await ctx.reply(
@@ -154,7 +154,7 @@ bot.callbackQuery('help', async (ctx: BotContext) => {
   );
 });
 
-bot.callbackQuery('cancel', async (ctx: BotContext) => {
+bot.callbackQuery('cancel', async (ctx) => {
   ctx.session.awaiting = undefined;
   await ctx.answerCallbackQuery();
   await ctx.reply('Ok. Se quiser, toque em /start para recomeçar.', {
@@ -162,7 +162,7 @@ bot.callbackQuery('cancel', async (ctx: BotContext) => {
   });
 });
 
-bot.callbackQuery('link:code', async (ctx: BotContext) => {
+bot.callbackQuery('link:code', async (ctx) => {
   ctx.session.awaiting = 'code';
   await ctx.answerCallbackQuery();
   await ctx.reply(
@@ -174,7 +174,7 @@ bot.callbackQuery('link:code', async (ctx: BotContext) => {
   );
 });
 
-bot.callbackQuery('link:phone', async (ctx: BotContext) => {
+bot.callbackQuery('link:phone', async (ctx) => {
   ctx.session.awaiting = undefined;
   await ctx.answerCallbackQuery();
   const keyboard = new Keyboard().requestContact('Partilhar o meu número').resized();
@@ -187,10 +187,10 @@ bot.callbackQuery('link:phone', async (ctx: BotContext) => {
   );
 });
 
-bot.on('message:text', async (ctx: BotContext) => {
+bot.on('message:text', async (ctx) => {
   if (ctx.session.awaiting !== 'code') return;
 
-  const code = ctx.message.text.trim();
+  const code = ctx.message?.text?.trim() ?? '';
   if (!code) return;
 
   ctx.session.awaiting = undefined;
@@ -214,8 +214,9 @@ bot.on('message:text', async (ctx: BotContext) => {
   await ctx.reply(formatApiError(data, status), { reply_markup: mainMenuKeyboard() });
 });
 
-bot.on('message:contact', async (ctx: BotContext) => {
-  const contact = ctx.message.contact;
+bot.on('message:contact', async (ctx) => {
+  const contact = ctx.message?.contact;
+  if (!contact) return;
   const fromId = ctx.from?.id;
   if (contact.user_id !== fromId) {
     await ctx.reply('Por segurança, use apenas o contacto da sua própria conta.');
