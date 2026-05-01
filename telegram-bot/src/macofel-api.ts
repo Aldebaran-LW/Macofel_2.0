@@ -65,6 +65,99 @@ export async function getTelegramMe(
   return { ok: res.ok, status: res.status, data };
 }
 
+export type TelegramProductSearchItem = {
+  id: string;
+  name: string;
+  codigo: string | null;
+  codBarra: string | null;
+  stock: number;
+  price: number;
+  imageUrl: string | null;
+};
+
+export async function getTelegramProductSearch(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string,
+  q: string,
+  limit = 10
+): Promise<{ ok: boolean; status: number; data: { items: TelegramProductSearchItem[] } | Record<string, unknown> }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/api/telegram/products/search?q=${encodeURIComponent(
+    q
+  )}&limit=${encodeURIComponent(String(limit))}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Telegram-Key': integrationKey,
+      'x-telegram-userid': telegramUserId,
+    },
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  return { ok: res.ok, status: res.status, data };
+}
+
+export async function postTelegramStockMove(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string,
+  body: { productId: string; delta: number; reason?: string | null }
+): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/api/telegram/stock/move`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Telegram-Key': integrationKey,
+      'x-telegram-userid': telegramUserId,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
+}
+
+export async function getTelegramQuoteRequests(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string,
+  params?: { status?: string; page?: number; limit?: number }
+): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const urlObj = new URL(`${baseUrl.replace(/\/$/, '')}/api/telegram/quote-requests`);
+  if (params?.status) urlObj.searchParams.set('status', String(params.status));
+  if (params?.page) urlObj.searchParams.set('page', String(params.page));
+  if (params?.limit) urlObj.searchParams.set('limit', String(params.limit));
+  const res = await fetch(urlObj.toString(), {
+    method: 'GET',
+    headers: {
+      'X-Telegram-Key': integrationKey,
+      'x-telegram-userid': telegramUserId,
+    },
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
+}
+
+export async function patchTelegramQuoteRequest(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string,
+  id: string,
+  body: Record<string, unknown>
+): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/api/telegram/quote-requests/${encodeURIComponent(id)}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Telegram-Key': integrationKey,
+      'x-telegram-userid': telegramUserId,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
+}
+
 export function formatApiError(data: Record<string, unknown>, status: number): string {
   const err = data?.error;
   if (typeof err === 'string' && err.trim()) return err;

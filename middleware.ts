@@ -10,9 +10,27 @@ import {
   isMasterAdminRole,
   isPainelLojaRole,
 } from '@/lib/permissions';
+import { pingTelegramBotWakeIfStale } from '@/lib/telegram-render-wake';
 
 function isLojaRoute(pathname: string) {
   return pathname === '/loja' || pathname.startsWith('/loja/');
+}
+
+function shouldWakeTelegramBotOnPublicHit(pathname: string): boolean {
+  if (
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/static/') ||
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/robots.txt') ||
+    pathname.startsWith('/sitemap')
+  ) {
+    return false;
+  }
+  if (pathname.match(/\.(ico|png|jpg|jpeg|webp|gif|svg|woff2?|ttf|eot|pdf|txt|xml|map)$/i)) {
+    return false;
+  }
+  return true;
 }
 
 const authMiddleware = withAuth(
@@ -87,6 +105,16 @@ const authMiddleware = withAuth(
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const pathname = req.nextUrl.pathname;
 
+  /**
+   * “Wake” opcional do bot na Render: quando alguém navega páginas públicas do site em produção,
+   * faz um GET throttleado no `/health` do bot. Desligue com TELEGRAM_BOT_WAKE_URL=""
+   */
+  const wakeEnabledRaw = process.env.TELEGRAM_BOT_WAKE_URL;
+  const wakeGloballyDisabled = wakeEnabledRaw != null && String(wakeEnabledRaw).trim() === '';
+  if (!wakeGloballyDisabled && process.env.NODE_ENV === 'production' && shouldWakeTelegramBotOnPublicHit(pathname)) {
+    pingTelegramBotWakeIfStale();
+  }
+
   if (pathname.startsWith('/painel-loja')) {
     const secret = process.env.NEXTAUTH_SECRET;
     if (!secret) {
@@ -126,6 +154,12 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
 
 export const config = {
   matcher: [
+    /*
+     * Incluir rotas públicas para permitir disparo opcional ao navegar vitrine/catálogo.
+     * Exclude estáticos grandes via filtro dentro do middleware.
+     */
+    '/((?!api/|_next/static|_next/image).*)',
+
     '/painel-loja',
     '/painel-loja/:path*',
     '/admin/:path*',

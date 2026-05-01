@@ -2,8 +2,9 @@ name: Ping telegram-bot (keep awake)
 
 on:
   schedule:
-    # A cada 5 minutos
-    - cron: "*/5 * * * *"
+    # Intenção: tentar rodar a cada 10 minutos (UTC). O GitHub Actions NÃO garante precisão para `schedule`
+    # (pode atrasar/consolidar execuções dependendo de carga/políticas do GitHub).
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 jobs:
