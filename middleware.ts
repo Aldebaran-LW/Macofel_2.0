@@ -16,6 +16,30 @@ function isLojaRoute(pathname: string) {
   return pathname === '/loja' || pathname.startsWith('/loja/');
 }
 
+/**
+ * Rotas que não devem passar pelo gate `authorized: !!token` do `withAuth`.
+ * Sem isso, `/login` exige sessão → NextAuth redireciona de volta para `/login`
+ * com `callbackUrl` aninhado (ERR_TOO_MANY_REDIRECTS).
+ */
+function isPublicStorefrontPath(pathname: string): boolean {
+  if (
+    pathname === '/login' ||
+    pathname === '/logout' ||
+    pathname === '/cadastro' ||
+    pathname === '/'
+  ) {
+    return true;
+  }
+  if (
+    pathname.startsWith('/catalogo') ||
+    pathname.startsWith('/produto/') ||
+    pathname.startsWith('/decar')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function shouldWakeTelegramBotOnPublicHit(pathname: string): boolean {
   if (
     pathname.startsWith('/api/') ||
@@ -80,6 +104,10 @@ const authMiddleware = withAuth(
         const path = req.nextUrl.pathname;
         const isAdminRoute = path.startsWith('/admin');
         const isAdminLoginRoute = path === '/admin/login';
+
+        if (isPublicStorefrontPath(path)) {
+          return true;
+        }
 
         if (isAdminLoginRoute) {
           return true;

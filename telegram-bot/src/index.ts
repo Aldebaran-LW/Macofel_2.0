@@ -10,6 +10,10 @@ import {
   type TelegramProductSearchItem,
   postTelegramStockMove,
   getTelegramQuoteRequests,
+  getTelegramQuoteById,
+  getTelegramProductById,
+  patchTelegramProduct,
+  postTelegramProductCreate,
   patchTelegramQuoteRequest,
 } from './macofel-api.js';
 
@@ -58,9 +62,19 @@ startHealthServerIfPortSet();
 type SessionData = {
   /** Estado conhecido pela última vez em `sendWelcome` (para escolher teclado correto em Ajuda). */
   linked?: boolean;
-  awaiting?: 'code' | 'product_search' | 'stock_delta' | 'quote_note';
-  /** Motivo atual de busca de produto (define o próximo passo após clicar num resultado). */
-  productIntent?: 'products' | 'stock';
+  /** Papel do usuário Prisma quando vinculado (ex.: mostrar links do painel /admin apenas a ADMIN). */
+  userRole?: string;
+  awaiting?:
+    | 'code'
+    | 'product_search'
+    | 'stock_delta'
+    | 'quote_note'
+    | 'quote_id_lookup'
+    | 'prod_edit_price'
+    | 'prod_edit_name'
+    | 'prod_create_line';
+  /** Origem do fluxo após buscar produto: cadastro (painel/edição) ou só estoque. */
+  productMode?: 'cadastro' | 'estoque';
   selectedProductId?: string;
   pendingStockSign?: 1 | -1;
   pendingQuoteId?: string;
@@ -88,7 +102,7 @@ function telegramIds(ctx: { from?: { id: number; username?: string }; chat?: { i
 
 function mainMenuReplyKeyboard(): Keyboard {
   return new Keyboard()
-    .text('🔄 /start · Reinício')
+    .text('🏠 Início')
     .row()
     .text('📎 Vincular por código')
     .text('📱 Vincular por telefone')
@@ -101,8 +115,7 @@ function mainMenuReplyKeyboard(): Keyboard {
 
 function opsMenuReplyKeyboard(): Keyboard {
   return new Keyboard()
-    .text('🔄 /start · Reinício')
-    .text('🏠 Menu')
+    .text('🏠 Início')
     .row()
     .text('🛒 Produtos')
     .text('📦 Estoque')
@@ -139,7 +152,7 @@ function opsMenuKeyboard(): InlineKeyboard {
 async function dispatchCommand(ctx: BotContext, cmd: 'start'): Promise<void> {
   if (cmd === 'start') {
     ctx.session.awaiting = undefined;
-    ctx.session.productIntent = undefined;
+    ctx.session.productMode = undefined;
     ctx.session.selectedProductId = undefined;
     ctx.session.pendingStockSign = undefined;
     ctx.session.pendingQuoteId = undefined;
@@ -158,6 +171,7 @@ async function sendWelcome(ctx: BotContext) {
   const linked = me.ok && (me.data as any)?.linked === true;
 
   ctx.session.linked = linked ? true : false;
+  ctx.session.userRole = linked ? String((me.data as any)?.user?.role ?? '').trim() : undefined;
 
   if (linked) {
     const name = (me.data as any)?.user?.name ?? '';
@@ -229,21 +243,20 @@ bot.command('vincular', async (ctx) => {
 
 bot.command('cancelar', async (ctx) => {
   ctx.session.awaiting = undefined;
-  ctx.session.productIntent = undefined;
+  ctx.session.productMode = undefined;
   ctx.session.selectedProductId = undefined;
   ctx.session.pendingStockSign = undefined;
   ctx.session.pendingQuoteId = undefined;
   await ctx.reply('Teclado removido.', { reply_markup: { remove_keyboard: true } });
 });
 
-/** Equivalente ao /start quando o cliente usa apenas o teclado. */
-bot.hears(['🏠 Menu', 'Menu'], async (ctx) => {
-  await dispatchCommand(ctx, 'start');
-});
-
-bot.hears(['🔄 /start · Reinício', '/start · Reinício', '🔄 Reinício', 'Reinício'], async (ctx) => {
-  await dispatchCommand(ctx, 'start');
-});
+/** Mesmo comportamento que /start: volta ao menu principal e limpa fluxos temporários. */
+bot.hears(
+  ['🏠 Início', '🏠 Menu', 'Menu', '🔄 /start · Reinício', '/start · Reinício', '🔄 Reinício', 'Reinício'],
+  async (ctx) => {
+    await dispatchCommand(ctx, 'start');
+  }
+);
 
 bot.hears(['❓ Ajuda', 'Ajuda'], async (ctx) => {
   ctx.session.awaiting = undefined;
@@ -265,11 +278,11 @@ bot.hears(['❓ Ajuda', 'Ajuda'], async (ctx) => {
 
 bot.hears(['✖️ Cancelar', 'Cancelar'], async (ctx) => {
   ctx.session.awaiting = undefined;
-  ctx.session.productIntent = undefined;
+  ctx.session.productMode = undefined;
   ctx.session.selectedProductId = undefined;
   ctx.session.pendingStockSign = undefined;
   ctx.session.pendingQuoteId = undefined;
-  await ctx.reply('Ok. Toque em Menu ou envie /start.', { reply_markup: { remove_keyboard: true } });
+  await ctx.reply('Ok. Toque em Início ou envie /start.', { reply_markup: { remove_keyboard: true } });
 });
 
 bot.hears(['📎 Vincular por código', 'Vincular por código'], async (ctx) => {
@@ -337,6 +350,152 @@ bot.callbackQuery('link:phone', async (ctx) => {
   );
 });
 
+bot.callbackQuery('flow:prod_search', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  ctx.session.productMode = 'cadastro';
+  ctx.session.awaiting = 'product_search';
+  await ctx.reply('Digite nome, código interno ou EAN do produto:', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery('flow:prod_help', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      '📖 Produtos no Telegram',
+      '',
+      '• Os dados são os mesmos do MongoDB do site — só muda a interface (mensagens e botões).',
+      '• Equipe (não cliente) pode ver ficha completa e alterar campos conforme permissão.',
+      '• “📦 Estoque” é movimentação rápida de entrada/saída.',
+    ].join('\n'),
+    { reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery('flow:prod_create', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  ctx.session.awaiting = 'prod_create_line';
+  await ctx.reply(
+    [
+      '➕ Cadastro rápido (gravado na mesma base do site)',
+      '',
+      'Envie uma linha:',
+      'NOME | PREÇO | ID_DA_CATEGORIA | DESCRIÇÃO',
+      '',
+      'Use o caractere | entre partes. PREÇO: ex. 19,90. ID da categoria: ObjectId Mongo.',
+      'Ex.: Argamassa AC3 | 42,50 | 674a1b2c3d4e5f678901234 | Saco 20kg',
+    ].join('\n'),
+    { reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^tg:g:(.+)$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  const { telegramUserId } = telegramIds(ctx);
+  const res = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
+  if (!res.ok) {
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const p = res.data as Record<string, unknown>;
+  const gallery = Array.isArray(p.imageUrls) ? (p.imageUrls as string[]).slice(0, 3).join(', ') : '';
+  const msg = [
+    `📄 ${String(p.name ?? '')}`,
+    `ID: ${String(p.id ?? productId)}`,
+    `Preço: ${formatBrl(Number(p.price) || 0)} · Estoque: ${String(p.stock ?? '')}`,
+    p.codigo ? `Código: ${String(p.codigo)}` : null,
+    p.codBarra ? `EAN: ${String(p.codBarra)}` : null,
+    `Categoria: ${String((p.category as any)?.name ?? '—')} (${String(p.categoryId ?? '')})`,
+    `Ativo: ${p.status !== false ? 'sim' : 'não'}`,
+    gallery ? `Imagens: ${gallery}` : null,
+    '',
+    String(p.description ?? '').slice(0, 1200),
+  ]
+    .filter(Boolean)
+    .join('\n');
+  await ctx.reply(msg.slice(0, 3900), {
+    reply_markup: new InlineKeyboard().text('Fechar', 'cancel_inline'),
+  });
+});
+
+bot.callbackQuery(/^tg:price:(.+)$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_edit_price';
+  await ctx.reply('Envie o novo preço (ex: 19,90):', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery(/^tg:name:(.+)$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_edit_name';
+  await ctx.reply('Envie o novo nome do produto:', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery(/^qr:list:(.+)$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const kind = String(ctx.match?.[1] ?? '').trim();
+
+  const titles: Record<string, string> = {
+    pending: '📌 Pendentes',
+    viewed: '👁 Visualizados',
+    answered: '📋 Respondidos',
+    archived: '📦 Arquivados',
+    newqueue: '🆕 Fila nova (pendente · sem responsável · follow-up novo)',
+    claimed: '👤 Com responsável',
+    mine: '🙋 Minhas solicitações',
+  };
+
+  let params: {
+    status?: string;
+    followUpNew?: boolean;
+    assignee?: 'any' | 'none' | 'me';
+  } = {};
+
+  switch (kind) {
+    case 'pending':
+      params = { status: 'pending' };
+      break;
+    case 'viewed':
+      params = { status: 'viewed' };
+      break;
+    case 'answered':
+      params = { status: 'answered' };
+      break;
+    case 'archived':
+      params = { status: 'archived' };
+      break;
+    case 'newqueue':
+      params = { status: 'pending', followUpNew: true, assignee: 'none' };
+      break;
+    case 'claimed':
+      params = { status: 'all', assignee: 'any' };
+      break;
+    case 'mine':
+      params = { status: 'all', assignee: 'me' };
+      break;
+    default:
+      await ctx.reply('Filtro desconhecido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+  }
+
+  await sendTelegramQuoteList(ctx as BotContext, titles[kind] ?? kind, params);
+});
+
+bot.callbackQuery('qr:lookup_prompt', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  ctx.session.awaiting = 'quote_id_lookup';
+  await ctx.reply(
+    'Envie o ID da solicitação (24 caracteres, ex.: 674a…). Copie da lista ou do site.',
+    { reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
 bot.on('message:text', async (ctx) => {
   const text = ctx.message?.text?.trim() ?? '';
   if (!text) return;
@@ -351,7 +510,7 @@ bot.on('message:text', async (ctx) => {
     }
     if (cmdWord === 'cancelar' || cmdWord === 'cancel') {
       ctx.session.awaiting = undefined;
-      ctx.session.productIntent = undefined;
+      ctx.session.productMode = undefined;
       ctx.session.selectedProductId = undefined;
       ctx.session.pendingStockSign = undefined;
       ctx.session.pendingQuoteId = undefined;
@@ -382,8 +541,83 @@ bot.on('message:text', async (ctx) => {
     return;
   }
 
+  if (ctx.session.awaiting === 'prod_edit_price') {
+    ctx.session.awaiting = undefined;
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const price = parseUserPriceBr(text);
+    if (price == null) {
+      await ctx.reply('Preço inválido. Ex.: 19,90', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, { price });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply(`Preço gravado: ${formatBrl(price)}`, { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+
+  if (ctx.session.awaiting === 'prod_edit_name') {
+    ctx.session.awaiting = undefined;
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const name = text.trim();
+    if (name.length < 2) {
+      await ctx.reply('Nome inválido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, { name });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply('Nome atualizado na base.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+
+  if (ctx.session.awaiting === 'prod_create_line') {
+    ctx.session.awaiting = undefined;
+    const parts = text.split('|').map((s) => s.trim());
+    if (parts.length < 4) {
+      await ctx.reply('Use: NOME | PREÇO | ID_CATEGORIA | DESCRIÇÃO', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const name = parts[0] ?? '';
+    const priceRaw = parts[1] ?? '';
+    const categoryId = parts[2] ?? '';
+    const description = parts.slice(3).join('|').trim();
+    const price = parseUserPriceBr(priceRaw);
+    if (!name || !description || !categoryId || price == null) {
+      await ctx.reply('Verifique os quatro campos (preço com vírgula ou ponto).', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const res = await postTelegramProductCreate(baseUrl!, integrationKey!, telegramUserId, {
+      name,
+      description,
+      categoryId,
+      price,
+      stock: 0,
+    });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const newId = String((res.data as any)?.id ?? '');
+    await ctx.reply(`Produto criado no banco. ID: ${newId}`, { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+
   if (ctx.session.awaiting === 'product_search') {
     ctx.session.awaiting = undefined;
+    if (!ctx.session.productMode) ctx.session.productMode = 'cadastro';
     const res = await getTelegramProductSearch(baseUrl!, integrationKey!, telegramUserId, text, 10);
     if (!res.ok) {
       await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
@@ -496,6 +730,52 @@ bot.on('message:text', async (ctx) => {
     await ctx.reply('Nota salva.', { reply_markup: opsMenuReplyKeyboard() });
     return;
   }
+
+  if (ctx.session.awaiting === 'quote_id_lookup') {
+    ctx.session.awaiting = undefined;
+    const id = text.trim();
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      await ctx.reply('ID inválido. Use os 24 caracteres hex da solicitação.', {
+        reply_markup: opsMenuReplyKeyboard(),
+      });
+      return;
+    }
+    const res = await getTelegramQuoteById(baseUrl!, integrationKey!, telegramUserId, id);
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const q = res.data as Record<string, unknown>;
+    const items = Array.isArray(q.items) ? q.items : [];
+    const itemsLines =
+      items.length > 0
+        ? items
+            .slice(0, 8)
+            .map((it: unknown, i: number) => {
+              const row = it as Record<string, unknown>;
+              return `${i + 1}. ${String(row?.name ?? '?')} × ${String(row?.quantity ?? '?')}`;
+            })
+            .join('\n')
+        : '—';
+    const msg = [
+      `📋 ${String(q.id ?? id)}`,
+      `Cliente: ${String(q.userName ?? '')} (${String(q.userEmail ?? '')})`,
+      `Estado site: ${quoteStatusPt(String(q.status ?? ''))}`,
+      `Follow-up: ${String(q.followUpStatus ?? 'new')}`,
+      q.assignedToName ? `Responsável: ${String(q.assignedToName)}` : 'Responsável: —',
+      q.message ? `Mensagem: ${String(q.message).slice(0, 400)}` : null,
+      '',
+      'Itens:',
+      itemsLines,
+      q.followUpNotes ? `\nNotas internas: ${String(q.followUpNotes).slice(0, 600)}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    await ctx.reply(msg.slice(0, 3900), {
+      reply_markup: quoteInlineActions(String(q.id ?? id)),
+    });
+    return;
+  }
 });
 
 bot.on('message:contact', async (ctx) => {
@@ -536,46 +816,77 @@ bot.on('message:contact', async (ctx) => {
 });
 
 bot.hears(['🛒 Produtos', 'Produtos'], async (ctx) => {
-  ctx.session.awaiting = 'product_search';
-  ctx.session.productIntent = 'products';
-  await ctx.reply('Digite o nome/código/EAN do produto:', { reply_markup: opsMenuReplyKeyboard() });
+  ctx.session.awaiting = undefined;
+  ctx.session.productMode = 'cadastro';
+
+  const kb = new InlineKeyboard()
+    .text('🔎 Pesquisar / alterar', 'flow:prod_search')
+    .text('➕ Cadastro rápido', 'flow:prod_create')
+    .row()
+    .text('📖 Resumo', 'flow:prod_help')
+    .text('🏠 Início', 'goto_menu');
+
+  const lines = [
+    '🛒 Produtos — dados vêm do mesmo banco do site; aqui o formato é o do Telegram.',
+    '',
+    '• Pesquisar / alterar: localiza o produto e altera preço, nome, estoque, etc. (conforme seu papel).',
+    '• Cadastro rápido: cria produto novo por mensagem (uma linha com separadores).',
+  ];
+
+  await ctx.reply(lines.join('\n'), { reply_markup: kb });
 });
 
 bot.hears(['📦 Estoque', 'Estoque'], async (ctx) => {
   ctx.session.awaiting = 'product_search';
-  ctx.session.productIntent = 'stock';
-  await ctx.reply('Digite o nome/código/EAN do produto para ajustar estoque:', {
-    reply_markup: opsMenuReplyKeyboard(),
-  });
+  ctx.session.productMode = 'estoque';
+  await ctx.reply(
+    [
+      '📦 Estoque — entrada (+) ou saída (-).',
+      '',
+      'Digite nome do produto, código interno ou EAN para localizar.',
+    ].join('\n'),
+    { reply_markup: opsMenuReplyKeyboard() }
+  );
 });
 
 bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
-  const { telegramUserId } = telegramIds(ctx);
-  const res = await getTelegramQuoteRequests(baseUrl!, integrationKey!, telegramUserId, {
-    status: 'pending',
-    page: 1,
-    limit: 10,
-  });
-  if (!res.ok) {
-    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+  if (!canManageQuotesRole(ctx.session.userRole)) {
+    await ctx.reply(
+      [
+        '📋 Solicitações de orçamento neste Telegram só para perfis do painel (ADMIN, MASTER, gerente ou vendedor da loja).',
+        '',
+        'Sua conta vinculada não tem essa permissão — use o site ou peça um vínculo adequado.',
+      ].join('\n'),
+      { reply_markup: opsMenuReplyKeyboard() }
+    );
     return;
   }
-  const list = (res.data as any)?.solicitacoes;
-  if (!Array.isArray(list) || list.length === 0) {
-    await ctx.reply('Sem solicitações pendentes.', { reply_markup: opsMenuReplyKeyboard() });
-    return;
-  }
-  for (const q of list.slice(0, 5)) {
-    const id = String(q?.id ?? '');
-    const userName = String(q?.userName ?? 'Cliente').slice(0, 60);
-    const kb = new InlineKeyboard()
-      .text('Assumir', `q:claim:${id}`)
-      .text('Contato', `q:contact:${id}`)
-      .row()
-      .text('Nota', `q:note:${id}`)
-      .text('Liberar', `q:release:${id}`);
-    await ctx.reply([`Solicitação: ${id}`, `Cliente: ${userName}`].join('\n'), { reply_markup: kb });
-  }
+
+  const kb = new InlineKeyboard()
+    .text('📌 Pendentes', 'qr:list:pending')
+    .text('👁 Visualizados', 'qr:list:viewed')
+    .row()
+    .text('📋 Respondidos', 'qr:list:answered')
+    .text('📦 Arquivados', 'qr:list:archived')
+    .row()
+    .text('🆕 Fila nova', 'qr:list:newqueue')
+    .text('👤 Com responsável', 'qr:list:claimed')
+    .row()
+    .text('🙋 Minhas', 'qr:list:mine')
+    .row()
+    .text('🔎 Buscar por ID', 'qr:lookup_prompt')
+    .text('🏠 Início', 'goto_menu');
+
+  await ctx.reply(
+    [
+      '📋 Solicitações de orçamento (mesmos estados do site).',
+      '',
+      'Pendente / Visualizado / Respondido / Arquivado — como no Admin.',
+      '“Fila nova”: pendente, sem responsável e follow-up ainda novo.',
+      'Depois de listar, use Detalhe / Assumir / Contato / Nota / Liberar como no painel.',
+    ].join('\n'),
+    { reply_markup: kb }
+  );
 });
 
 bot.callbackQuery('cancel_inline', async (ctx) => {
@@ -624,6 +935,89 @@ function formatBrl(price: number): string {
   }
 }
 
+/** Preço colado pelo utilizador (pt-BR). */
+function parseUserPriceBr(text: string): number | null {
+  const s = text.trim().replace(/\s/g, '').replace(/[^\d,.-]/g, '');
+  if (!s) return null;
+  const normalized = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function isStaffNotClient(role: string | undefined): boolean {
+  return !!role?.trim() && role !== 'CLIENT';
+}
+
+function canManageQuotesRole(role: string | undefined): boolean {
+  const r = (role ?? '').trim();
+  return r === 'ADMIN' || r === 'MASTER_ADMIN' || r === 'STORE_MANAGER' || r === 'SELLER';
+}
+
+const QUOTE_STATUS_PT: Record<string, string> = {
+  pending: 'Pendente',
+  viewed: 'Visualizado',
+  answered: 'Respondido',
+  archived: 'Arquivado',
+};
+
+function quoteStatusPt(status: string): string {
+  return QUOTE_STATUS_PT[status] ?? status;
+}
+
+function quoteInlineActions(id: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('👁 Detalhe', `q:detail:${id}`)
+    .text('Assumir', `q:claim:${id}`)
+    .row()
+    .text('Contato', `q:contact:${id}`)
+    .text('Nota', `q:note:${id}`)
+    .row()
+    .text('Liberar', `q:release:${id}`);
+}
+
+async function sendTelegramQuoteList(
+  ctx: BotContext,
+  title: string,
+  listParams: {
+    status?: string;
+    followUpNew?: boolean;
+    assignee?: 'any' | 'none' | 'me';
+  }
+) {
+  const { telegramUserId } = telegramIds(ctx);
+  const res = await getTelegramQuoteRequests(baseUrl!, integrationKey!, telegramUserId, {
+    page: 1,
+    limit: 8,
+    ...listParams,
+  });
+  if (!res.ok) {
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const list = (res.data as any)?.solicitacoes;
+  const pag = (res.data as any)?.pagination;
+  if (!Array.isArray(list) || list.length === 0) {
+    await ctx.reply(`${title}\n\nNada encontrado com este filtro.`, { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const total = typeof pag?.total === 'number' ? pag.total : list.length;
+  const extra =
+    total > list.length ? `\n…mostrando ${Math.min(5, list.length)} de ${total}.` : '';
+  await ctx.reply(`${title}${extra}`, { reply_markup: opsMenuReplyKeyboard() });
+  for (const raw of list.slice(0, 5)) {
+    const row = raw as Record<string, unknown>;
+    const id = String(row?.id ?? '');
+    const msg = [
+      `📋 ${id}`,
+      `Cliente: ${String(row?.userName ?? '—').slice(0, 50)}`,
+      `Estado site: ${quoteStatusPt(String(row?.status ?? ''))}`,
+      `Follow-up: ${String(row?.followUpStatus ?? 'new')}`,
+      row?.assignedToName ? `Responsável: ${String(row.assignedToName)}` : 'Responsável: —',
+    ].join('\n');
+    await ctx.reply(msg, { reply_markup: quoteInlineActions(id) });
+  }
+}
+
 bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
   await ctx.answerCallbackQuery();
   const token = String(ctx.match?.[1] ?? '').trim();
@@ -632,16 +1026,8 @@ bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
   if (!productId) return;
   ctx.session.selectedProductId = productId;
 
-  const intent = ctx.session.productIntent ?? 'products';
-
-  const kbStock = new InlineKeyboard()
-    .text('Entrada (+)', `s:in:${productId}`)
-    .text('Baixa (-)', `s:out:${productId}`)
-    .row();
-
-  const kbInfo = new InlineKeyboard()
-    .text('🔎 Outra busca', 'search_again')
-    .row();
+  const mode = ctx.session.productMode ?? 'cadastro';
+  const staff = isStaffNotClient(ctx.session.userRole);
 
   const lines = [
     `✅ ${product.name}`,
@@ -651,28 +1037,53 @@ bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
     `Em estoque: ${product.stock}`,
     `Preço: ${formatBrl(product.price)}`,
     `ID: ${productId}`,
-    '',
-    intent === 'stock'
-      ? 'Ajustar estoque: escolha Entrada (+) ou Baixa (-).'
-      : 'Para ajustar estoque, escolha “📦 Estoque” no teclado e busque este produto de novo.',
   ].filter(Boolean) as string[];
 
-  const reply_markup =
-    intent === 'stock'
-      ? kbStock
-          .text('🏠 Voltar ao menu', 'goto_menu')
-          .row()
-          .text('Fechar', 'cancel_inline')
-      : kbInfo.text('📦 Ir para Estoque agora', 'go_stock_then_search').row().text('🏠 Voltar ao menu', 'goto_menu').row().text(
-          'Fechar',
-          'cancel_inline'
-        );
+  if (mode === 'estoque') {
+    lines.push('', 'Fluxo Estoque: envie a quantidade depois de tocar Entrada ou Saída.');
+    const kb = new InlineKeyboard()
+      .text('➕ Entrada (+)', `s:in:${productId}`)
+      .text('➖ Saída (-)', `s:out:${productId}`)
+      .row()
+      .text('🔎 Nova busca', 'search_again')
+      .text('🏠 Início', 'goto_menu')
+      .row()
+      .text('Fechar', 'cancel_inline');
+    await ctx.reply(lines.join('\n'), { reply_markup: kb });
+    return;
+  }
 
-  await ctx.reply(lines.join('\n'), {
-    reply_markup,
-  });
+  if (staff) {
+    lines.push(
+      '',
+      'Alterações gravam na mesma base do site (conforme sua permissão).',
+      'Use os botões abaixo — interface Telegram, sem abrir o painel web.'
+    );
+  } else {
+    lines.push('', 'Perfil cliente: consulta rápida e estoque aqui; cadastro completo continua no site.');
+  }
 
-  if (intent === 'stock') ctx.session.productIntent = undefined;
+  let kb = new InlineKeyboard()
+    .text('➕ Entrada (+)', `s:in:${productId}`)
+    .text('➖ Saída (-)', `s:out:${productId}`)
+    .row();
+
+  if (staff) {
+    kb = kb
+      .text('📄 Ficha completa', `tg:g:${productId}`)
+      .row()
+      .text('✏️ Alterar preço', `tg:price:${productId}`)
+      .text('✏️ Alterar nome', `tg:name:${productId}`)
+      .row();
+  }
+
+  kb = kb
+    .text('🔎 Nova busca', 'search_again')
+    .text('🏠 Início', 'goto_menu')
+    .row()
+    .text('Fechar', 'cancel_inline');
+
+  await ctx.reply(lines.join('\n'), { reply_markup: kb });
 });
 
 bot.callbackQuery(/^s:(in|out):(.+)$/i, async (ctx) => {
@@ -684,6 +1095,45 @@ bot.callbackQuery(/^s:(in|out):(.+)$/i, async (ctx) => {
   ctx.session.pendingStockSign = dir === 'in' ? 1 : -1;
   ctx.session.awaiting = 'stock_delta';
   await ctx.reply('Informe a quantidade:', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery(/^q:detail:(.+)$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const id = String(ctx.match?.[1] ?? '').trim();
+  if (!id) return;
+  const { telegramUserId } = telegramIds(ctx);
+  const res = await getTelegramQuoteById(baseUrl!, integrationKey!, telegramUserId, id);
+  if (!res.ok) {
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const q = res.data as Record<string, unknown>;
+  const items = Array.isArray(q.items) ? q.items : [];
+  const itemsLines =
+    items.length > 0
+      ? items
+          .slice(0, 8)
+          .map((it: unknown, i: number) => {
+            const row = it as Record<string, unknown>;
+            return `${i + 1}. ${String(row?.name ?? '?')} × ${String(row?.quantity ?? '?')}`;
+          })
+          .join('\n')
+      : '—';
+  const msg = [
+    `📋 ${String(q.id ?? id)}`,
+    `Cliente: ${String(q.userName ?? '')} (${String(q.userEmail ?? '')})`,
+    `Estado site: ${quoteStatusPt(String(q.status ?? ''))}`,
+    `Follow-up: ${String(q.followUpStatus ?? 'new')}`,
+    q.assignedToName ? `Responsável: ${String(q.assignedToName)}` : 'Responsável: —',
+    q.message ? `Mensagem: ${String(q.message).slice(0, 400)}` : null,
+    '',
+    'Itens:',
+    itemsLines,
+    q.followUpNotes ? `\nNotas internas: ${String(q.followUpNotes).slice(0, 600)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  await ctx.reply(msg.slice(0, 3900), { reply_markup: quoteInlineActions(String(q.id ?? id)) });
 });
 
 bot.callbackQuery(/^q:(claim|contact|release|note):(.+)$/i, async (ctx) => {
@@ -718,17 +1168,8 @@ bot.callbackQuery(/^q:(claim|contact|release|note):(.+)$/i, async (ctx) => {
 bot.callbackQuery('search_again', async (ctx) => {
   await ctx.answerCallbackQuery();
   ctx.session.awaiting = 'product_search';
-  ctx.session.productIntent = 'products';
-  await ctx.reply('Digite o nome/código/EAN:', { reply_markup: opsMenuReplyKeyboard() });
-});
-
-bot.callbackQuery('go_stock_then_search', async (ctx) => {
-  await ctx.answerCallbackQuery();
-  ctx.session.awaiting = 'product_search';
-  ctx.session.productIntent = 'stock';
-  await ctx.reply('Busque o produto de novo (mesmo termo serve) para ajustar estoque:', {
-    reply_markup: opsMenuReplyKeyboard(),
-  });
+  if (!ctx.session.productMode) ctx.session.productMode = 'cadastro';
+  await ctx.reply('Digite nome, código ou EAN do produto:', { reply_markup: opsMenuReplyKeyboard() });
 });
 
 bot.callbackQuery('goto_menu', async (ctx) => {

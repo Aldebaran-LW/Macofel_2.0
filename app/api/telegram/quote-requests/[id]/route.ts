@@ -4,11 +4,36 @@ import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
 import {
   appendQuoteRequestFollowUpNote,
   claimQuoteRequest,
+  getQuoteRequestById,
   markQuoteRequestContacted,
   releaseQuoteRequest,
 } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const linked = await requireLinkedTelegramUser(_req);
+    if (!linked.ok) {
+      return NextResponse.json({ error: linked.error }, { status: linked.status });
+    }
+    if (!canManageQuotesAndOrcamentos(linked.user.role)) {
+      return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
+    }
+    const id = String(params?.id ?? '').trim();
+    if (!id) {
+      return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
+    }
+    const doc = await getQuoteRequestById(id);
+    if (!doc) {
+      return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+    }
+    return NextResponse.json(doc);
+  } catch (error: unknown) {
+    console.error('[api/telegram/quote-requests/:id GET]', error);
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+  }
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {

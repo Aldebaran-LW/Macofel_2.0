@@ -1534,6 +1534,12 @@ export async function listQuoteRequestsAdmin(filters?: {
   status?: string;
   page?: number;
   limit?: number;
+  /** Só pedidos ainda sem follow-up atribuído (estado `new` ou ausente). */
+  followUpNewOnly?: boolean;
+  /** Filtro de responsável: ninguém, alguém, ou o utilizador corrente. */
+  assignee?: 'any' | 'none' | 'me';
+  /** Obrigatório se `assignee` === `me` (comparar com `assignedToUserId`). */
+  actorUserId?: string;
 }) {
   const db = await connectToDatabase();
   const col = db.collection('quote_requests');
@@ -1541,10 +1547,33 @@ export async function listQuoteRequestsAdmin(filters?: {
   const limit = Math.min(filters?.limit ?? 30, 100);
   const skip = (page - 1) * limit;
 
-  const query: any = {};
+  const clauses: Record<string, unknown>[] = [];
   if (filters?.status && filters.status !== 'all') {
-    query.status = filters.status;
+    clauses.push({ status: filters.status });
   }
+  if (filters?.followUpNewOnly) {
+    clauses.push({
+      $or: [
+        { followUpStatus: { $exists: false } },
+        { followUpStatus: null },
+        { followUpStatus: 'new' },
+      ],
+    });
+  }
+  if (filters?.assignee === 'none') {
+    clauses.push({
+      $or: [{ assignedToUserId: { $exists: false } }, { assignedToUserId: null }, { assignedToUserId: '' }],
+    });
+  } else if (filters?.assignee === 'any') {
+    clauses.push({
+      assignedToUserId: { $exists: true, $nin: [null, ''] },
+    });
+  } else if (filters?.assignee === 'me' && filters.actorUserId) {
+    clauses.push({ assignedToUserId: filters.actorUserId });
+  }
+
+  const query: Record<string, unknown> =
+    clauses.length === 0 ? {} : clauses.length === 1 ? clauses[0]! : { $and: clauses };
 
   const total = await col.countDocuments(query);
   const docs = await col.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray();
