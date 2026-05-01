@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm exec --yes --package=esbuild@0.25.5 -- esbuild src/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/index.js",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -14,6 +15,6 @@
   "devDependencies": {
     "@types/node": "^20.6.2",
     "tsx": "4.20.3",
-    "typescript": "5.2.2"
+    "typescript": "^5.2.2"
   }
 }
