@@ -10,7 +10,6 @@ import {
   postTelegramLink,
   formatApiError,
   getTelegramProductSearch,
-  type TelegramProductSearchItem,
   postTelegramStockMove,
   getTelegramQuoteRequests,
   getTelegramQuoteById,
@@ -742,48 +741,13 @@ bot.on('message:text', async (ctx) => {
       return;
     }
 
-    const compactForCallback = (
-      raw: TelegramProductSearchItem
-    ): Pick<
-      TelegramProductSearchItem,
-      'id' | 'name' | 'codigo' | 'codBarra' | 'stock' | 'price'
-    > & {
-      /** URL pode ser grande; só enviamos se couber na callback_data (Telegram: 64 bytes). */
-      imageUrl?: string | null;
-    } => ({
-      id: raw.id,
-      /** Nomes longos aumentam callback_data (limite Telegram: 64 bytes). */
-      name: raw.name?.slice(0, 48) ?? 'Produto',
-      codigo: raw.codigo,
-      codBarra: raw.codBarra,
-      stock: raw.stock,
-      price: raw.price,
-      imageUrl: (() => {
-        const u = raw.imageUrl?.trim();
-        if (!u) return null;
-        return u.length <= 52 ? u : null;
-      })(),
-    });
-
-    const makeCallbackPayload = (
-      compact: Pick<TelegramProductSearchItem, 'id' | 'name' | 'codigo' | 'codBarra' | 'stock' | 'price'> & {
-        imageUrl?: string | null;
-      }
-    ): string => {
-      const enc = encodeURIComponent(JSON.stringify(compact));
-      if (Buffer.byteLength(`p_${enc}`, 'utf8') <= 64) return enc;
-      const fallback = encodeURIComponent(JSON.stringify({ id: compact.id, name: compact.name }));
-      return fallback;
-    };
-
+    /** Telegram: cada `callback_data` ≤ 64 bytes. Só enviamos o ObjectId; o detalhe vem da API em `p_`. */
     const kb = new InlineKeyboard();
     for (const it of items.slice(0, 10)) {
       const id = String(it?.id ?? '').trim();
       const name = String(it?.name ?? 'Produto').slice(0, 40);
-      if (!id) continue;
-      const compact = compactForCallback(it as TelegramProductSearchItem);
-      const payload = makeCallbackPayload(compact);
-      kb.text(name, `p_${payload}`).row();
+      if (!id || !/^[a-f\d]{24}$/i.test(id)) continue;
+      kb.text(name, `p_${id}`).row();
     }
     kb.text('Fechar', 'cancel_inline');
 
@@ -942,7 +906,18 @@ function decodeProductCallbackToken(encoded: string): {
   price: number;
   imageUrl: string | null;
 } | null {
-  const raw = decodeURIComponent(encoded);
+  const raw = decodeURIComponent(encoded).trim();
+  if (/^[a-f\d]{24}$/i.test(raw)) {
+    return {
+      id: raw,
+      name: 'Produto',
+      codigo: null,
+      codBarra: null,
+      stock: 0,
+      price: 0,
+      imageUrl: null,
+    };
+  }
   try {
     const parsed = JSON.parse(raw) as any;
     const id = String(parsed?.id ?? '').trim();
@@ -1055,10 +1030,30 @@ async function sendTelegramQuoteList(
 bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
   await ctx.answerCallbackQuery();
   const token = String(ctx.match?.[1] ?? '').trim();
-  const product = decodeProductCallbackToken(token);
+  let product = decodeProductCallbackToken(token);
   if (!product?.id) return;
   const productId = product.id;
   ctx.session.selectedProductId = productId;
+
+  const { telegramUserId } = telegramIds(ctx);
+  const fresh = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
+  if (fresh.ok) {
+    const p = fresh.data as Record<string, unknown>;
+    product = {
+      id: productId,
+      name: String(p.name ?? product.name),
+      codigo: p.codigo != null ? String(p.codigo) : product.codigo,
+      codBarra: p.codBarra != null ? String(p.codBarra) : product.codBarra,
+      stock:
+        typeof p.stock === 'number'
+          ? Math.trunc(p.stock)
+          : Number.isFinite(Number(p.stock))
+            ? Math.trunc(Number(p.stock))
+            : product.stock,
+      price: typeof p.price === 'number' ? p.price : Number(p.price) || product.price,
+      imageUrl: null,
+    };
+  }
 
   const mode = ctx.session.productMode ?? 'cadastro';
   const staff = isStaffNotClient(ctx.session.userRole);
