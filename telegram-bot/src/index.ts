@@ -334,6 +334,86 @@ bot.hears(['📱 Vincular por telefone', 'Vincular por telefone'], async (ctx) =
   );
 });
 
+function canManageQuotesRole(role: string | undefined): boolean {
+  const r = (role ?? '').trim();
+  return r === 'ADMIN' || r === 'MASTER_ADMIN' || r === 'STORE_MANAGER' || r === 'SELLER';
+}
+
+/** Tem de ficar ANTES de `bot.on('message:text')`, senão o handler genérico consome o update e estes nunca correm. */
+bot.hears(['🛒 Produtos', 'Produtos'], async (ctx) => {
+  ctx.session.awaiting = undefined;
+  ctx.session.productMode = 'cadastro';
+
+  const kb = new InlineKeyboard()
+    .text('🔎 Pesquisar / alterar', 'flow:prod_search')
+    .text('➕ Cadastro rápido', 'flow:prod_create')
+    .row()
+    .text('📖 Resumo', 'flow:prod_help')
+    .text('🏠 Início', 'goto_menu');
+
+  const lines = [
+    '🛒 Produtos — dados vêm do mesmo banco do site; aqui o formato é o do Telegram.',
+    '',
+    '• Pesquisar / alterar: localiza o produto e altera preço, nome, estoque, etc. (conforme seu papel).',
+    '• Cadastro rápido: cria produto novo por mensagem (uma linha com separadores).',
+  ];
+
+  await ctx.reply(lines.join('\n'), { reply_markup: kb });
+});
+
+bot.hears(['📦 Estoque', 'Estoque'], async (ctx) => {
+  ctx.session.awaiting = 'product_search';
+  ctx.session.productMode = 'estoque';
+  await ctx.reply(
+    [
+      '📦 Estoque — entrada (+) ou saída (-).',
+      '',
+      'Digite nome do produto, código interno ou EAN para localizar.',
+    ].join('\n'),
+    { reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
+  if (!canManageQuotesRole(ctx.session.userRole)) {
+    await ctx.reply(
+      [
+        '📋 Solicitações de orçamento neste Telegram só para perfis do painel (ADMIN, MASTER, gerente ou vendedor da loja).',
+        '',
+        'Sua conta vinculada não tem essa permissão — use o site ou peça um vínculo adequado.',
+      ].join('\n'),
+      { reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  const kb = new InlineKeyboard()
+    .text('📌 Pendentes', 'qr:list:pending')
+    .text('👁 Visualizados', 'qr:list:viewed')
+    .row()
+    .text('📋 Respondidos', 'qr:list:answered')
+    .text('📦 Arquivados', 'qr:list:archived')
+    .row()
+    .text('🆕 Fila nova', 'qr:list:newqueue')
+    .text('👤 Com responsável', 'qr:list:claimed')
+    .row()
+    .text('🙋 Minhas', 'qr:list:mine')
+    .row()
+    .text('🔎 Buscar por ID', 'qr:lookup_prompt')
+    .text('🏠 Início', 'goto_menu');
+
+  await ctx.reply(
+    [
+      '📋 Solicitações de orçamento (mesmos estados do site).',
+      '',
+      'Pendente / Visualizado / Respondido / Arquivado — como no Admin.',
+      '“Fila nova”: pendente, sem responsável e follow-up ainda novo.',
+      'Depois de listar, use Detalhe / Assumir / Contato / Nota / Liberar como no painel.',
+    ].join('\n'),
+    { reply_markup: kb }
+  );
+});
+
 bot.callbackQuery('help', async (ctx) => {
   ctx.session.awaiting = undefined;
   await ctx.answerCallbackQuery();
@@ -848,80 +928,6 @@ bot.on('message:contact', async (ctx) => {
   });
 });
 
-bot.hears(['🛒 Produtos', 'Produtos'], async (ctx) => {
-  ctx.session.awaiting = undefined;
-  ctx.session.productMode = 'cadastro';
-
-  const kb = new InlineKeyboard()
-    .text('🔎 Pesquisar / alterar', 'flow:prod_search')
-    .text('➕ Cadastro rápido', 'flow:prod_create')
-    .row()
-    .text('📖 Resumo', 'flow:prod_help')
-    .text('🏠 Início', 'goto_menu');
-
-  const lines = [
-    '🛒 Produtos — dados vêm do mesmo banco do site; aqui o formato é o do Telegram.',
-    '',
-    '• Pesquisar / alterar: localiza o produto e altera preço, nome, estoque, etc. (conforme seu papel).',
-    '• Cadastro rápido: cria produto novo por mensagem (uma linha com separadores).',
-  ];
-
-  await ctx.reply(lines.join('\n'), { reply_markup: kb });
-});
-
-bot.hears(['📦 Estoque', 'Estoque'], async (ctx) => {
-  ctx.session.awaiting = 'product_search';
-  ctx.session.productMode = 'estoque';
-  await ctx.reply(
-    [
-      '📦 Estoque — entrada (+) ou saída (-).',
-      '',
-      'Digite nome do produto, código interno ou EAN para localizar.',
-    ].join('\n'),
-    { reply_markup: opsMenuReplyKeyboard() }
-  );
-});
-
-bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
-  if (!canManageQuotesRole(ctx.session.userRole)) {
-    await ctx.reply(
-      [
-        '📋 Solicitações de orçamento neste Telegram só para perfis do painel (ADMIN, MASTER, gerente ou vendedor da loja).',
-        '',
-        'Sua conta vinculada não tem essa permissão — use o site ou peça um vínculo adequado.',
-      ].join('\n'),
-      { reply_markup: opsMenuReplyKeyboard() }
-    );
-    return;
-  }
-
-  const kb = new InlineKeyboard()
-    .text('📌 Pendentes', 'qr:list:pending')
-    .text('👁 Visualizados', 'qr:list:viewed')
-    .row()
-    .text('📋 Respondidos', 'qr:list:answered')
-    .text('📦 Arquivados', 'qr:list:archived')
-    .row()
-    .text('🆕 Fila nova', 'qr:list:newqueue')
-    .text('👤 Com responsável', 'qr:list:claimed')
-    .row()
-    .text('🙋 Minhas', 'qr:list:mine')
-    .row()
-    .text('🔎 Buscar por ID', 'qr:lookup_prompt')
-    .text('🏠 Início', 'goto_menu');
-
-  await ctx.reply(
-    [
-      '📋 Solicitações de orçamento (mesmos estados do site).',
-      '',
-      'Pendente / Visualizado / Respondido / Arquivado — como no Admin.',
-      '“Fila nova”: pendente, sem responsável e follow-up ainda novo.',
-      'Depois de listar, use Detalhe / Assumir / Contato / Nota / Liberar como no painel.',
-    ].join('\n'),
-    { reply_markup: kb }
-  );
-});
-
 bot.callbackQuery('cancel_inline', async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.deleteMessage().catch(() => {});
@@ -979,11 +985,6 @@ function parseUserPriceBr(text: string): number | null {
 
 function isStaffNotClient(role: string | undefined): boolean {
   return !!role?.trim() && role !== 'CLIENT';
-}
-
-function canManageQuotesRole(role: string | undefined): boolean {
-  const r = (role ?? '').trim();
-  return r === 'ADMIN' || r === 'MASTER_ADMIN' || r === 'STORE_MANAGER' || r === 'SELLER';
 }
 
 const QUOTE_STATUS_PT: Record<string, string> = {
