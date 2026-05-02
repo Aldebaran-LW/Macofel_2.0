@@ -101,6 +101,10 @@ export async function getProducts(filters?: {
   inStock?: boolean;
   onSale?: boolean;
   featured?: boolean;
+  /** Se true, exclui produtos com `featured: true` (ex.: vitrine por categoria na home). Ignorado se `featured: true` for passado. */
+  excludeFeatured?: boolean;
+  /** Vitrine inicial: só produtos com showOnHome !== false (legados sem campo contam como visíveis). */
+  onlyHomeVisible?: boolean;
   page?: number;
   limit?: number;
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name_asc' | 'newest' | 'best_selling';
@@ -182,6 +186,10 @@ export async function getProducts(filters?: {
   const subcategoriasFilter = multiFieldFilter(filters?.subcategorias, 'subcategoria');
   if (subcategoriasFilter) andClauses.push(subcategoriasFilter);
 
+  if (filters?.onlyHomeVisible) {
+    andClauses.push({ showOnHome: { $ne: false } });
+  }
+
   // Filtro de preço
   if (filters?.minPrice || filters?.maxPrice) {
     query.price = {};
@@ -192,6 +200,8 @@ export async function getProducts(filters?: {
   // Filtro de destaque
   if (filters?.featured) {
     query.featured = true;
+  } else if (filters?.excludeFeatured) {
+    query.featured = { $ne: true };
   }
 
   if (filters?.inStock) {
@@ -345,6 +355,8 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
     minStock: number | null;
     weight: number | null;
     imageUrl: string | null;
+    /** Galeria (URLs limpas); `imageUrl` na resposta já inclui fallback da primeira foto. */
+    imageUrls: string[];
     categoryId: string;
     featured: boolean;
     codigo: string | null;
@@ -356,6 +368,7 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
     subcategoria: string | null;
     origin: string | null;
     status: boolean;
+    showOnHome: boolean;
     category: { id: string; name: string };
   }>;
   pagination: { page: number; limit: number; total: number; totalPages: number };
@@ -526,6 +539,14 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
 
     // Mesma semântica do catálogo público: qualquer valor "inativo" (inclui strings) deve ser tratado como oculto.
     const statusBool = !isInactiveProductStatus(p.status);
+    const showOnHomeBool = p.showOnHome !== false;
+
+    const rawImageUrls = Array.isArray(p.imageUrls) ? p.imageUrls : [];
+    const cleanImageUrls = rawImageUrls
+      .map((u: unknown) => (typeof u === 'string' ? u.trim() : ''))
+      .filter((u: string) => u.length > 0);
+    const primaryImageUrl =
+      (typeof p.imageUrl === 'string' ? p.imageUrl.trim() : '') || cleanImageUrls[0] || null;
 
     return {
       id: p._id.toString(),
@@ -537,7 +558,8 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
       minStock:
         typeof p.minStock === 'number' && Number.isFinite(p.minStock) ? Math.trunc(p.minStock) : null,
       weight: typeof p.weight === 'number' && Number.isFinite(p.weight) ? p.weight : p.weight ?? null,
-      imageUrl: p.imageUrl ?? null,
+      imageUrl: primaryImageUrl,
+      imageUrls: cleanImageUrls,
       categoryId: cid instanceof ObjectId ? cid.toString() : typeof cid === 'string' ? cid : '',
       featured: Boolean(p.featured),
       codigo: p.codigo != null ? String(p.codigo) : null,
@@ -550,6 +572,7 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
       subcategoria: p.subcategoria != null ? String(p.subcategoria) : null,
       origin: p.origin != null ? String(p.origin) : null,
       status: statusBool,
+      showOnHome: showOnHomeBool,
       category: cat
         ? { id: cat._id.toString(), name: String(cat.name ?? '') }
         : {

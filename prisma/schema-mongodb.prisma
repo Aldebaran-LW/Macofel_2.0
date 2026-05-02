@@ -58,6 +58,8 @@ model Product {
   /// true = ATIVO, false = INATIVO. O catálogo público filtra `status !== false`.
   status       Boolean  @default(true)
   featured     Boolean  @default(false)
+  /// Se false, o produto não entra nas listagens da página inicial (continua no catálogo / URL).
+  showOnHome   Boolean  @default(true)
   imageUrl     String?
   imageUrls    String[] @default([])
   /// Obrigatório: todo produto pertence a uma Category (relação em cascade).
@@ -76,6 +78,7 @@ model Product {
   @@map("products")
   @@index([categoryId])
   @@index([featured])
+  @@index([showOnHome])
   @@index([marca])
   @@index([subcategoria])
   @@index([origin])

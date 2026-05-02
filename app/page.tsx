@@ -1,18 +1,8 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import {
-  ShoppingCart,
-  Star,
-  ChevronLeft,
-  ChevronRight,
-  ArrowRight,
-  Menu,
-  X,
-} from 'lucide-react';
-import ProductSectionCarousel from '@/components/product-section-carousel';
+import { ArrowRight } from 'lucide-react';
 import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
-import CategoryProductsCarousel from '@/components/category-products-carousel';
+import ProductCardV2 from '@/components/product-card-v2';
 import HeroCarousel from '@/components/hero-carousel';
 import HeaderMobile from '@/components/header-mobile';
 import StoreTopBar from '@/components/store-top-bar';
@@ -26,8 +16,8 @@ export const dynamic = 'force-dynamic';
 
 async function getFeaturedProducts() {
   try {
-    const result = await getProducts({ featured: true, limit: 8 });
-    // Home: mostrar apenas produtos com foto (ativo já é filtrado em getProducts).
+    const result = await getProducts({ featured: true, limit: 8, onlyHomeVisible: true });
+    // Primeira linha da home: só destaque + com foto (ativo já vem do getProducts).
     return (result.products ?? []).filter((p: any) => Boolean(p?.imageUrl));
   } catch {
     return [];
@@ -72,7 +62,7 @@ function getFeaturedSecondaryImage(categoryName?: string | null) {
 }
 
 async function ProductsByCategory() {
-  // Categorias da vitrine com slugs canónicos + aliases legados.
+  // Faixas seguintes: produtos da macro por slug de categoria, sem repetir os que já estão em Destaque.
   const categoryMapping: Record<string, string[]> = {
     'Cimento & Argamassa': ['cimento-argamassa', 'cimento'],
     'Tijolos & Blocos': ['tijolos-blocos'],
@@ -88,10 +78,17 @@ async function ProductsByCategory() {
       try {
         let products: any[] = [];
         
-        // Tentar cada slug possível até encontrar produtos
+        // Tentar cada slug possível até encontrar produtos (exclui featured — ficam só na primeira linha).
         for (const slug of possibleSlugs) {
-          const result = await getProducts({ categorySlug: slug, limit: 8 });
-          const withPhoto = (result.products ?? []).filter((p: any) => Boolean(p?.imageUrl));
+          const result = await getProducts({
+            categorySlug: slug,
+            limit: 24,
+            excludeFeatured: true,
+            onlyHomeVisible: true,
+          });
+          const withPhoto = (result.products ?? [])
+            .filter((p: any) => Boolean(p?.imageUrl))
+            .slice(0, 8);
           if (withPhoto.length > 0) {
             products = withPhoto;
             break;
@@ -148,9 +145,16 @@ async function ProductsByCategory() {
 
           {/* Carousel de Produtos */}
           {category.products && category.products.length > 0 && (
-            <CategoryProductsCarousel
-              products={category.products}
-            />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              {category.products.map((product: any, index: number) => (
+                <ProductCardV2
+                  key={product.id}
+                  product={product}
+                  priority={index < 4}
+                  secondaryImageUrl={product.secondaryImageUrl}
+                />
+              ))}
+            </div>
           )}
 
           {/* Link para ver mais */}
@@ -212,64 +216,6 @@ async function HeroBanner() {
 function ServiceBadges() {
   return <StoreServiceBadges />;
 }
-
-function ProductCard({ product }: { product: any }) {
-  const pixPrice = (product.price * 0.9).toFixed(2).replace('.', ',');
-  const installment = (product.price / 12).toFixed(2).replace('.', ',');
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow group">
-      {/* Imagem */}
-      <div className="relative aspect-square mb-4 overflow-hidden rounded-lg bg-gray-50">
-        {product.imageUrl ? (
-          <Image
-            src={product.imageUrl}
-            alt={product.name}
-            fill
-            className="object-contain p-4 group-hover:scale-105 transition-transform"
-            sizes="(max-width: 768px) 50vw, 25vw"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300">
-            <span className="text-5xl">📦</span>
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 min-h-[40px]">
-        {product.name}
-      </h3>
-
-      {/* Rating */}
-      <div className="flex items-center gap-1 mb-3">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
-        ))}
-        <span className="text-xs text-gray-500 ml-1">(0)</span>
-      </div>
-
-      {/* Preço */}
-      <div className="mb-4">
-        <p className="text-xl font-black text-emerald-600">
-          R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
-        </p>
-        <p className="text-xs text-gray-500">
-          12x de R$ {installment} no cartão s/ juros
-        </p>
-      </div>
-
-      {/* Botão Comprar */}
-      <Link
-        href={`/produto/${product.slug}`}
-        className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white text-center font-bold py-3 rounded-lg transition-colors"
-      >
-        Comprar
-      </Link>
-    </div>
-  );
-}
-
 
 function CategoryCards() {
   /** Slugs = coleção `categories` (macros); nomes amigáveis para o carrossel. */
@@ -351,7 +297,16 @@ async function FeaturedProducts() {
       </div>
 
       {productsWithSecondary.length > 0 ? (
-        <CategoryProductsCarousel products={productsWithSecondary} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
+          {productsWithSecondary.map((product: any, index: number) => (
+            <ProductCardV2
+              key={product.id}
+              product={product}
+              priority={index < 6}
+              secondaryImageUrl={product.secondaryImageUrl}
+            />
+          ))}
+        </div>
       ) : (
         <div className="col-span-4 text-center py-20 text-slate-400">
           <div className="text-5xl mb-4">📦</div>

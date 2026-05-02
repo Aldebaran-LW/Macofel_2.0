@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
       imageUrl,
       categoryId,
       featured,
+      showOnHome,
       codigo,
       cost,
       pricePrazo,
@@ -141,6 +142,8 @@ export async function POST(req: NextRequest) {
         imageUrl: resolvedImageUrl,
         categoryId,
         featured: featured === true || featured === 'true',
+        showOnHome:
+          showOnHome === undefined || showOnHome === true || showOnHome === 'true',
         codigo: codigoStr,
         cost: costNum != null && Number.isFinite(costNum) ? costNum : null,
         pricePrazo:
