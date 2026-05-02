@@ -243,6 +243,53 @@ export async function patchTelegramQuoteRequest(
   return { ok: res.ok, status: res.status, data };
 }
 
+export async function postTelegramOrcamento(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string,
+  body: {
+    clienteNome: string;
+    clienteEmail?: string | null;
+    clienteTelefone?: string | null;
+    observacoes?: string | null;
+    itens: Array<{ produto: string; quantidade: number; precoUnitario: number }>;
+  }
+): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/api/telegram/orcamentos`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Telegram-Key': integrationKey,
+      'x-telegram-userid': telegramUserId,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
+}
+
+export async function fetchTelegramOrcamentoPrintHtml(
+  baseUrl: string,
+  integrationKey: string,
+  telegramUserId: string,
+  orcamentoId: string
+): Promise<{ ok: boolean; status: number; html: string | null }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/api/telegram/orcamentos/${encodeURIComponent(
+    orcamentoId
+  )}/print`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Telegram-Key': integrationKey,
+      'x-telegram-userid': telegramUserId,
+    },
+  });
+  if (!res.ok) return { ok: false, status: res.status, html: null };
+  const html = await res.text();
+  return { ok: true, status: res.status, html };
+}
+
 export function formatApiError(data: Record<string, unknown>, status: number): string {
   const err = data?.error;
   if (typeof err === 'string' && err.trim()) return err;

@@ -64,6 +64,7 @@ async function readProductTelegram(productId: string) {
     codigo: p.codigo != null ? String(p.codigo) : null,
     cost: typeof p.cost === 'number' && Number.isFinite(p.cost) ? p.cost : null,
     pricePrazo: typeof p.pricePrazo === 'number' && Number.isFinite(p.pricePrazo) ? p.pricePrazo : null,
+    dimensionsCm: p.dimensionsCm != null ? String(p.dimensionsCm) : null,
     unidade: p.unidade != null ? String(p.unidade) : null,
     codBarra: p.codBarra != null ? String(p.codBarra) : null,
     marca: p.marca != null ? String(p.marca) : null,
@@ -129,6 +130,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { productId:
       'marca',
       'unidade',
       'status',
+      'weight',
+      'dimensionsCm',
+      'imageUrl',
+      'imageUrls',
     ]);
     const adminKeys = new Set([
       ...staffKeys,
@@ -136,9 +141,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { productId:
       'featured',
       'cost',
       'pricePrazo',
-      'weight',
-      'imageUrl',
-      'imageUrls',
       'subcategoria',
     ]);
 
@@ -159,6 +161,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { productId:
         updateData[key] = Math.trunc(Number(v)) || 0;
       } else if (key === 'weight') {
         updateData.weight = v === '' || v == null ? null : parseFloat(String(v));
+      } else if (key === 'dimensionsCm') {
+        updateData.dimensionsCm = v != null && String(v).trim() !== '' ? String(v).trim() : null;
       } else if (key === 'featured') {
         updateData.featured = !(v === false || v === 'false');
       } else if (key === 'status') {

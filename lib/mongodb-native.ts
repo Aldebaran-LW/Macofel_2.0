@@ -1287,7 +1287,15 @@ export type OrcamentoDoc = {
   total: number;
 };
 
-function normalizeOrcamento(doc: any) {
+export type OrcamentoNormalized = OrcamentoDoc & {
+  id: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+};
+
+function normalizeOrcamento(doc: any): OrcamentoNormalized {
+  const descontoTipo: 'reais' | 'percentual' =
+    doc.descontoTipo === 'percentual' ? 'percentual' : 'reais';
   return {
     id: doc._id.toString(),
     clienteNome: String(doc.clienteNome ?? ''),
@@ -1297,7 +1305,7 @@ function normalizeOrcamento(doc: any) {
     itens: Array.isArray(doc.itens) ? doc.itens : [],
     subtotal: typeof doc.subtotal === 'number' ? doc.subtotal : 0,
     freteValor: typeof doc.freteValor === 'number' ? doc.freteValor : 0,
-    descontoTipo: doc.descontoTipo === 'percentual' ? 'percentual' : 'reais',
+    descontoTipo,
     descontoRaw: typeof doc.descontoRaw === 'number' ? doc.descontoRaw : 0,
     descontoValor: typeof doc.descontoValor === 'number' ? doc.descontoValor : 0,
     total: typeof doc.total === 'number' ? doc.total : 0,

@@ -21,10 +21,11 @@ import {
   Package,
   LogOut,
   Heart,
+  Bot,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isOperationalStaffRole } from '@/lib/permissions';
 
 interface Category {
   id: string;
@@ -55,6 +56,7 @@ export default function HeaderV2() {
   const megaRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
+  const isStaffOps = isOperationalStaffRole((session?.user as any)?.role);
 
   useEffect(() => {
     setMounted(true);
@@ -265,6 +267,16 @@ export default function HeaderV2() {
                     <User className="w-5 h-5" />
                     <span className="text-[9px] font-bold hidden sm:block">Conta</span>
                   </Link>
+                  {isStaffOps && (
+                    <Link
+                      href="/equipa/telegram"
+                      className="hidden md:flex flex-col items-center gap-0.5 text-slate-600 hover:text-red-600 transition-colors p-2 rounded-xl hover:bg-slate-50"
+                      title="Código para vincular o bot Telegram"
+                    >
+                      <Bot className="w-5 h-5" />
+                      <span className="text-[9px] font-bold hidden sm:block">Telegram</span>
+                    </Link>
+                  )}
                   {!isAdmin && (
                     <Link
                       href="/carrinho"
@@ -511,6 +523,15 @@ export default function HeaderV2() {
                   >
                     <User className="w-4 h-4 text-slate-500" /> Minha Conta
                   </Link>
+                  {isStaffOps && (
+                    <Link
+                      href="/equipa/telegram"
+                      className="flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-slate-50 text-sm font-semibold"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Bot className="w-4 h-4 text-slate-500" /> Telegram (código de vínculo)
+                    </Link>
+                  )}
                   {!isAdmin && (
                     <Link
                       href="/carrinho"

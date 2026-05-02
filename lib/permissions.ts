@@ -134,6 +134,13 @@ export function parseUserRole(role: string | undefined | null): UserRole | null 
   return null;
 }
 
+/** Qualquer conta de equipa (papéis Prisma exceto CLIENT). */
+export function isOperationalStaffRole(role: string | undefined | null): boolean {
+  const r = parseUserRole(role);
+  if (!r) return false;
+  return r !== 'CLIENT';
+}
+
 export function hasPermission(
   role: string | undefined | null,
   permission: AppPermission
@@ -173,9 +180,9 @@ export function isPainelLojaRole(role: string | undefined | null): boolean {
   return role === 'STORE_MANAGER' || role === 'SELLER';
 }
 
-/** Orçamentos internos (Mongo) + solicitações de clientes (`quote_requests`). Admin ou painel da loja. */
+/** Orçamentos internos (Mongo) + solicitações de clientes (`quote_requests`). Toda a equipa não-cliente. */
 export function canManageQuotesAndOrcamentos(role: string | undefined | null): boolean {
-  return isAdminDashboardRole(role) || isPainelLojaRole(role);
+  return isOperationalStaffRole(role);
 }
 
 export function isCustomerRole(role: string | undefined | null): boolean {

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
-import { Bot, InlineKeyboard, Keyboard, session } from 'grammy';
+import { Bot, InlineKeyboard, InputFile, Keyboard, session } from 'grammy';
 import type { Context, SessionFlavor } from 'grammy';
 import {
   getTelegramMe,
@@ -17,6 +17,8 @@ import {
   patchTelegramProduct,
   postTelegramProductCreate,
   patchTelegramQuoteRequest,
+  postTelegramOrcamento,
+  fetchTelegramOrcamentoPrintHtml,
 } from './macofel-api.js';
 
 function dotEnvCandidatePaths(): string[] {
@@ -102,14 +104,26 @@ type SessionData = {
     | 'stock_delta'
     | 'quote_note'
     | 'quote_id_lookup'
-    | 'prod_edit_price'
     | 'prod_edit_name'
-    | 'prod_create_line';
+    | 'prod_create_line'
+    | 'prod_price_vista'
+    | 'prod_price_prazo'
+    | 'prod_desc'
+    | 'prod_weight'
+    | 'prod_dim'
+    | 'prod_photo'
+    | 'orc_nome'
+    | 'orc_email'
+    | 'orc_lines';
   /** Origem do fluxo após buscar produto: cadastro (painel/edição) ou só estoque. */
   productMode?: 'cadastro' | 'estoque';
   selectedProductId?: string;
   pendingStockSign?: 1 | -1;
   pendingQuoteId?: string;
+  prodDescMode?: 'append' | 'replace';
+  prodPhotoMode?: 'add' | 'replace_first' | 'replace_all';
+  orcClienteNome?: string;
+  orcClienteEmail?: string | null;
 };
 
 type BotContext = Context & SessionFlavor<SessionData>;
@@ -333,9 +347,13 @@ bot.hears(['📱 Vincular por telefone', 'Vincular por telefone'], async (ctx) =
   );
 });
 
+/** Qualquer papel de equipa no site (não CLIENT) — alinhado a `isOperationalStaffRole` na API. */
+function isStaffNotClient(role: string | undefined): boolean {
+  return !!role?.trim() && role !== 'CLIENT';
+}
+
 function canManageQuotesRole(role: string | undefined): boolean {
-  const r = (role ?? '').trim();
-  return r === 'ADMIN' || r === 'MASTER_ADMIN' || r === 'STORE_MANAGER' || r === 'SELLER';
+  return isStaffNotClient(role);
 }
 
 /** Tem de ficar ANTES de `bot.on('message:text')`, senão o handler genérico consome o update e estes nunca correm. */
@@ -377,9 +395,9 @@ bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
   if (!canManageQuotesRole(ctx.session.userRole)) {
     await ctx.reply(
       [
-        '📋 Solicitações de orçamento neste Telegram só para perfis do painel (ADMIN, MASTER, gerente ou vendedor da loja).',
+        '📋 Solicitações de orçamento exigem conta de funcionário vinculada (não cliente).',
         '',
-        'Sua conta vinculada não tem essa permissão — use o site ou peça um vínculo adequado.',
+        'Sua conta não está como equipa no site — peça o cadastro correto ou use o portal.',
       ].join('\n'),
       { reply_markup: opsMenuReplyKeyboard() }
     );
@@ -399,6 +417,8 @@ bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
     .text('🙋 Minhas', 'qr:list:mine')
     .row()
     .text('🔎 Buscar por ID', 'qr:lookup_prompt')
+    .row()
+    .text('➕ Novo orçamento', 'flow:orc_novo')
     .text('🏠 Início', 'goto_menu');
 
   await ctx.reply(
@@ -531,13 +551,148 @@ bot.callbackQuery(/^tg:g:(.+)$/i, async (ctx) => {
   });
 });
 
-bot.callbackQuery(/^tg:price:(.+)$/i, async (ctx) => {
+bot.callbackQuery(/^ppv:([a-f\d]{24})$/i, async (ctx) => {
   await ctx.answerCallbackQuery();
   const productId = String(ctx.match?.[1] ?? '').trim();
   if (!productId) return;
   ctx.session.selectedProductId = productId;
-  ctx.session.awaiting = 'prod_edit_price';
-  await ctx.reply('Envie o novo preço (ex: 19,90):', { reply_markup: opsMenuReplyKeyboard() });
+  ctx.session.awaiting = 'prod_price_vista';
+  await ctx.reply('Preço à vista — envie o valor (ex.: 19,90):', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery(/^ppp:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_price_prazo';
+  await ctx.reply('Preço a prazo — envie o valor (ex.: 21,90):', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery(/^dapp:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_desc';
+  ctx.session.prodDescMode = 'append';
+  await ctx.reply(
+    'Descreva o texto a **anexar** ao final da descrição atual (pode ser várias linhas numa mensagem).',
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^dnew:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_desc';
+  ctx.session.prodDescMode = 'replace';
+  await ctx.reply(
+    'Envie a **nova descrição completa** (substitui a atual).',
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^ppw:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_weight';
+  await ctx.reply('Peso (kg), ex.: 12,5 ou 0 para limpar:', { reply_markup: opsMenuReplyKeyboard() });
+});
+
+bot.callbackQuery(/^ppm:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_dim';
+  await ctx.reply(
+    'Medidas / dimensões (texto livre, ex.: 30x40x10 cm). Envie — para limpar.',
+    { reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^iadd:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_photo';
+  ctx.session.prodPhotoMode = 'add';
+  await ctx.reply('Envie uma **foto** deste produto — será adicionada à galeria.', {
+    parse_mode: 'Markdown',
+    reply_markup: opsMenuReplyKeyboard(),
+  });
+});
+
+bot.callbackQuery(/^ir1:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_photo';
+  ctx.session.prodPhotoMode = 'replace_first';
+  await ctx.reply(
+    'Envie uma **foto** para substituir a imagem principal (capa + primeira da galeria).',
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^ir0:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_photo';
+  ctx.session.prodPhotoMode = 'replace_all';
+  await ctx.reply('Envie uma **foto** — a galeria passará a ter só esta imagem.', {
+    parse_mode: 'Markdown',
+    reply_markup: opsMenuReplyKeyboard(),
+  });
+});
+
+bot.callbackQuery('flow:orc_novo', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  ctx.session.awaiting = 'orc_nome';
+  ctx.session.orcClienteNome = undefined;
+  ctx.session.orcClienteEmail = undefined;
+  await ctx.reply(
+    [
+      '➕ **Novo orçamento interno**',
+      '',
+      '1) Envie o **nome do cliente**.',
+      '2) Depois o **email** (ou **-** para ignorar).',
+      '3) Envie os itens, **uma linha por produto**:',
+      '`DESCRIÇÃO ; quantidade ; preço unitário`',
+      '4) Última linha: **OK**',
+    ].join('\n'),
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^oprint:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const id = String(ctx.match?.[1] ?? '').trim();
+  if (!id) return;
+  const { telegramUserId } = telegramIds(ctx);
+  const r = await fetchTelegramOrcamentoPrintHtml(baseUrl!, integrationKey!, telegramUserId, id);
+  if (!r.ok || !r.html) {
+    await ctx.reply('Não foi possível gerar o HTML. Verifique permissão e ID.', {
+      reply_markup: opsMenuReplyKeyboard(),
+    });
+    return;
+  }
+  const safeName = `orcamento-${id}.html`;
+  await ctx.replyWithDocument(new InputFile(Buffer.from(r.html, 'utf-8'), safeName), {
+    caption:
+      'Abra o ficheiro no telemóvel → partilhar → **Imprimir** → **Guardar como PDF** (como no site).',
+    parse_mode: 'Markdown',
+    reply_markup: opsMenuReplyKeyboard(),
+  });
 });
 
 bot.callbackQuery(/^tg:name:(.+)$/i, async (ctx) => {
@@ -626,6 +781,10 @@ bot.on('message:text', async (ctx) => {
       ctx.session.selectedProductId = undefined;
       ctx.session.pendingStockSign = undefined;
       ctx.session.pendingQuoteId = undefined;
+      ctx.session.prodDescMode = undefined;
+      ctx.session.prodPhotoMode = undefined;
+      ctx.session.orcClienteNome = undefined;
+      ctx.session.orcClienteEmail = undefined;
       await ctx.reply('Ok.', { reply_markup: { remove_keyboard: true } });
       return;
     }
@@ -653,7 +812,7 @@ bot.on('message:text', async (ctx) => {
     return;
   }
 
-  if (ctx.session.awaiting === 'prod_edit_price') {
+  if (ctx.session.awaiting === 'prod_price_vista') {
     ctx.session.awaiting = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
@@ -670,7 +829,192 @@ bot.on('message:text', async (ctx) => {
       await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
       return;
     }
-    await ctx.reply(`Preço gravado: ${formatBrl(price)}`, { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(`Preço à vista gravado: ${formatBrl(price)}`, { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+
+  if (ctx.session.awaiting === 'prod_price_prazo') {
+    ctx.session.awaiting = undefined;
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const raw = text.trim();
+    const pricePrazo =
+      raw === '' || raw === '-' ? null : parseUserPriceBr(raw);
+    if (raw !== '' && raw !== '-' && pricePrazo == null) {
+      await ctx.reply('Preço a prazo inválido. Ex.: 21,90 ou **-** para limpar.', {
+        parse_mode: 'Markdown',
+        reply_markup: opsMenuReplyKeyboard(),
+      });
+      return;
+    }
+    const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, {
+      pricePrazo: pricePrazo ?? null,
+    });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply(
+      pricePrazo != null ? `Preço a prazo: ${formatBrl(pricePrazo)}` : 'Preço a prazo removido.',
+      { reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (ctx.session.awaiting === 'prod_desc') {
+    const mode = ctx.session.prodDescMode ?? 'replace';
+    ctx.session.awaiting = undefined;
+    ctx.session.prodDescMode = undefined;
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const cur = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
+    const prevDesc =
+      cur.ok && typeof (cur.data as any)?.description === 'string'
+        ? String((cur.data as any).description)
+        : '';
+    const body =
+      mode === 'append'
+        ? { description: prevDesc ? `${prevDesc.trim()}\n\n${text.trim()}` : text.trim() }
+        : { description: text.trim() };
+    const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, body);
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply(
+      mode === 'append' ? 'Texto anexado à descrição.' : 'Descrição substituída.',
+      { reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (ctx.session.awaiting === 'prod_weight') {
+    ctx.session.awaiting = undefined;
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const raw = text.trim().replace(',', '.');
+    const weight =
+      raw === '' || raw === '-' ? null : parseFloat(raw);
+    if (raw !== '' && raw !== '-' && !Number.isFinite(weight)) {
+      await ctx.reply('Peso inválido. Ex.: 12,5 ou **-** para limpar.', {
+        parse_mode: 'Markdown',
+        reply_markup: opsMenuReplyKeyboard(),
+      });
+      return;
+    }
+    const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, {
+      weight: weight ?? null,
+    });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply(
+      weight != null ? `Peso gravado: ${weight} kg` : 'Peso removido.',
+      { reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (ctx.session.awaiting === 'prod_dim') {
+    ctx.session.awaiting = undefined;
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const raw = text.trim();
+    const dimensionsCm = raw === '' || raw === '-' ? null : raw;
+    const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, {
+      dimensionsCm,
+    });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply(
+      dimensionsCm != null ? `Medidas gravadas: ${dimensionsCm}` : 'Medidas limpas.',
+      { reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (ctx.session.awaiting === 'orc_nome') {
+    const nome = text.trim();
+    if (nome.length < 2) {
+      await ctx.reply('Nome do cliente muito curto.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    ctx.session.orcClienteNome = nome;
+    ctx.session.awaiting = 'orc_email';
+    await ctx.reply('Email do cliente (ou envie **-** para ignorar):', {
+      parse_mode: 'Markdown',
+      reply_markup: opsMenuReplyKeyboard(),
+    });
+    return;
+  }
+
+  if (ctx.session.awaiting === 'orc_email') {
+    const raw = text.trim();
+    ctx.session.orcClienteEmail = raw === '-' ? null : raw;
+    ctx.session.awaiting = 'orc_lines';
+    await ctx.reply(
+      [
+        'Envie os **itens**, uma linha por produto:',
+        '`DESCRIÇÃO ; quantidade ; preço unitário`',
+        'Ex.: `Areia média ; 3 ; 120,00`',
+        '',
+        'Na **última linha** envie só: **OK**',
+      ].join('\n'),
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (ctx.session.awaiting === 'orc_lines') {
+    ctx.session.awaiting = undefined;
+    const nome = ctx.session.orcClienteNome?.trim();
+    const email = ctx.session.orcClienteEmail;
+    ctx.session.orcClienteNome = undefined;
+    ctx.session.orcClienteEmail = undefined;
+    if (!nome) {
+      await ctx.reply('Fluxo perdido. Comece em 📋 Orçamentos → Novo orçamento.', {
+        reply_markup: opsMenuReplyKeyboard(),
+      });
+      return;
+    }
+    const parsed = parseOrcamentoItensBlock(text);
+    if (!parsed.ok) {
+      await ctx.reply(parsed.error, { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const res = await postTelegramOrcamento(baseUrl!, integrationKey!, telegramUserId, {
+      clienteNome: nome,
+      clienteEmail: email,
+      itens: parsed.items,
+    });
+    if (!res.ok) {
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const oid = String((res.data as any)?.id ?? '');
+    const kb = new InlineKeyboard()
+      .text('📄 HTML (como PDF no site)', `oprint:${oid}`)
+      .row()
+      .text('🏠 Início', 'goto_menu');
+    await ctx.reply(`Orçamento criado na base. ID: **${oid}**`, {
+      parse_mode: 'Markdown',
+      reply_markup: kb,
+    });
     return;
   }
 
@@ -958,8 +1302,38 @@ function parseUserPriceBr(text: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-function isStaffNotClient(role: string | undefined): boolean {
-  return !!role?.trim() && role !== 'CLIENT';
+type OrcamentoItemParsed = { produto: string; quantidade: number; precoUnitario: number };
+
+function parseOrcamentoItensBlock(text: string): { ok: true; items: OrcamentoItemParsed[] } | { ok: false; error: string } {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const items: OrcamentoItemParsed[] = [];
+  let sawOk = false;
+  for (const line of lines) {
+    if (/^ok$/i.test(line)) {
+      sawOk = true;
+      continue;
+    }
+    const parts = line.split(';').map((p) => p.trim());
+    if (parts.length < 3) {
+      return { ok: false, error: `Linha inválida (use ; entre descrição, qtd e preço):\n${line}` };
+    }
+    const produto = parts[0] ?? '';
+    const qtyRaw = parts[1] ?? '';
+    const priceRaw = parts.slice(2).join(';').trim();
+    const quantidade = Math.max(1, Math.trunc(parseInt(qtyRaw, 10) || 0));
+    const precoUnitario = parseUserPriceBr(priceRaw.replace(/\s/g, ''));
+    if (!produto || !quantidade || precoUnitario == null) {
+      return { ok: false, error: `Linha inválida:\n${line}` };
+    }
+    items.push({ produto, quantidade, precoUnitario });
+  }
+  if (!sawOk) {
+    return { ok: false, error: 'Falta uma linha final só com: OK' };
+  }
+  if (items.length === 0) {
+    return { ok: false, error: 'Nenhum item antes do OK.' };
+  }
+  return { ok: true, items };
 }
 
 const QUOTE_STATUS_PT: Record<string, string> = {
@@ -1058,13 +1432,23 @@ bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
   const mode = ctx.session.productMode ?? 'cadastro';
   const staff = isStaffNotClient(ctx.session.userRole);
 
+  const data = fresh.ok ? (fresh.data as Record<string, unknown>) : null;
   const lines = [
     `✅ ${product.name}`,
     '',
     product.codigo ? `Código: ${product.codigo}` : null,
     product.codBarra ? `EAN/cód. barras: ${product.codBarra}` : null,
     `Em estoque: ${product.stock}`,
-    `Preço: ${formatBrl(product.price)}`,
+    `Preço à vista: ${formatBrl(product.price)}`,
+    data && typeof data.pricePrazo === 'number' && Number.isFinite(data.pricePrazo)
+      ? `Preço a prazo: ${formatBrl(data.pricePrazo as number)}`
+      : null,
+    data && data.weight != null && String(data.weight).trim() !== ''
+      ? `Peso: ${String(data.weight)} kg`
+      : null,
+    data && data.dimensionsCm != null && String(data.dimensionsCm).trim() !== ''
+      ? `Medidas: ${String(data.dimensionsCm)}`
+      : null,
     `ID: ${productId}`,
   ].filter(Boolean) as string[];
 
@@ -1101,9 +1485,24 @@ bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
     kb = kb
       .text('📄 Ficha completa', `tg:g:${productId}`)
       .row()
-      .text('✏️ Alterar preço', `tg:price:${productId}`)
-      .text('✏️ Alterar nome', `tg:name:${productId}`)
+      .text('💵 À vista', `ppv:${productId}`)
+      .text('💳 A prazo', `ppp:${productId}`)
+      .row()
+      .text('📝 Desc +', `dapp:${productId}`)
+      .text('📝 Desc nova', `dnew:${productId}`)
+      .row()
+      .text('⚖️ Peso', `ppw:${productId}`)
+      .text('📏 Medidas', `ppm:${productId}`)
+      .row()
+      .text('✏️ Nome', `tg:name:${productId}`)
       .row();
+    if (isStaffNotClient(ctx.session.userRole)) {
+      kb = kb
+        .text('📷 + img', `iadd:${productId}`)
+        .text('📷 1ª', `ir1:${productId}`)
+        .text('📷 só esta', `ir0:${productId}`)
+        .row();
+    }
   }
 
   kb = kb
@@ -1232,6 +1631,105 @@ bot.callbackQuery('ops:sales', async (ctx) => {
   await ctx.reply('Vendas: em breve.\n\n(Próximo passo: Alertas e resumo)', {
     reply_markup: opsMenuKeyboard(),
   });
+});
+
+bot.on('message:photo', async (ctx) => {
+  if (ctx.session.awaiting !== 'prod_photo') return;
+  const productId = ctx.session.selectedProductId;
+  const mode = ctx.session.prodPhotoMode ?? 'add';
+  if (!productId) {
+    ctx.session.awaiting = undefined;
+    ctx.session.prodPhotoMode = undefined;
+    await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const photos = ctx.message?.photo;
+  if (!photos?.length) return;
+  const best = photos[photos.length - 1];
+  let file;
+  try {
+    file = await ctx.api.getFile(best.file_id);
+  } catch {
+    await ctx.reply('Não foi possível ler a foto.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  if (!file.file_path) {
+    await ctx.reply('Ficheiro inválido.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+  let buf: Buffer;
+  try {
+    const res = await fetch(fileUrl);
+    buf = Buffer.from(await res.arrayBuffer());
+  } catch {
+    await ctx.reply('Falha ao transferir a imagem.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const ext = (file.file_path.split('.').pop() || 'jpg').toLowerCase();
+  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const filename = `tg_${Date.now()}.${ext}`;
+  const form = new FormData();
+  form.append('file', new Blob([buf], { type: mime }), filename);
+
+  const { telegramUserId } = telegramIds(ctx);
+  const up = await fetch(`${baseUrl!.replace(/\/$/, '')}/api/telegram/products/upload-image`, {
+    method: 'POST',
+    headers: {
+      'X-Telegram-Key': integrationKey!,
+      'x-telegram-userid': telegramUserId,
+    },
+    body: form,
+  });
+  const upData = (await up.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!up.ok) {
+    await ctx.reply(formatApiError(upData, up.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const imageUrl = String(upData.imageUrl ?? '').trim();
+  if (!imageUrl) {
+    await ctx.reply('Upload sem URL.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+
+  const cur = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
+  if (!cur.ok) {
+    ctx.session.awaiting = undefined;
+    ctx.session.prodPhotoMode = undefined;
+    await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const p = cur.data as Record<string, unknown>;
+  const existingRaw = Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [];
+  const existing = existingRaw.map(String).filter(Boolean);
+  const primary = typeof p.imageUrl === 'string' ? p.imageUrl.trim() : '';
+
+  let imageUrls: string[];
+  let imageUrlOut: string | null;
+
+  if (mode === 'add') {
+    imageUrls = existing.includes(imageUrl) ? existing : [...existing, imageUrl];
+    imageUrlOut = primary || imageUrls[0] || imageUrl;
+  } else if (mode === 'replace_first') {
+    imageUrlOut = imageUrl;
+    const rest = existing.filter((u) => u !== imageUrl);
+    imageUrls = [imageUrl, ...rest.filter((u) => u !== primary)];
+  } else {
+    imageUrlOut = imageUrl;
+    imageUrls = [imageUrl];
+  }
+
+  const patch = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, {
+    imageUrl: imageUrlOut,
+    imageUrls,
+  });
+  ctx.session.awaiting = undefined;
+  ctx.session.prodPhotoMode = undefined;
+  if (!patch.ok) {
+    await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  await ctx.reply('Imagem guardada na base.', { reply_markup: opsMenuReplyKeyboard() });
 });
 
 bot.catch((err: unknown) => {

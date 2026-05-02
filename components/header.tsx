@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
-import { ShoppingCart, User, LogOut, Menu, X, Search } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Menu, X, Search, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole, isOperationalStaffRole } from '@/lib/permissions';
 
 export default function Header() {
   const [mounted, setMounted] = useState(false);
@@ -18,6 +18,7 @@ export default function Header() {
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
   const isPainelLoja = isPainelLojaRole((session?.user as any)?.role);
+  const isStaffOps = isOperationalStaffRole((session?.user as any)?.role);
 
   useEffect(() => {
     setMounted(true);
@@ -105,6 +106,12 @@ export default function Header() {
                 Painel loja
               </Link>
             )}
+            {isStaffOps && (
+              <Link href="/equipa/telegram" className="hover:text-red-600 transition-colors inline-flex items-center gap-1">
+                <Bot className="w-3.5 h-3.5" aria-hidden />
+                Telegram
+              </Link>
+            )}
           </div>
 
           {/* Actions */}
@@ -125,6 +132,15 @@ export default function Header() {
                         {cartCount}
                       </span>
                     )}
+                  </Link>
+                )}
+                {isStaffOps && (
+                  <Link
+                    href="/equipa/telegram"
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                    title="Código para vincular o bot Telegram"
+                  >
+                    <Bot className="w-5 h-5" />
                   </Link>
                 )}
                 <Link href="/minha-conta" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -220,6 +236,15 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Painel loja
+              </Link>
+            )}
+            {isStaffOps && (
+              <Link
+                href="/equipa/telegram"
+                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-red-600"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Telegram (código de vínculo)
               </Link>
             )}
             {!session?.user && (
