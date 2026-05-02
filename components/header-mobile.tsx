@@ -21,6 +21,7 @@ export default function HeaderMobile() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [rawCategories, setRawCategories] = useState<Array<{ name: string; slug: string }>>([]);
   const [cartCount, setCartCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,6 +45,12 @@ export default function HeaderMobile() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (pathname === '/catalogo') {
+      setSearchQuery(searchParams?.get('search') ?? '');
+    }
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     if (status !== 'authenticated' || isAdmin || isPainelLoja) {
@@ -88,6 +95,21 @@ export default function HeaderMobile() {
 
   const cartBadge = (n: number) => (n > 99 ? '99+' : String(n));
 
+  const runCatalogSearch = () => {
+    const q = searchQuery.trim();
+    setMobileMenuOpen(false);
+    if (q) {
+      router.push(`/catalogo?search=${encodeURIComponent(q)}`);
+    } else {
+      router.push('/catalogo');
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runCatalogSearch();
+  };
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -110,20 +132,28 @@ export default function HeaderMobile() {
             </div>
           </Link>
 
-          <div className="hidden sm:flex flex-1 max-w-2xl">
+          <form className="hidden sm:flex flex-1 max-w-2xl" onSubmit={handleSearchSubmit} role="search">
             <div className="relative w-full">
               <input
-                type="text"
+                type="search"
+                name="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Faça uma pesquisa..."
+                autoComplete="off"
                 className="w-full border-2 border-gray-200 rounded-lg py-2 sm:py-3 px-4 pr-12 focus:border-emerald-500 focus:outline-none text-sm"
               />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600">
+              <button
+                type="submit"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600"
+                aria-label="Pesquisar"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
             </div>
-          </div>
+          </form>
 
           {/* Desktop: conta + carrinho */}
           <div className="hidden md:flex items-center gap-4 shrink-0">
@@ -341,20 +371,28 @@ export default function HeaderMobile() {
               )}
             </div>
 
-            <div className="p-4 border-b border-gray-200">
+            <form className="p-4 border-b border-gray-200" onSubmit={handleSearchSubmit} role="search">
               <div className="relative">
                 <input
-                  type="text"
+                  type="search"
+                  name="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Faça uma pesquisa..."
+                  autoComplete="off"
                   className="w-full border-2 border-gray-200 rounded-lg py-2.5 px-4 pr-12 focus:border-emerald-500 focus:outline-none text-sm"
                 />
-                <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600">
+                <button
+                  type="submit"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600"
+                  aria-label="Pesquisar"
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </button>
               </div>
-            </div>
+            </form>
 
             <div className="p-4">
               <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Categorias</h3>
