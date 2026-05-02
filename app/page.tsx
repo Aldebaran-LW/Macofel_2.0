@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import CategoriesInlineCarousel from '@/components/categories-inline-carousel';
+import CategoryProductsCarousel from '@/components/category-products-carousel';
 import ProductCardV2 from '@/components/product-card-v2';
 import HeroCarousel from '@/components/hero-carousel';
 import HeaderMobile from '@/components/header-mobile';
@@ -16,9 +17,9 @@ export const dynamic = 'force-dynamic';
 
 async function getFeaturedProducts() {
   try {
-    const result = await getProducts({ featured: true, limit: 8, onlyHomeVisible: true });
-    // Primeira linha da home: só destaque + com foto (ativo já vem do getProducts).
-    return (result.products ?? []).filter((p: any) => Boolean(p?.imageUrl));
+    // Primeira faixa: featured + ativos (getProducts). Sem exigir foto — o card usa 📦.
+    const result = await getProducts({ featured: true, limit: 8 });
+    return result.products ?? [];
   } catch {
     return [];
   }
@@ -84,13 +85,10 @@ async function ProductsByCategory() {
             categorySlug: slug,
             limit: 24,
             excludeFeatured: true,
-            onlyHomeVisible: true,
           });
-          const withPhoto = (result.products ?? [])
-            .filter((p: any) => Boolean(p?.imageUrl))
-            .slice(0, 8);
-          if (withPhoto.length > 0) {
-            products = withPhoto;
+          const batch = (result.products ?? []).slice(0, 8);
+          if (batch.length > 0) {
+            products = batch;
             break;
           }
         }
@@ -297,16 +295,7 @@ async function FeaturedProducts() {
       </div>
 
       {productsWithSecondary.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
-          {productsWithSecondary.map((product: any, index: number) => (
-            <ProductCardV2
-              key={product.id}
-              product={product}
-              priority={index < 6}
-              secondaryImageUrl={product.secondaryImageUrl}
-            />
-          ))}
-        </div>
+        <CategoryProductsCarousel products={productsWithSecondary} />
       ) : (
         <div className="col-span-4 text-center py-20 text-slate-400">
           <div className="text-5xl mb-4">📦</div>

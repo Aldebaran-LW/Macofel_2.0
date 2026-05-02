@@ -39,7 +39,6 @@ async function readProductFromMongo(productId: string) {
     imageUrl: p.imageUrl ?? null,
     categoryId: cid instanceof ObjectId ? cid.toString() : typeof cid === 'string' ? cid : '',
     featured: Boolean(p.featured),
-    showOnHome: p.showOnHome !== false,
     codigo: p.codigo != null ? String(p.codigo) : null,
     cost: typeof p.cost === 'number' && Number.isFinite(p.cost) ? p.cost : null,
     pricePrazo: typeof p.pricePrazo === 'number' && Number.isFinite(p.pricePrazo) ? p.pricePrazo : null,
@@ -115,7 +114,6 @@ export async function PATCH(
       imageUrls: imageUrlsBody,
       categoryId,
       featured,
-      showOnHome,
       codigo,
       cost,
       pricePrazo,
@@ -177,7 +175,6 @@ export async function PATCH(
     }
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (featured !== undefined) updateData.featured = featured === true || featured === 'true';
-    if (showOnHome !== undefined) updateData.showOnHome = showOnHome === true || showOnHome === 'true';
     // Mesmos campos extra do model Product (import LW / painel).
     if (codigo !== undefined) {
       updateData.codigo = codigo != null && String(codigo).trim() !== '' ? String(codigo).trim() : null;
@@ -261,7 +258,12 @@ export async function PATCH(
       ...(Object.keys(extraMongo).length ? extraMongo : {}),
       updatedAt: new Date(),
     };
-    const result = await productsCol.updateOne({ _id: new ObjectId(productId) }, { $set });
+    /** Remove campo legado `showOnHome` ao inativar (limpeza Mongo). */
+    const payload: Record<string, unknown> = { $set };
+    if ($set.status === false) {
+      payload.$unset = { showOnHome: '' };
+    }
+    const result = await productsCol.updateOne({ _id: new ObjectId(productId) }, payload);
     if (result.matchedCount <= 0) {
       return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }

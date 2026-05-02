@@ -55,8 +55,6 @@ interface Product {
   imageUrls?: string[] | null;
   categoryId: string;
   featured: boolean;
-  /** false = não listar na página inicial (catálogo normal continua). */
-  showOnHome?: boolean;
   codigo?: string | null;
   cost?: number | null;
   pricePrazo?: number | null;
@@ -120,7 +118,6 @@ export default function AdminProdutosPage() {
     imageUrls: [] as string[],
     categoryId: '',
     featured: false,
-    showOnHome: true,
     codigo: '',
     cost: '',
     pricePrazo: '',
@@ -466,7 +463,6 @@ export default function AdminProdutosPage() {
       imageUrls: [],
       categoryId: '',
       featured: false,
-      showOnHome: true,
       codigo: '',
       cost: '',
       pricePrazo: '',
@@ -574,7 +570,6 @@ export default function AdminProdutosPage() {
             : [],
         categoryId: product.categoryId,
         featured: product.featured,
-        showOnHome: product.showOnHome !== false,
         codigo: product.codigo ?? '',
         cost: product.cost != null ? String(product.cost) : '',
         pricePrazo: product.pricePrazo != null ? String(product.pricePrazo) : '',
@@ -636,7 +631,6 @@ export default function AdminProdutosPage() {
             : [],
           categoryId: formData.categoryId,
           featured: formData.featured,
-          showOnHome: formData.showOnHome,
           codigo: formData.codigo.trim() || null,
           cost: formData.cost.trim() || null,
           pricePrazo: formData.pricePrazo.trim() || null,
@@ -1237,9 +1231,6 @@ export default function AdminProdutosPage() {
                   Destaque
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Na home
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Ações
                 </th>
               </tr>
@@ -1247,13 +1238,13 @@ export default function AdminProdutosPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {totalCount === 0 && !filtersActive ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     Nenhum produto encontrado. Clique em "Adicionar Produto" para começar.
                   </td>
                 </tr>
               ) : totalCount === 0 && filtersActive ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     Nenhum produto corresponde aos filtros.{' '}
                     <button
                       type="button"
@@ -1336,17 +1327,6 @@ export default function AdminProdutosPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {product.featured ? (
                         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          Sim
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
-                          Não
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {product.showOnHome !== false ? (
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
                           Sim
                         </span>
                       ) : (
@@ -2148,30 +2128,22 @@ export default function AdminProdutosPage() {
               </p>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="featured"
-                checked={formData.featured}
-                onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-              />
-              <label htmlFor="featured" className="text-sm font-medium">
-                Produto em destaque
-              </label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="showOnHome"
-                checked={formData.showOnHome}
-                onChange={(e) => setFormData({ ...formData, showOnHome: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <label htmlFor="showOnHome" className="text-sm font-medium">
-                Exibir na home
-              </label>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="featured"
+                  checked={formData.featured}
+                  onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                />
+                <label htmlFor="featured" className="text-sm font-medium">
+                  Produto em destaque
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 pl-6">
+                Primeira faixa da loja (carrossel). Só produtos <strong>ativos</strong> no catálogo aparecem na vitrine.
+              </p>
             </div>
 
             <DialogFooter>

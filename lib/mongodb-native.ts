@@ -103,8 +103,6 @@ export async function getProducts(filters?: {
   featured?: boolean;
   /** Se true, exclui produtos com `featured: true` (ex.: vitrine por categoria na home). Ignorado se `featured: true` for passado. */
   excludeFeatured?: boolean;
-  /** Vitrine inicial: só produtos com showOnHome !== false (legados sem campo contam como visíveis). */
-  onlyHomeVisible?: boolean;
   page?: number;
   limit?: number;
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name_asc' | 'newest' | 'best_selling';
@@ -185,10 +183,6 @@ export async function getProducts(filters?: {
   if (voltagensFilter) andClauses.push(voltagensFilter);
   const subcategoriasFilter = multiFieldFilter(filters?.subcategorias, 'subcategoria');
   if (subcategoriasFilter) andClauses.push(subcategoriasFilter);
-
-  if (filters?.onlyHomeVisible) {
-    andClauses.push({ showOnHome: { $ne: false } });
-  }
 
   // Filtro de preço
   if (filters?.minPrice || filters?.maxPrice) {
@@ -368,7 +362,6 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
     subcategoria: string | null;
     origin: string | null;
     status: boolean;
-    showOnHome: boolean;
     category: { id: string; name: string };
   }>;
   pagination: { page: number; limit: number; total: number; totalPages: number };
@@ -539,7 +532,6 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
 
     // Mesma semântica do catálogo público: qualquer valor "inativo" (inclui strings) deve ser tratado como oculto.
     const statusBool = !isInactiveProductStatus(p.status);
-    const showOnHomeBool = p.showOnHome !== false;
 
     const rawImageUrls = Array.isArray(p.imageUrls) ? p.imageUrls : [];
     const cleanImageUrls = rawImageUrls
@@ -572,7 +564,6 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
       subcategoria: p.subcategoria != null ? String(p.subcategoria) : null,
       origin: p.origin != null ? String(p.origin) : null,
       status: statusBool,
-      showOnHome: showOnHomeBool,
       category: cat
         ? { id: cat._id.toString(), name: String(cat.name ?? '') }
         : {
