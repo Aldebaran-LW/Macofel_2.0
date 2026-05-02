@@ -7,6 +7,10 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
+# Não precisa de token nem de secrets; explícito evita surpresas com default de permissões.
+permissions:
+  contents: read
+
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -17,12 +21,15 @@ jobs:
           set -euo pipefail
           url="https://macofel-telegram-bot.onrender.com/health"
           echo "Pinging: $url"
-          # --fail: falha se HTTP >= 400
-          # --retry: tenta de novo em falhas transitórias
+          # Não use `curl | head`: o `head` fecha o pipe cedo e o `curl` pode receber SIGPIPE
+          # (exit 141) e falhar o job com `set -o pipefail` mesmo com HTTP 200.
+          # --fail: falha se HTTP >= 400; -o /dev/null: não precisamos do corpo
           curl --fail --silent --show-error \
             --max-time 20 \
             --retry 3 \
             --retry-all-errors \
             --retry-delay 2 \
-            "$url" | head -c 200
+            -o /dev/null \
+            "$url"
+          echo "ok"
 
