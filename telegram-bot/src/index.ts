@@ -1,4 +1,7 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import { Bot, InlineKeyboard, Keyboard, session } from 'grammy';
 import type { Context, SessionFlavor } from 'grammy';
@@ -16,6 +19,29 @@ import {
   postTelegramProductCreate,
   patchTelegramQuoteRequest,
 } from './macofel-api.js';
+
+function dotEnvCandidatePaths(): string[] {
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  return [
+    path.join(scriptDir, '..', '.env'),
+    path.join(scriptDir, '..', '..', '.env'),
+    path.join(process.cwd(), '.env'),
+    path.join(process.cwd(), '..', '.env'),
+  ];
+}
+
+/** Carrega `.env` de vários sítios (pasta do bot, raiz do repo, cwd). */
+function loadTelegramBotEnv(): void {
+  const seen = new Set<string>();
+  for (const p of dotEnvCandidatePaths()) {
+    const key = path.normalize(p);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (fs.existsSync(p)) dotenv.config({ path: p, override: true });
+  }
+}
+
+loadTelegramBotEnv();
 
 /** Render (e similares) injeta PORT — o Web Service precisa de um listener HTTP. */
 function startHealthServerIfPortSet(): void {
@@ -48,9 +74,16 @@ function requireEnv(): void {
   if (!integrationKey) missing.push('TELEGRAM_INTEGRATION_KEY');
   if (!baseUrl) missing.push('MACOFEL_BASE_URL');
   if (missing.length) {
-    console.error(
-      `[telegram-bot] Variáveis em falta: ${missing.join(', ')}. Copie telegram-bot/.env.example para telegram-bot/.env`
-    );
+    const found = dotEnvCandidatePaths().filter((p) => fs.existsSync(p));
+    console.error(`[telegram-bot] Variáveis em falta: ${missing.join(', ')}.`);
+    if (found.length) {
+      console.error(
+        `[telegram-bot] Existem ficheiros .env (${found.join(' | ')}), mas estas chaves estão vazias ou em falta — repare em aspas e nomes exatos.`
+      );
+    } else {
+      console.error(`[telegram-bot] Nenhum .env encontrado. Procurei em:\n  ${dotEnvCandidatePaths().join('\n  ')}`);
+    }
+    console.error('[telegram-bot] Veja telegram-bot/.env.example');
     process.exit(1);
   }
 }
@@ -1022,8 +1055,8 @@ bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
   await ctx.answerCallbackQuery();
   const token = String(ctx.match?.[1] ?? '').trim();
   const product = decodeProductCallbackToken(token);
-  const productId = product?.id ?? '';
-  if (!productId) return;
+  if (!product?.id) return;
+  const productId = product.id;
   ctx.session.selectedProductId = productId;
 
   const mode = ctx.session.productMode ?? 'cadastro';
