@@ -50,6 +50,7 @@ model User {
   accounts Account[]
   sessions Session[]
   orders   Order[]
+  productReviews ProductReview[]
   cart     Cart?
   telegramAccount  TelegramAccount?
   telegramLinkCodes TelegramLinkCode[]
@@ -136,6 +137,7 @@ model Order {
 
   user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items OrderItem[]
+  productReviews ProductReview[]
 
   @@index([userId])
   @@index([status])
@@ -154,6 +156,25 @@ model OrderItem {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
+}
+
+/// Avaliação de produto da loja (`productId` = `_id` no MongoDB). Só pode ser criada após pedido concluído com o item.
+model ProductReview {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  orderId   String
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("product_reviews")
 }
 
 /// Chave/valor JSON para configuração global (só Master Admin no painel).

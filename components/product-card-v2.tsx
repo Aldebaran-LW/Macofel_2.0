@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 
@@ -12,6 +11,7 @@ interface Product {
   slug: string;
   price: number;
   pricePrazo?: number | null;
+  showInstallmentsOnStore?: boolean;
   imageUrl?: string | null;
   secondaryImageUrl?: string | null;
   category?: { name: string } | null;
@@ -109,14 +109,6 @@ export default function ProductCardV2({
         {product.name}
       </h3>
 
-      {/* Rating */}
-      <div className="flex items-center gap-1 mb-3">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
-        ))}
-        <span className="text-xs text-gray-500 ml-1">(0)</span>
-      </div>
-
       {/* Preço */}
       <div className="mb-4 space-y-1">
         {hasPrazo ? (
@@ -133,9 +125,11 @@ export default function ProductCardV2({
             <p className="text-xl font-black text-emerald-600">
               R$ {pixPrice} <span className="text-sm font-bold">no PIX</span>
             </p>
-            <p className="text-xs text-gray-500">
-              12x de R$ {installment} no cartão s/ juros
-            </p>
+            {product.showInstallmentsOnStore === true && (
+              <p className="text-xs text-gray-500">
+                12x de R$ {installment} no cartão s/ juros
+              </p>
+            )}
           </>
         )}
       </div>

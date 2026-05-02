@@ -12,7 +12,6 @@ import {
   LayoutGrid,
   LayoutList,
   ShoppingCart,
-  Star,
   Heart,
   MessageCircle,
   Truck,
@@ -32,6 +31,9 @@ interface Product {
   slug: string;
   description: string;
   price: number;
+  pricePrazo?: number | null;
+  /** Se true, cartões do catálogo podem mostrar linha 12x (e sem preço a prazo). */
+  showInstallmentsOnStore?: boolean;
   stock: number;
   imageUrl?: string;
   category: { name: string; slug: string };
@@ -1114,17 +1116,15 @@ function CatalogoContent() {
                           <h3 className="text-sm font-bold text-slate-800 line-clamp-2 leading-snug mb-3 flex-1 group-hover:text-red-600 transition-colors">
                             {product.name}
                           </h3>
-                          <div className="flex items-center gap-1 mb-3">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-3 h-3 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                            ))}
-                          </div>
                           <p className="text-xl font-black text-slate-900">
                             R$ <span className="text-red-600">{product.price.toFixed(2).replace('.', ',')}</span>
                           </p>
-                          <p className="text-[10px] text-slate-400">
-                            ou 12x de R$ {(product.price / 12).toFixed(2).replace('.', ',')}
-                          </p>
+                          {product.showInstallmentsOnStore === true &&
+                            !(product.pricePrazo != null && product.pricePrazo > 0) && (
+                              <p className="text-[10px] text-slate-400">
+                                ou 12x de R$ {(product.price / 12).toFixed(2).replace('.', ',')}
+                              </p>
+                            )}
                         </div>
                       </Link>
                     ) : (
@@ -1168,9 +1168,12 @@ function CatalogoContent() {
                               <p className="text-2xl font-black text-slate-900">
                                 R$ <span className="text-red-600">{product.price.toFixed(2).replace('.', ',')}</span>
                               </p>
-                              <p className="text-[10px] text-slate-400">
-                                12x R$ {(product.price / 12).toFixed(2).replace('.', ',')}
-                              </p>
+                              {product.showInstallmentsOnStore === true &&
+                                !(product.pricePrazo != null && product.pricePrazo > 0) && (
+                                  <p className="text-[10px] text-slate-400">
+                                    12x R$ {(product.price / 12).toFixed(2).replace('.', ',')}
+                                  </p>
+                                )}
                             </div>
                             <button
                               onClick={(e) => handleAddToCart(e, product)}

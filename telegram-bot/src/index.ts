@@ -105,16 +105,27 @@ type SessionData = {
     | 'quote_note'
     | 'quote_id_lookup'
     | 'prod_edit_name'
-    | 'prod_create_line'
+    | 'prod_create_flow'
     | 'prod_price_vista'
     | 'prod_price_prazo'
     | 'prod_desc'
     | 'prod_weight'
     | 'prod_dim'
     | 'prod_photo'
+    | 'prod_photo_multi'
     | 'orc_nome'
     | 'orc_email'
     | 'orc_lines';
+  /** Assistente de cadastro rápido (passo a passo). */
+  prodCreate?: {
+    step: 'name' | 'price' | 'category' | 'description' | 'pricePrazo' | 'images' | 'confirm';
+    name?: string;
+    price?: number;
+    categoryId?: string;
+    description?: string;
+    pricePrazo?: number | null;
+    imageUrls?: string[];
+  };
   /** Origem do fluxo após buscar produto: cadastro (painel/edição) ou só estoque. */
   productMode?: 'cadastro' | 'estoque';
   selectedProductId?: string;
@@ -371,8 +382,8 @@ bot.hears(['🛒 Produtos', 'Produtos'], async (ctx) => {
   const lines = [
     '🛒 Produtos — dados vêm do mesmo banco do site; aqui o formato é o do Telegram.',
     '',
-    '• Pesquisar / alterar: localiza o produto e altera preço, nome, estoque, etc. (conforme seu papel).',
-    '• Cadastro rápido: cria produto novo por mensagem (uma linha com separadores).',
+    '• Pesquisar / alterar: localiza o produto (preço, descrição, imagens, etc.). Entrada/saída de stock é em 📦 Estoque.',
+    '• Cadastro rápido: assistente pergunta cada campo e imagens; confirma no fim.',
   ];
 
   await ctx.reply(lines.join('\n'), { reply_markup: kb });
@@ -496,8 +507,8 @@ bot.callbackQuery('flow:prod_help', async (ctx) => {
       '📖 Produtos no Telegram',
       '',
       '• Os dados são os mesmos do MongoDB do site — só muda a interface (mensagens e botões).',
-      '• Equipe (não cliente) pode ver ficha completa e alterar campos conforme permissão.',
-      '• “📦 Estoque” é movimentação rápida de entrada/saída.',
+      '• Equipe (não cliente) pode ver ficha completa e alterar preço, descrição, imagens, etc.',
+      '• Entrada/saída de stock é só em “📦 Estoque”.',
     ].join('\n'),
     { reply_markup: opsMenuReplyKeyboard() }
   );
@@ -505,18 +516,21 @@ bot.callbackQuery('flow:prod_help', async (ctx) => {
 
 bot.callbackQuery('flow:prod_create', async (ctx) => {
   await ctx.answerCallbackQuery();
-  ctx.session.awaiting = 'prod_create_line';
+  if (!isStaffNotClient(ctx.session.userRole)) {
+    await ctx.reply('Cadastro rápido é apenas para contas de equipa (não cliente).', {
+      reply_markup: opsMenuReplyKeyboard(),
+    });
+    return;
+  }
+  ctx.session.awaiting = 'prod_create_flow';
+  ctx.session.prodCreate = { step: 'name' };
   await ctx.reply(
     [
-      '➕ Cadastro rápido (gravado na mesma base do site)',
+      '➕ **Cadastro rápido** (mesma base do site)',
       '',
-      'Envie uma linha:',
-      'NOME | PREÇO | ID_DA_CATEGORIA | DESCRIÇÃO',
-      '',
-      'Use o caractere | entre partes. PREÇO: ex. 19,90. ID da categoria: ObjectId Mongo.',
-      'Ex.: Argamassa AC3 | 42,50 | 674a1b2c3d4e5f678901234 | Saco 20kg',
+      '1/6 — Qual o **nome** do produto?',
     ].join('\n'),
-    { reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
   );
 });
 
@@ -783,6 +797,7 @@ bot.on('message:text', async (ctx) => {
       ctx.session.pendingQuoteId = undefined;
       ctx.session.prodDescMode = undefined;
       ctx.session.prodPhotoMode = undefined;
+      ctx.session.prodCreate = undefined;
       ctx.session.orcClienteNome = undefined;
       ctx.session.orcClienteEmail = undefined;
       await ctx.reply('Ok.', { reply_markup: { remove_keyboard: true } });
@@ -1039,35 +1054,110 @@ bot.on('message:text', async (ctx) => {
     return;
   }
 
-  if (ctx.session.awaiting === 'prod_create_line') {
-    ctx.session.awaiting = undefined;
-    const parts = text.split('|').map((s) => s.trim());
-    if (parts.length < 4) {
-      await ctx.reply('Use: NOME | PREÇO | ID_CATEGORIA | DESCRIÇÃO', { reply_markup: opsMenuReplyKeyboard() });
+  if (ctx.session.awaiting === 'prod_create_flow' && ctx.session.prodCreate) {
+    const d = ctx.session.prodCreate;
+    const t = text.trim();
+
+    if (d.step === 'name') {
+      if (t.length < 2) {
+        await ctx.reply('Nome muito curto.', { reply_markup: opsMenuReplyKeyboard() });
+        return;
+      }
+      d.name = t;
+      d.step = 'price';
+      await ctx.reply('2/6 — **Preço à vista** (ex.: 19,90):', {
+        parse_mode: 'Markdown',
+        reply_markup: opsMenuReplyKeyboard(),
+      });
       return;
     }
-    const name = parts[0] ?? '';
-    const priceRaw = parts[1] ?? '';
-    const categoryId = parts[2] ?? '';
-    const description = parts.slice(3).join('|').trim();
-    const price = parseUserPriceBr(priceRaw);
-    if (!name || !description || !categoryId || price == null) {
-      await ctx.reply('Verifique os quatro campos (preço com vírgula ou ponto).', { reply_markup: opsMenuReplyKeyboard() });
+    if (d.step === 'price') {
+      const price = parseUserPriceBr(t);
+      if (price == null) {
+        await ctx.reply('Preço inválido. Ex.: 19,90', { reply_markup: opsMenuReplyKeyboard() });
+        return;
+      }
+      d.price = price;
+      d.step = 'category';
+      await ctx.reply(
+        '3/6 — **ID da categoria** (ObjectId Mongo, 24 caracteres). Copie do painel do site.',
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      );
       return;
     }
-    const res = await postTelegramProductCreate(baseUrl!, integrationKey!, telegramUserId, {
-      name,
-      description,
-      categoryId,
-      price,
-      stock: 0,
-    });
-    if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    if (d.step === 'category') {
+      if (!/^[a-f\d]{24}$/i.test(t)) {
+        await ctx.reply('ID de categoria inválido. Deve ser 24 caracteres hex.', {
+          reply_markup: opsMenuReplyKeyboard(),
+        });
+        return;
+      }
+      d.categoryId = t;
+      d.step = 'description';
+      await ctx.reply('4/6 — **Descrição** do produto (pode ser várias linhas numa mensagem):', {
+        parse_mode: 'Markdown',
+        reply_markup: opsMenuReplyKeyboard(),
+      });
       return;
     }
-    const newId = String((res.data as any)?.id ?? '');
-    await ctx.reply(`Produto criado no banco. ID: ${newId}`, { reply_markup: opsMenuReplyKeyboard() });
+    if (d.step === 'description') {
+      if (t.length < 2) {
+        await ctx.reply('Descrição muito curta.', { reply_markup: opsMenuReplyKeyboard() });
+        return;
+      }
+      d.description = t;
+      d.step = 'pricePrazo';
+      await ctx.reply(
+        '5/6 — **Preço a prazo** (ex.: 21,90) ou envie **-** para não definir.',
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      );
+      return;
+    }
+    if (d.step === 'pricePrazo') {
+      if (t === '-' || t === '') {
+        d.pricePrazo = null;
+      } else {
+        const pz = parseUserPriceBr(t);
+        if (pz == null) {
+          await ctx.reply('Valor inválido ou use **-** para pular.', {
+            parse_mode: 'Markdown',
+            reply_markup: opsMenuReplyKeyboard(),
+          });
+          return;
+        }
+        d.pricePrazo = pz;
+      }
+      d.step = 'images';
+      d.imageUrls = [];
+      await ctx.reply(
+        [
+          '6/6 — **Imagens**',
+          '',
+          'Envie uma ou várias **fotos** (uma foto por mensagem), ou envie **-** para criar sem imagem.',
+          'Depois mostramos o resumo para confirmar.',
+        ].join('\n'),
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      );
+      return;
+    }
+    if (d.step === 'images') {
+      if (t === '-' || t === '') {
+        d.step = 'confirm';
+        await showProdCreateConfirm(ctx, d);
+        return;
+      }
+      await ctx.reply(
+        'Envie uma **foto** por mensagem ou **-** para terminar e ver o resumo.',
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      );
+      return;
+    }
+    if (d.step === 'confirm') {
+      await ctx.reply('Use os botões Confirmar ou Cancelar na mensagem do resumo.', {
+        reply_markup: opsMenuReplyKeyboard(),
+      });
+      return;
+    }
     return;
   }
 
@@ -1358,6 +1448,102 @@ function quoteInlineActions(id: string): InlineKeyboard {
     .text('Liberar', `q:release:${id}`);
 }
 
+function productHasGallery(data: Record<string, unknown> | null): boolean {
+  if (!data) return false;
+  const urls = Array.isArray(data.imageUrls)
+    ? (data.imageUrls as unknown[]).map(String).filter(Boolean)
+    : [];
+  const primary = typeof data.imageUrl === 'string' ? data.imageUrl.trim() : '';
+  return urls.length > 0 || !!primary;
+}
+
+/** Teclado principal do fluxo Produtos (cadastro): sem entrada/saída de stock. */
+function kbProductCadastro(productId: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('📄 Ficha completa', `tg:g:${productId}`)
+    .row()
+    .text('💰 Preço', `sub:pre:${productId}`)
+    .text('📝 Descrição', `sub:des:${productId}`)
+    .row()
+    .text('🖼 Imagens', `sub:img:${productId}`)
+    .row()
+    .text('⚖️ Peso', `ppw:${productId}`)
+    .text('📏 Medidas', `ppm:${productId}`)
+    .row()
+    .text('✏️ Nome', `tg:name:${productId}`)
+    .row()
+    .text('🔎 Nova busca', 'search_again')
+    .text('🏠 Início', 'goto_menu')
+    .row()
+    .text('Fechar', 'cancel_inline');
+}
+
+function kbProductClienteConsulta(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('🔎 Nova busca', 'search_again')
+    .text('🏠 Início', 'goto_menu')
+    .row()
+    .text('Fechar', 'cancel_inline');
+}
+
+function kbSubPreco(productId: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('💵 À vista', `ppv:${productId}`)
+    .text('💳 A prazo', `ppp:${productId}`)
+    .row()
+    .text('◀ Voltar', `backcad:${productId}`);
+}
+
+function kbSubDesc(productId: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('✏️ Nova', `dnew:${productId}`)
+    .text('➕ Editar', `dapp:${productId}`)
+    .row()
+    .text('◀ Voltar', `backcad:${productId}`);
+}
+
+function kbSubImagens(productId: string, hasExisting: boolean): InlineKeyboard {
+  const kb = new InlineKeyboard().text('📷 Nova imagem (várias)', `imn:${productId}`).row();
+  if (hasExisting) {
+    kb.text('🔄 Substituir existente', `ims:${productId}`).row();
+  }
+  kb.text('◀ Voltar', `backcad:${productId}`);
+  return kb;
+}
+
+function kbSubSubstituirImagens(productId: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('📷 Capa / 1ª', `ir1:${productId}`)
+    .text('📷 Só esta', `ir0:${productId}`)
+    .row()
+    .text('◀ Voltar', `sub:img:${productId}`);
+}
+
+async function showProdCreateConfirm(ctx: BotContext, d: NonNullable<SessionData['prodCreate']>) {
+  const urls = d.imageUrls ?? [];
+  const prazoLine =
+    d.pricePrazo != null && Number.isFinite(d.pricePrazo)
+      ? `Preço a prazo: ${formatBrl(d.pricePrazo)}`
+      : 'Preço a prazo: —';
+  const desc = String(d.description ?? '');
+  const msg = [
+    '📋 **Resumo do produto**',
+    '',
+    `Nome: ${d.name}`,
+    `Preço à vista: ${formatBrl(d.price ?? 0)}`,
+    prazoLine,
+    `Categoria ID: ${d.categoryId}`,
+    `Descrição: ${desc.slice(0, 500)}${desc.length > 500 ? '…' : ''}`,
+    urls.length ? `Imagens: ${urls.length} foto(s)` : 'Imagens: nenhuma',
+    '',
+    'Confirma criar no banco?',
+  ].join('\n');
+  await ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: new InlineKeyboard().text('✅ Confirmar', 'pcok').text('❌ Cancelar', 'pcnx'),
+  });
+}
+
 async function sendTelegramQuoteList(
   ctx: BotContext,
   title: string,
@@ -1400,6 +1586,147 @@ async function sendTelegramQuoteList(
     await ctx.reply(msg, { reply_markup: quoteInlineActions(id) });
   }
 }
+
+bot.callbackQuery(/^backcad:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  const staff = isStaffNotClient(ctx.session.userRole);
+  const markup = staff ? kbProductCadastro(productId) : kbProductClienteConsulta();
+  await ctx.editMessageReplyMarkup({ reply_markup: markup }).catch(async () => {
+    await ctx.reply('Abra o produto outra vez pela busca.', { reply_markup: opsMenuReplyKeyboard() });
+  });
+});
+
+bot.callbackQuery(/^sub:pre:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  await ctx.editMessageReplyMarkup({ reply_markup: kbSubPreco(productId) }).catch(() => {});
+});
+
+bot.callbackQuery(/^sub:des:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  await ctx.editMessageReplyMarkup({ reply_markup: kbSubDesc(productId) }).catch(() => {});
+});
+
+bot.callbackQuery(/^sub:img:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  const { telegramUserId } = telegramIds(ctx);
+  const fresh = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
+  const data = fresh.ok ? (fresh.data as Record<string, unknown>) : null;
+  await ctx
+    .editMessageReplyMarkup({
+      reply_markup: kbSubImagens(productId, productHasGallery(data)),
+    })
+    .catch(() => {});
+});
+
+bot.callbackQuery(/^ims:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  await ctx.editMessageReplyMarkup({ reply_markup: kbSubSubstituirImagens(productId) }).catch(() => {});
+});
+
+bot.callbackQuery(/^imn:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId) return;
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_photo_multi';
+  ctx.session.prodPhotoMode = 'add';
+  await ctx.reply(
+    [
+      '📷 Envie **uma foto por mensagem** (pode enviar várias seguidas).',
+      'Quando terminar, toque **✅ Concluir envio**.',
+    ].join('\n'),
+    {
+      parse_mode: 'Markdown',
+      reply_markup: new InlineKeyboard().text('✅ Concluir envio', `imdone:${productId}`),
+    }
+  );
+});
+
+bot.callbackQuery(/^imdone:([a-f\d]{24})$/i, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId || ctx.session.selectedProductId !== productId) return;
+  ctx.session.awaiting = undefined;
+  ctx.session.prodPhotoMode = undefined;
+  await ctx.reply('Envio de imagens encerrado. Pode voltar ao produto pela busca.', {
+    reply_markup: opsMenuReplyKeyboard(),
+  });
+});
+
+bot.callbackQuery('pcok', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const draft = ctx.session.prodCreate;
+  if (!draft || draft.step !== 'confirm') {
+    await ctx.reply('Nada a confirmar.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const { telegramUserId } = telegramIds(ctx);
+  const name = (draft.name ?? '').trim();
+  const description = (draft.description ?? '').trim();
+  const categoryId = (draft.categoryId ?? '').trim();
+  const price = draft.price;
+  if (!name || !description || !categoryId || price == null || !Number.isFinite(price)) {
+    ctx.session.prodCreate = undefined;
+    ctx.session.awaiting = undefined;
+    await ctx.reply('Dados incompletos. Recomece o cadastro.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const res = await postTelegramProductCreate(baseUrl!, integrationKey!, telegramUserId, {
+    name,
+    description,
+    categoryId,
+    price,
+    stock: 0,
+  });
+  if (!res.ok) {
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+  const newId = String((res.data as any)?.id ?? '').trim();
+  const urls = draft.imageUrls ?? [];
+  const prazo = draft.pricePrazo;
+  if (newId && (urls.length > 0 || (prazo != null && Number.isFinite(prazo)))) {
+    const patchBody: Record<string, unknown> = {};
+    if (prazo != null && Number.isFinite(prazo)) patchBody.pricePrazo = prazo;
+    if (urls.length > 0) {
+      patchBody.imageUrls = urls;
+      patchBody.imageUrl = urls[0];
+    }
+    const pr = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, newId, patchBody);
+    if (!pr.ok) {
+      await ctx.reply(
+        `Produto criado (ID ${newId}), mas falhou ao aplicar imagens/preço a prazo: ${formatApiError(pr.data as any, pr.status)}`,
+        { reply_markup: opsMenuReplyKeyboard() }
+      );
+      ctx.session.prodCreate = undefined;
+      ctx.session.awaiting = undefined;
+      return;
+    }
+  }
+  ctx.session.prodCreate = undefined;
+  ctx.session.awaiting = undefined;
+  await ctx.reply(
+    `✅ Produto criado no banco.\nID: **${newId}**${urls.length ? `\n${urls.length} imagem(ns).` : ''}`,
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+  );
+});
+
+bot.callbackQuery('pcnx', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  ctx.session.prodCreate = undefined;
+  ctx.session.awaiting = undefined;
+  await ctx.reply('Cadastro cancelado.', { reply_markup: opsMenuReplyKeyboard() });
+});
 
 bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
   await ctx.answerCallbackQuery();
@@ -1473,43 +1800,10 @@ bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
       'Use os botões abaixo — interface Telegram, sem abrir o painel web.'
     );
   } else {
-    lines.push('', 'Perfil cliente: consulta rápida e estoque aqui; cadastro completo continua no site.');
+    lines.push('', 'Perfil cliente: consulta rápida aqui. Para stock use 📦 Estoque no menu.');
   }
 
-  let kb = new InlineKeyboard()
-    .text('➕ Entrada (+)', `s:in:${productId}`)
-    .text('➖ Saída (-)', `s:out:${productId}`)
-    .row();
-
-  if (staff) {
-    kb = kb
-      .text('📄 Ficha completa', `tg:g:${productId}`)
-      .row()
-      .text('💵 À vista', `ppv:${productId}`)
-      .text('💳 A prazo', `ppp:${productId}`)
-      .row()
-      .text('📝 Desc +', `dapp:${productId}`)
-      .text('📝 Desc nova', `dnew:${productId}`)
-      .row()
-      .text('⚖️ Peso', `ppw:${productId}`)
-      .text('📏 Medidas', `ppm:${productId}`)
-      .row()
-      .text('✏️ Nome', `tg:name:${productId}`)
-      .row();
-    if (isStaffNotClient(ctx.session.userRole)) {
-      kb = kb
-        .text('📷 + img', `iadd:${productId}`)
-        .text('📷 1ª', `ir1:${productId}`)
-        .text('📷 só esta', `ir0:${productId}`)
-        .row();
-    }
-  }
-
-  kb = kb
-    .text('🔎 Nova busca', 'search_again')
-    .text('🏠 Início', 'goto_menu')
-    .row()
-    .text('Fechar', 'cancel_inline');
+  const kb = staff ? kbProductCadastro(productId) : kbProductClienteConsulta();
 
   await ctx.reply(lines.join('\n'), { reply_markup: kb });
 });
@@ -1634,19 +1928,12 @@ bot.callbackQuery('ops:sales', async (ctx) => {
 });
 
 bot.on('message:photo', async (ctx) => {
-  if (ctx.session.awaiting !== 'prod_photo') return;
-  const productId = ctx.session.selectedProductId;
-  const mode = ctx.session.prodPhotoMode ?? 'add';
-  if (!productId) {
-    ctx.session.awaiting = undefined;
-    ctx.session.prodPhotoMode = undefined;
-    await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
-    return;
-  }
+  const aw = ctx.session.awaiting;
+  const draft = ctx.session.prodCreate;
   const photos = ctx.message?.photo;
   if (!photos?.length) return;
   const best = photos[photos.length - 1];
-  let file;
+  let file: { file_path?: string };
   try {
     file = await ctx.api.getFile(best.file_id);
   } catch {
@@ -1657,10 +1944,10 @@ bot.on('message:photo', async (ctx) => {
     await ctx.reply('Ficheiro inválido.', { reply_markup: opsMenuReplyKeyboard() });
     return;
   }
-  const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+  const dlUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
   let buf: Buffer;
   try {
-    const res = await fetch(fileUrl);
+    const res = await fetch(dlUrl);
     buf = Buffer.from(await res.arrayBuffer());
   } catch {
     await ctx.reply('Falha ao transferir a imagem.', { reply_markup: opsMenuReplyKeyboard() });
@@ -1689,6 +1976,62 @@ bot.on('message:photo', async (ctx) => {
   const imageUrl = String(upData.imageUrl ?? '').trim();
   if (!imageUrl) {
     await ctx.reply('Upload sem URL.', { reply_markup: opsMenuReplyKeyboard() });
+    return;
+  }
+
+  if (aw === 'prod_create_flow' && draft?.step === 'images') {
+    if (!draft.imageUrls) draft.imageUrls = [];
+    draft.imageUrls.push(imageUrl);
+    const n = draft.imageUrls.length;
+    await ctx.reply(
+      `Foto ${n} anexada ao cadastro. Envie mais fotos ou uma mensagem **-** para ver o resumo.`,
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (aw === 'prod_photo_multi') {
+    const productId = ctx.session.selectedProductId;
+    if (!productId) {
+      ctx.session.awaiting = undefined;
+      ctx.session.prodPhotoMode = undefined;
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const cur = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
+    if (!cur.ok) {
+      await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    const p = cur.data as Record<string, unknown>;
+    const existingRaw = Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [];
+    const existing = existingRaw.map(String).filter(Boolean);
+    const primary = typeof p.imageUrl === 'string' ? p.imageUrl.trim() : '';
+    const imageUrls = existing.includes(imageUrl) ? existing : [...existing, imageUrl];
+    const imageUrlOut = primary || imageUrls[0] || imageUrl;
+    const patch = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, {
+      imageUrl: imageUrlOut,
+      imageUrls,
+    });
+    if (!patch.ok) {
+      await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard() });
+      return;
+    }
+    await ctx.reply(
+      `Imagem adicionada à galeria. Envie mais ou toque **Concluir envio** quando terminar.`,
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    );
+    return;
+  }
+
+  if (aw !== 'prod_photo') return;
+
+  const productId = ctx.session.selectedProductId;
+  const mode = ctx.session.prodPhotoMode ?? 'add';
+  if (!productId) {
+    ctx.session.awaiting = undefined;
+    ctx.session.prodPhotoMode = undefined;
+    await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
     return;
   }
 

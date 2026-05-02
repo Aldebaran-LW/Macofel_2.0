@@ -291,6 +291,7 @@ export async function getProducts(filters?: {
       description: product.description,
       price: product.price,
       pricePrazo: product.pricePrazo ?? null,
+      showInstallmentsOnStore: product.showInstallmentsOnStore === true,
       stock: product.stock,
       minStock: product.minStock ?? null,
       weight: product.weight ?? null,
@@ -362,6 +363,8 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
     subcategoria: string | null;
     origin: string | null;
     status: boolean;
+    /** Se true, ficha pública pode mostrar linha de parcelamento no cartão (12x). */
+    showInstallmentsOnStore: boolean;
     category: { id: string; name: string };
   }>;
   pagination: { page: number; limit: number; total: number; totalPages: number };
@@ -564,6 +567,7 @@ export async function listAdminProductsFromMongo(searchParams: URLSearchParams):
       subcategoria: p.subcategoria != null ? String(p.subcategoria) : null,
       origin: p.origin != null ? String(p.origin) : null,
       status: statusBool,
+      showInstallmentsOnStore: p.showInstallmentsOnStore === true,
       category: cat
         ? { id: cat._id.toString(), name: String(cat.name ?? '') }
         : {
@@ -874,6 +878,7 @@ export async function getProductBySlug(slug: string) {
       : null,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
+    showInstallmentsOnStore: product.showInstallmentsOnStore === true,
   };
 }
 

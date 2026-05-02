@@ -58,6 +58,8 @@ model Product {
   /// true = ATIVO, false = INATIVO. O catálogo público filtra `status !== false`.
   status       Boolean  @default(true)
   featured     Boolean  @default(false)
+  /// Se true, a ficha do produto na loja exibe a linha de parcelamento no cartão (12x); padrão false.
+  showInstallmentsOnStore Boolean @default(false)
   imageUrl     String?
   imageUrls    String[] @default([])
   /// Obrigatório: todo produto pertence a uma Category (relação em cascade).

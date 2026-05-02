@@ -12,7 +12,6 @@ import {
   Package,
   Tag,
   ChevronRight,
-  Star,
   Shield,
   Truck,
   RotateCcw,
@@ -28,6 +27,7 @@ import StoreTopBar from '@/components/store-top-bar';
 import StoreFooter from '@/components/store-footer';
 import StoreWhatsAppFloat from '@/components/store-whatsapp-float';
 import StoreServiceBadges from '@/components/store-service-badges';
+import ProductReviewsBlock from '@/components/product-reviews-block';
 import { toast } from 'sonner';
 
 interface Product {
@@ -40,6 +40,8 @@ interface Product {
   stock: number;
   imageUrl?: string;
   imageUrls?: string[];
+  /** Se true, exibe linha "12x sem juros" na caixa de preço (quando não há preço a prazo separado). */
+  showInstallmentsOnStore?: boolean;
   category: { name: string; slug: string };
 }
 
@@ -331,15 +333,7 @@ export default function ProductPage() {
                 {product?.name}
               </h1>
 
-              {/* Rating placeholder */}
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className={`w-4 h-4 ${i < 4 ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                  ))}
-                </div>
-                <span className="text-sm text-slate-400 font-medium">4.0 (12 avaliações)</span>
-              </div>
+              <ProductReviewsBlock productSlug={product.slug} />
             </div>
 
             {/* Price */}
@@ -369,10 +363,12 @@ export default function ProductPage() {
                   </span>
                 ) : (
                   <>
-                    <span>
-                      ou <strong className="text-slate-700">12x</strong> de{' '}
-                      <strong className="text-slate-700">R$ {installment}</strong> sem juros
-                    </span>
+                    {product.showInstallmentsOnStore === true && (
+                      <span>
+                        ou <strong className="text-slate-700">12x</strong> de{' '}
+                        <strong className="text-slate-700">R$ {installment}</strong> sem juros
+                      </span>
+                    )}
                     <span className="text-emerald-600 font-bold">5% off no PIX</span>
                   </>
                 )}

@@ -15,11 +15,15 @@ import { HERO_DEFAULT_SLIDES } from '@/lib/hero-default-slides';
 
 export const dynamic = 'force-dynamic';
 
+function hasProductImage(p: { imageUrl?: string | null }) {
+  return Boolean(p?.imageUrl && String(p.imageUrl).trim());
+}
+
 async function getFeaturedProducts() {
   try {
-    // Primeira faixa: featured + ativos (getProducts). Sem exigir foto — o card usa 📦.
-    const result = await getProducts({ featured: true, limit: 8 });
-    return result.products ?? [];
+    // Buscar mais do que 8 para preencher depois do filtro por foto (imageUrl já inclui fallback da galeria no getProducts).
+    const result = await getProducts({ featured: true, limit: 48 });
+    return (result.products ?? []).filter(hasProductImage).slice(0, 8);
   } catch {
     return [];
   }
@@ -83,12 +87,12 @@ async function ProductsByCategory() {
         for (const slug of possibleSlugs) {
           const result = await getProducts({
             categorySlug: slug,
-            limit: 24,
+            limit: 48,
             excludeFeatured: true,
           });
-          const batch = (result.products ?? []).slice(0, 8);
-          if (batch.length > 0) {
-            products = batch;
+          const withPhoto = (result.products ?? []).filter(hasProductImage).slice(0, 8);
+          if (withPhoto.length > 0) {
+            products = withPhoto;
             break;
           }
         }

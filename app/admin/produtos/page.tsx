@@ -63,6 +63,8 @@ interface Product {
   marca?: string | null;
   /** false = inativo no catálogo público */
   status?: boolean;
+  /** Se true, ficha na loja mostra parcelamento 12x no cartão (sem preço a prazo separado). */
+  showInstallmentsOnStore?: boolean;
   category: { name: string; id: string };
 }
 
@@ -126,6 +128,7 @@ export default function AdminProdutosPage() {
     marca: '',
     subcategoria: '',
     statusActive: true,
+    showInstallmentsOnStore: false,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -471,6 +474,7 @@ export default function AdminProdutosPage() {
       marca: '',
       subcategoria: '',
       statusActive: true,
+      showInstallmentsOnStore: false,
     });
     setEditingProduct(null);
     setImagePreview(null);
@@ -578,6 +582,7 @@ export default function AdminProdutosPage() {
         marca: product.marca ?? '',
         subcategoria: (product as any).subcategoria ?? '',
         statusActive: product.status !== false,
+        showInstallmentsOnStore: product.showInstallmentsOnStore === true,
       });
       setImagePreview(product.imageUrl || null);
     } else {
@@ -639,6 +644,7 @@ export default function AdminProdutosPage() {
           marca: formData.marca.trim() || null,
           subcategoria: formData.subcategoria.trim() || null,
           status: formData.statusActive,
+          showInstallmentsOnStore: formData.showInstallmentsOnStore,
         }),
       });
 
@@ -1993,6 +1999,21 @@ export default function AdminProdutosPage() {
                   className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                 />
                 <span className="text-sm">Produto ativo na loja (desmarque para esconder do catálogo público)</span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.showInstallmentsOnStore}
+                  onChange={(e) =>
+                    setFormData({ ...formData, showInstallmentsOnStore: e.target.checked })
+                  }
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                />
+                <span className="text-sm text-gray-700">
+                  Na ficha da loja, mostrar parcelamento no cartão (12x sem juros). Só aparece quando{' '}
+                  <strong className="font-medium">Preço prazo</strong> está vazio — caso contrário a
+                  vitrine usa só o bloco «à vista / a prazo».
+                </span>
               </label>
             </div>
 

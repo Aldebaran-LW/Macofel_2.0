@@ -49,6 +49,7 @@ async function readProductFromMongo(productId: string) {
     origin: p.origin != null ? String(p.origin) : null,
     status: statusBool,
     category: cat ? { id: cat._id.toString(), name: String(cat.name ?? '') } : { id: '', name: '—' },
+    showInstallmentsOnStore: p.showInstallmentsOnStore === true,
   };
 }
 
@@ -122,6 +123,7 @@ export async function PATCH(
       marca,
       subcategoria,
       status,
+      showInstallmentsOnStore,
     } = body;
 
     const updateData: Record<string, unknown> = {};
@@ -209,6 +211,10 @@ export async function PATCH(
     }
     if (status !== undefined) {
       updateData.status = status === false || status === 'false' ? false : true;
+    }
+    if (showInstallmentsOnStore !== undefined) {
+      updateData.showInstallmentsOnStore =
+        showInstallmentsOnStore === true || showInstallmentsOnStore === 'true';
     }
 
     const lookupName = typeof name === 'string' && name.trim() ? name.trim() : current?.name;

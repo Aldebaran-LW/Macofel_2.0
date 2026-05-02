@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       marca,
       subcategoria,
       status,
+      showInstallmentsOnStore,
     } = body;
 
     const priceNum = parsePriceInput(price);
@@ -128,6 +129,8 @@ export async function POST(req: NextRequest) {
     const subcategoriaStr =
       subcategoria != null && String(subcategoria).trim() !== '' ? String(subcategoria).trim() : null;
     const statusBool = status === false || status === 'false' ? false : true;
+    const showInstallmentsBool =
+      showInstallmentsOnStore === true || showInstallmentsOnStore === 'true';
 
     const product = await mongoPrisma.product.create({
       data: {
@@ -141,6 +144,7 @@ export async function POST(req: NextRequest) {
         imageUrl: resolvedImageUrl,
         categoryId,
         featured: featured === true || featured === 'true',
+        showInstallmentsOnStore: showInstallmentsBool,
         codigo: codigoStr,
         cost: costNum != null && Number.isFinite(costNum) ? costNum : null,
         pricePrazo:
