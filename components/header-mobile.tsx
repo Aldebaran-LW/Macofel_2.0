@@ -5,10 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, Menu, X, User, LogOut, Bot } from 'lucide-react';
+import { ShoppingCart, Menu, X, User, LogOut } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole, isPainelLojaRole, isOperationalStaffRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
 
 interface NavCategory {
   name: string;
@@ -29,7 +29,6 @@ export default function HeaderMobile() {
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
   const isPainelLoja = isPainelLojaRole((session?.user as any)?.role);
-  const isStaffOps = isOperationalStaffRole((session?.user as any)?.role);
   const isLoggedIn = status === 'authenticated' && !!session?.user;
 
   useEffect(() => {
@@ -144,16 +143,6 @@ export default function HeaderMobile() {
                   <Link href="/minha-conta" className="text-gray-600 hover:text-emerald-600 font-semibold inline-flex items-center gap-1">
                     <User className="h-4 w-4" />
                     Minha conta
-                  </Link>
-                )}
-                {isStaffOps && (
-                  <Link
-                    href="/equipa/telegram"
-                    className="text-gray-600 hover:text-emerald-600 font-semibold inline-flex items-center gap-1"
-                    title="Código para vincular o bot Telegram"
-                  >
-                    <Bot className="h-4 w-4" />
-                    Telegram
                   </Link>
                 )}
                 {!isAdmin && !isPainelLoja && (
@@ -306,16 +295,6 @@ export default function HeaderMobile() {
                         Solicitar orçamento
                       </Link>
                     </>
-                  )}
-                  {isStaffOps && (
-                    <Link
-                      href="/equipa/telegram"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-sky-200 text-sky-800 font-bold rounded-lg"
-                    >
-                      <Bot className="w-5 h-5" />
-                      Telegram — código de vínculo
-                    </Link>
                   )}
                   <Link
                     href="/carrinho"
