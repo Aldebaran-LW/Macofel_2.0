@@ -31,7 +31,7 @@ export default async function PainelLojaHomePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Link
           href="/loja"
           className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm transition hover:border-sky-400"
@@ -48,6 +48,15 @@ export default async function PainelLojaHomePage() {
             <p className="mt-1 text-sm text-slate-600">Descarregar PDV Desktop para o PC do caixa.</p>
           </a>
         ) : null}
+        <Link
+          href="/equipa/telegram"
+          className="rounded-xl border border-violet-200 bg-violet-50/90 p-5 shadow-sm transition hover:border-violet-400"
+        >
+          <p className="font-semibold text-violet-950">Telegram — código de vínculo</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Gerar o código para associar o bot ao seu utilizador no sistema.
+          </p>
+        </Link>
       </div>
 
       {isGerente && (

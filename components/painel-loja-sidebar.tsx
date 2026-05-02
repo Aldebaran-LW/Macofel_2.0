@@ -18,6 +18,7 @@ import {
   FileText,
   FolderOpen,
   ClipboardList,
+  Bot,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -38,6 +39,7 @@ const baseItems: Item[] = [
   { href: '/loja', label: 'PDV no navegador', icon: Monitor },
   { href: '/painel-loja/historico-caixa', label: 'Histórico do caixa', icon: History },
   { href: '/painel-loja/instalador', label: 'PDV Desktop (Windows)', icon: Download },
+  { href: '/equipa/telegram', label: 'Código Telegram (bot)', icon: Bot },
 ];
 
 const orcamentoItems: Item[] = [
