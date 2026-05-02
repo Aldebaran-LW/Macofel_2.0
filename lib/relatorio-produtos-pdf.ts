@@ -35,7 +35,6 @@ export function buildPdfImportDescription(r: RelatorioProdutoPdfRow): string {
   const parts = [
     `Unid.: ${r.unid}.`,
     `Peso: ${r.peso}.`,
-    `Custo: ${r.custo}.`,
     `Venda prazo: ${r.vendaPrazo}.`,
     `Status: ${r.status}.`,
   ];

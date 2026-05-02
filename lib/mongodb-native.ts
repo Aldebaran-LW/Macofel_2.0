@@ -1,6 +1,7 @@
 // Cliente MongoDB Nativo (sem Prisma) - Apenas para exibir produtos
 import { MongoClient, Db, ObjectId } from 'mongodb';
 import type { QuoteProposalStored } from './quote-proposal-totals';
+import { sanitizePublicProductDescription } from './product-description-public';
 
 // Função para garantir que a connection string tenha nome do banco
 function ensureDatabaseName(uri: string): string {
@@ -288,7 +289,7 @@ export async function getProducts(filters?: {
       id: product._id.toString(),
       name: product.name,
       slug: product.slug,
-      description: product.description,
+      description: sanitizePublicProductDescription(product.description),
       price: product.price,
       pricePrazo: product.pricePrazo ?? null,
       showInstallmentsOnStore: product.showInstallmentsOnStore === true,
@@ -848,7 +849,7 @@ export async function getProductBySlug(slug: string) {
     id: product._id.toString(),
     name: product.name,
     slug: product.slug,
-    description: product.description,
+    description: sanitizePublicProductDescription(product.description),
     price: product.price,
     pricePrazo: product.pricePrazo ?? null,
     stock: product.stock,
