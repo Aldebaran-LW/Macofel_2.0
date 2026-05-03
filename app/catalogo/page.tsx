@@ -24,6 +24,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { publicCategoryLabel } from '@/lib/category-display';
+import { readFavoriteProductIds, toggleFavoriteProduct } from '@/lib/client-favorites';
 
 interface Product {
   id: string;
@@ -122,6 +123,15 @@ function CatalogoContent() {
   const filtersReqSeq = useRef(0);
 
   useEffect(() => { fetchCategories(); }, []);
+
+  useEffect(() => {
+    const uid = session?.user ? String((session.user as { id?: string }).id ?? '') : '';
+    if (!uid) {
+      setWishedIds(new Set());
+      return;
+    }
+    setWishedIds(new Set(readFavoriteProductIds(uid)));
+  }, [session?.user]);
 
   useEffect(() => {
     setSearchInput(searchParams?.get('search') ?? '');
@@ -350,12 +360,15 @@ function CatalogoContent() {
   const toggleWish = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    setWishedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); toast.success('Removido dos favoritos'); }
-      else { next.add(id); toast.success('Adicionado aos favoritos ❤️'); }
-      return next;
-    });
+    const uid = session?.user ? String((session.user as { id?: string }).id ?? '') : '';
+    if (!uid) {
+      toast.error('Faça login para usar favoritos');
+      router.push('/login');
+      return;
+    }
+    const added = toggleFavoriteProduct(uid, id);
+    setWishedIds(new Set(readFavoriteProductIds(uid)));
+    toast.success(added ? 'Adicionado aos favoritos' : 'Removido dos favoritos');
   };
 
   const hasFilters =
@@ -1148,6 +1161,16 @@ function CatalogoContent() {
                               📦
                             </div>
                           )}
+                          <button
+                            type="button"
+                            onClick={(e) => toggleWish(e, product.id)}
+                            title="Favoritos"
+                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/90 bg-white/90 shadow-sm backdrop-blur-[2px] hover:border-red-200"
+                          >
+                            <Heart
+                              className={`w-3.5 h-3.5 ${wishedIds.has(product.id) ? 'fill-red-600 text-red-600' : 'text-slate-300'}`}
+                            />
+                          </button>
                         </div>
                         <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
                           <div>

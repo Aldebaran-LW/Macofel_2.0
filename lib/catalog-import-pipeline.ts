@@ -5,6 +5,7 @@ import { connectToDatabase } from './mongodb-native';
 import mongoPrisma from '@/lib/mongodb';
 import {
   getBuscarProdutoInfoByBarcode,
+  hasBarcodeEanEnrichmentApisConfigured,
   hasBarcodeWebLookupApisConfigured,
   probeGoogleCustomSearchApi,
 } from '@/lib/buscar-produto-service';
@@ -486,9 +487,9 @@ export async function applyGeminiEnrichmentToCatalogDocument(
       if (!info?.title?.trim()) {
         // Web não devolveu dados — fallback: continua com Gemini usando só o nome.
         let eanMatchFallback = 'no_listing';
-        if (!hasBarcodeWebLookupApisConfigured()) {
+        if (!hasBarcodeEanEnrichmentApisConfigured()) {
           eanMatchFallback = 'api_incomplete';
-        } else {
+        } else if (hasBarcodeWebLookupApisConfigured()) {
           const probe = await getCseProbeOnce();
           if (!probe.ok) eanMatchFallback = 'api_incomplete';
         }

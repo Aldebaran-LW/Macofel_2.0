@@ -170,7 +170,23 @@ function mainMenuReplyKeyboard(): Keyboard {
     .persistent();
 }
 
-function opsMenuReplyKeyboard(): Keyboard {
+/**
+ * Teclado do menu operacional.
+ * Perfis `EMPLOYEE` só usam o fluxo **📦 Estoque** (movimentação + orientação devoluções/trocas).
+ */
+function opsMenuReplyKeyboard(userRole?: string): Keyboard {
+  const role = (userRole ?? '').trim();
+  if (role === 'EMPLOYEE') {
+    return new Keyboard()
+      .text('🏠 Início')
+      .row()
+      .text('📦 Estoque')
+      .row()
+      .text('❓ Ajuda')
+      .text('✖️ Cancelar')
+      .resized()
+      .persistent();
+  }
   return new Keyboard()
     .text('🏠 Início')
     .row()
@@ -241,7 +257,7 @@ async function sendWelcome(ctx: BotContext) {
       ]
         .filter(Boolean)
         .join('\n'),
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -328,7 +344,7 @@ bot.hears(['❓ Ajuda', 'Ajuda'], async (ctx) => {
     ].join('\n'),
     {
       reply_markup:
-        ctx.session.linked === true ? opsMenuReplyKeyboard() : mainMenuReplyKeyboard(),
+        ctx.session.linked === true ? opsMenuReplyKeyboard(ctx.session.userRole) : mainMenuReplyKeyboard(),
     }
   );
 });
@@ -367,9 +383,35 @@ function canManageQuotesRole(role: string | undefined): boolean {
   return isStaffNotClient(role);
 }
 
+/** Perfil operacional de armazém: no Telegram só o menu Estoque (política Macofel). */
+function isTelegramEmployeeStockOnly(role: string | undefined): boolean {
+  return (role ?? '').trim() === 'EMPLOYEE';
+}
+
+function painelTrocasDevolucoesUrl(): string {
+  return `${baseUrl!.replace(/\/$/, '')}/painel-loja/trocas-devolucoes`;
+}
+
+/** Quem pode abrir no browser a área formal de trocas/devoluções no painel da loja. */
+function canOpenPainelTrocasWeb(role: string | undefined): boolean {
+  const r = (role ?? '').trim();
+  return r === 'STORE_MANAGER' || r === 'SELLER' || r === 'ADMIN' || r === 'MASTER_ADMIN';
+}
+
 /** Tem de ficar ANTES de `bot.on('message:text')`, senão o handler genérico consome o update e estes nunca correm. */
 bot.hears(['🛒 Produtos', 'Produtos'], async (ctx) => {
   ctx.session.awaiting = undefined;
+  if (isTelegramEmployeeStockOnly(ctx.session.userRole)) {
+    await ctx.reply(
+      [
+        '🛒 O seu perfil (**funcionário / armazém**) usa apenas o fluxo **📦 Estoque** neste bot.',
+        '',
+        'Toque em **📦 Estoque** no teclado: movimentação (±) ou orientação sobre **devoluções e trocas**.',
+      ].join('\n'),
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+    );
+    return;
+  }
   ctx.session.productMode = 'cadastro';
 
   const kb = new InlineKeyboard()
@@ -390,19 +432,37 @@ bot.hears(['🛒 Produtos', 'Produtos'], async (ctx) => {
 });
 
 bot.hears(['📦 Estoque', 'Estoque'], async (ctx) => {
-  ctx.session.awaiting = 'product_search';
+  ctx.session.awaiting = undefined;
   ctx.session.productMode = 'estoque';
+  const kb = new InlineKeyboard()
+    .text('📥 Movimentação (± stock)', 'flow:estoque_mov')
+    .row()
+    .text('↩️ Devolução e trocas', 'flow:estoque_trocas')
+    .row()
+    .text('🏠 Início', 'goto_menu');
   await ctx.reply(
     [
-      '📦 Estoque — entrada (+) ou saída (-).',
+      '📦 **Estoque**',
       '',
-      'Digite nome do produto, código interno ou EAN para localizar.',
+      '• **Movimentação:** pesquisa o produto e regista entrada (+) ou saída (-).',
+      '• **Devolução e trocas:** orientação e ligação ao painel da loja (quando aplicável).',
     ].join('\n'),
-    { reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: kb }
   );
 });
 
 bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
+  if (isTelegramEmployeeStockOnly(ctx.session.userRole)) {
+    await ctx.reply(
+      [
+        '📋 O seu perfil (**funcionário / armazém**) não usa orçamentos neste bot.',
+        '',
+        'Use **📦 Estoque** para movimentação e devoluções/trocas.',
+      ].join('\n'),
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+    );
+    return;
+  }
   if (!canManageQuotesRole(ctx.session.userRole)) {
     await ctx.reply(
       [
@@ -410,7 +470,7 @@ bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
         '',
         'Sua conta não está como equipa no site — peça o cadastro correto ou use o portal.',
       ].join('\n'),
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -493,11 +553,56 @@ bot.callbackQuery('link:phone', async (ctx) => {
   );
 });
 
+bot.callbackQuery('flow:estoque_mov', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  ctx.session.productMode = 'estoque';
+  ctx.session.awaiting = 'product_search';
+  await ctx.reply(
+    [
+      '📥 **Movimentação de stock**',
+      '',
+      'Digite nome do produto, código interno ou EAN para localizar.',
+    ].join('\n'),
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+  );
+});
+
+bot.callbackQuery('flow:estoque_trocas', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const role = ctx.session.userRole;
+  const lines = [
+    '↩️ **Devolução e trocas**',
+    '',
+    '• **Mercadoria que regressa ao armazém:** use **Movimentação** → pesquise o produto → **Entrada (+)** com a quantidade recebida.',
+    '• **Registo formal** (política da loja, aprovações): área **Trocas e devoluções** no painel web da loja (em evolução no site).',
+  ];
+  if (canOpenPainelTrocasWeb(role)) {
+    lines.push('', `Abrir: ${painelTrocasDevolucoesUrl()}`);
+  } else {
+    lines.push(
+      '',
+      'O seu utilizador regista aqui a **movimentação física**; pedidos formais de troca/devolução tratam com **gerente ou vendedor** da loja.'
+    );
+  }
+  const kb = new InlineKeyboard()
+    .text('📥 Ir para movimentação', 'flow:estoque_mov')
+    .row()
+    .text('🏠 Início', 'goto_menu');
+  await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', reply_markup: kb });
+});
+
 bot.callbackQuery('flow:prod_search', async (ctx) => {
   await ctx.answerCallbackQuery();
+  if (isTelegramEmployeeStockOnly(ctx.session.userRole)) {
+    await ctx.reply(
+      'Perfis de armazém só usam **📦 Estoque** (movimentação e devoluções).',
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+    );
+    return;
+  }
   ctx.session.productMode = 'cadastro';
   ctx.session.awaiting = 'product_search';
-  await ctx.reply('Digite nome, código interno ou EAN do produto:', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Digite nome, código interno ou EAN do produto:', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery('flow:prod_help', async (ctx) => {
@@ -510,15 +615,22 @@ bot.callbackQuery('flow:prod_help', async (ctx) => {
       '• Equipe (não cliente) pode ver ficha completa e alterar preço, descrição, imagens, etc.',
       '• Entrada/saída de stock é só em “📦 Estoque”.',
     ].join('\n'),
-    { reply_markup: opsMenuReplyKeyboard() }
+    { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
 bot.callbackQuery('flow:prod_create', async (ctx) => {
   await ctx.answerCallbackQuery();
+  if (isTelegramEmployeeStockOnly(ctx.session.userRole)) {
+    await ctx.reply(
+      'Cadastro de produtos pelo bot não está disponível para o seu perfil. Use **📦 Estoque**.',
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+    );
+    return;
+  }
   if (!isStaffNotClient(ctx.session.userRole)) {
     await ctx.reply('Cadastro rápido é apenas para contas de equipa (não cliente).', {
-      reply_markup: opsMenuReplyKeyboard(),
+      reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
     });
     return;
   }
@@ -530,7 +642,7 @@ bot.callbackQuery('flow:prod_create', async (ctx) => {
       '',
       '1/6 — Qual o **nome** do produto?',
     ].join('\n'),
-    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -541,7 +653,7 @@ bot.callbackQuery(/^tg:g:(.+)$/i, async (ctx) => {
   const { telegramUserId } = telegramIds(ctx);
   const res = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
   if (!res.ok) {
-    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const p = res.data as Record<string, unknown>;
@@ -571,7 +683,7 @@ bot.callbackQuery(/^ppv:([a-f\d]{24})$/i, async (ctx) => {
   if (!productId) return;
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_price_vista';
-  await ctx.reply('Preço à vista — envie o valor (ex.: 19,90):', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Preço à vista — envie o valor (ex.: 19,90):', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery(/^ppp:([a-f\d]{24})$/i, async (ctx) => {
@@ -580,7 +692,7 @@ bot.callbackQuery(/^ppp:([a-f\d]{24})$/i, async (ctx) => {
   if (!productId) return;
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_price_prazo';
-  await ctx.reply('Preço a prazo — envie o valor (ex.: 21,90):', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Preço a prazo — envie o valor (ex.: 21,90):', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery(/^dapp:([a-f\d]{24})$/i, async (ctx) => {
@@ -592,7 +704,7 @@ bot.callbackQuery(/^dapp:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.prodDescMode = 'append';
   await ctx.reply(
     'Descreva o texto a **anexar** ao final da descrição atual (pode ser várias linhas numa mensagem).',
-    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -605,7 +717,7 @@ bot.callbackQuery(/^dnew:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.prodDescMode = 'replace';
   await ctx.reply(
     'Envie a **nova descrição completa** (substitui a atual).',
-    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -615,7 +727,7 @@ bot.callbackQuery(/^ppw:([a-f\d]{24})$/i, async (ctx) => {
   if (!productId) return;
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_weight';
-  await ctx.reply('Peso (kg), ex.: 12,5 ou 0 para limpar:', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Peso (kg), ex.: 12,5 ou 0 para limpar:', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery(/^ppm:([a-f\d]{24})$/i, async (ctx) => {
@@ -626,7 +738,7 @@ bot.callbackQuery(/^ppm:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.awaiting = 'prod_dim';
   await ctx.reply(
     'Medidas / dimensões (texto livre, ex.: 30x40x10 cm). Envie — para limpar.',
-    { reply_markup: opsMenuReplyKeyboard() }
+    { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -639,7 +751,7 @@ bot.callbackQuery(/^iadd:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.prodPhotoMode = 'add';
   await ctx.reply('Envie uma **foto** deste produto — será adicionada à galeria.', {
     parse_mode: 'Markdown',
-    reply_markup: opsMenuReplyKeyboard(),
+    reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
   });
 });
 
@@ -652,7 +764,7 @@ bot.callbackQuery(/^ir1:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.prodPhotoMode = 'replace_first';
   await ctx.reply(
     'Envie uma **foto** para substituir a imagem principal (capa + primeira da galeria).',
-    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -665,7 +777,7 @@ bot.callbackQuery(/^ir0:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.prodPhotoMode = 'replace_all';
   await ctx.reply('Envie uma **foto** — a galeria passará a ter só esta imagem.', {
     parse_mode: 'Markdown',
-    reply_markup: opsMenuReplyKeyboard(),
+    reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
   });
 });
 
@@ -684,7 +796,7 @@ bot.callbackQuery('flow:orc_novo', async (ctx) => {
       '`DESCRIÇÃO ; quantidade ; preço unitário`',
       '4) Última linha: **OK**',
     ].join('\n'),
-    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -696,7 +808,7 @@ bot.callbackQuery(/^oprint:([a-f\d]{24})$/i, async (ctx) => {
   const r = await fetchTelegramOrcamentoPrintHtml(baseUrl!, integrationKey!, telegramUserId, id);
   if (!r.ok || !r.html) {
     await ctx.reply('Não foi possível gerar o HTML. Verifique permissão e ID.', {
-      reply_markup: opsMenuReplyKeyboard(),
+      reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
     });
     return;
   }
@@ -705,7 +817,7 @@ bot.callbackQuery(/^oprint:([a-f\d]{24})$/i, async (ctx) => {
     caption:
       'Abra o ficheiro no telemóvel → partilhar → **Imprimir** → **Guardar como PDF** (como no site).',
     parse_mode: 'Markdown',
-    reply_markup: opsMenuReplyKeyboard(),
+    reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
   });
 });
 
@@ -715,7 +827,7 @@ bot.callbackQuery(/^tg:name:(.+)$/i, async (ctx) => {
   if (!productId) return;
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_edit_name';
-  await ctx.reply('Envie o novo nome do produto:', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Envie o novo nome do produto:', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery(/^qr:list:(.+)$/i, async (ctx) => {
@@ -761,7 +873,7 @@ bot.callbackQuery(/^qr:list:(.+)$/i, async (ctx) => {
       params = { status: 'all', assignee: 'me' };
       break;
     default:
-      await ctx.reply('Filtro desconhecido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Filtro desconhecido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
   }
 
@@ -773,7 +885,7 @@ bot.callbackQuery('qr:lookup_prompt', async (ctx) => {
   ctx.session.awaiting = 'quote_id_lookup';
   await ctx.reply(
     'Envie o ID da solicitação (24 caracteres, ex.: 674a…). Copie da lista ou do site.',
-    { reply_markup: opsMenuReplyKeyboard() }
+    { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -831,20 +943,20 @@ bot.on('message:text', async (ctx) => {
     ctx.session.awaiting = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const price = parseUserPriceBr(text);
     if (price == null) {
-      await ctx.reply('Preço inválido. Ex.: 19,90', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Preço inválido. Ex.: 19,90', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, { price });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
-    await ctx.reply(`Preço à vista gravado: ${formatBrl(price)}`, { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(`Preço à vista gravado: ${formatBrl(price)}`, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
 
@@ -852,7 +964,7 @@ bot.on('message:text', async (ctx) => {
     ctx.session.awaiting = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const raw = text.trim();
@@ -861,7 +973,7 @@ bot.on('message:text', async (ctx) => {
     if (raw !== '' && raw !== '-' && pricePrazo == null) {
       await ctx.reply('Preço a prazo inválido. Ex.: 21,90 ou **-** para limpar.', {
         parse_mode: 'Markdown',
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
@@ -869,12 +981,12 @@ bot.on('message:text', async (ctx) => {
       pricePrazo: pricePrazo ?? null,
     });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     await ctx.reply(
       pricePrazo != null ? `Preço a prazo: ${formatBrl(pricePrazo)}` : 'Preço a prazo removido.',
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -885,7 +997,7 @@ bot.on('message:text', async (ctx) => {
     ctx.session.prodDescMode = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const cur = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
@@ -899,12 +1011,12 @@ bot.on('message:text', async (ctx) => {
         : { description: text.trim() };
     const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, body);
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     await ctx.reply(
       mode === 'append' ? 'Texto anexado à descrição.' : 'Descrição substituída.',
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -913,7 +1025,7 @@ bot.on('message:text', async (ctx) => {
     ctx.session.awaiting = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const raw = text.trim().replace(',', '.');
@@ -922,7 +1034,7 @@ bot.on('message:text', async (ctx) => {
     if (raw !== '' && raw !== '-' && !Number.isFinite(weight)) {
       await ctx.reply('Peso inválido. Ex.: 12,5 ou **-** para limpar.', {
         parse_mode: 'Markdown',
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
@@ -930,12 +1042,12 @@ bot.on('message:text', async (ctx) => {
       weight: weight ?? null,
     });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     await ctx.reply(
       weight != null ? `Peso gravado: ${weight} kg` : 'Peso removido.',
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -944,7 +1056,7 @@ bot.on('message:text', async (ctx) => {
     ctx.session.awaiting = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const raw = text.trim();
@@ -953,12 +1065,12 @@ bot.on('message:text', async (ctx) => {
       dimensionsCm,
     });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     await ctx.reply(
       dimensionsCm != null ? `Medidas gravadas: ${dimensionsCm}` : 'Medidas limpas.',
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -966,14 +1078,14 @@ bot.on('message:text', async (ctx) => {
   if (ctx.session.awaiting === 'orc_nome') {
     const nome = text.trim();
     if (nome.length < 2) {
-      await ctx.reply('Nome do cliente muito curto.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Nome do cliente muito curto.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     ctx.session.orcClienteNome = nome;
     ctx.session.awaiting = 'orc_email';
     await ctx.reply('Email do cliente (ou envie **-** para ignorar):', {
       parse_mode: 'Markdown',
-      reply_markup: opsMenuReplyKeyboard(),
+      reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
     });
     return;
   }
@@ -990,7 +1102,7 @@ bot.on('message:text', async (ctx) => {
         '',
         'Na **última linha** envie só: **OK**',
       ].join('\n'),
-      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -1003,13 +1115,13 @@ bot.on('message:text', async (ctx) => {
     ctx.session.orcClienteEmail = undefined;
     if (!nome) {
       await ctx.reply('Fluxo perdido. Comece em 📋 Orçamentos → Novo orçamento.', {
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
     const parsed = parseOrcamentoItensBlock(text);
     if (!parsed.ok) {
-      await ctx.reply(parsed.error, { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(parsed.error, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const res = await postTelegramOrcamento(baseUrl!, integrationKey!, telegramUserId, {
@@ -1018,7 +1130,7 @@ bot.on('message:text', async (ctx) => {
       itens: parsed.items,
     });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const oid = String((res.data as any)?.id ?? '');
@@ -1037,20 +1149,20 @@ bot.on('message:text', async (ctx) => {
     ctx.session.awaiting = undefined;
     const productId = ctx.session.selectedProductId;
     if (!productId) {
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const name = text.trim();
     if (name.length < 2) {
-      await ctx.reply('Nome inválido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Nome inválido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const res = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, { name });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
-    await ctx.reply('Nome atualizado na base.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Nome atualizado na base.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
 
@@ -1060,35 +1172,35 @@ bot.on('message:text', async (ctx) => {
 
     if (d.step === 'name') {
       if (t.length < 2) {
-        await ctx.reply('Nome muito curto.', { reply_markup: opsMenuReplyKeyboard() });
+        await ctx.reply('Nome muito curto.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
         return;
       }
       d.name = t;
       d.step = 'price';
       await ctx.reply('2/6 — **Preço à vista** (ex.: 19,90):', {
         parse_mode: 'Markdown',
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
     if (d.step === 'price') {
       const price = parseUserPriceBr(t);
       if (price == null) {
-        await ctx.reply('Preço inválido. Ex.: 19,90', { reply_markup: opsMenuReplyKeyboard() });
+        await ctx.reply('Preço inválido. Ex.: 19,90', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
         return;
       }
       d.price = price;
       d.step = 'category';
       await ctx.reply(
         '3/6 — **ID da categoria** (ObjectId Mongo, 24 caracteres). Copie do painel do site.',
-        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
       );
       return;
     }
     if (d.step === 'category') {
       if (!/^[a-f\d]{24}$/i.test(t)) {
         await ctx.reply('ID de categoria inválido. Deve ser 24 caracteres hex.', {
-          reply_markup: opsMenuReplyKeyboard(),
+          reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
         });
         return;
       }
@@ -1096,20 +1208,20 @@ bot.on('message:text', async (ctx) => {
       d.step = 'description';
       await ctx.reply('4/6 — **Descrição** do produto (pode ser várias linhas numa mensagem):', {
         parse_mode: 'Markdown',
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
     if (d.step === 'description') {
       if (t.length < 2) {
-        await ctx.reply('Descrição muito curta.', { reply_markup: opsMenuReplyKeyboard() });
+        await ctx.reply('Descrição muito curta.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
         return;
       }
       d.description = t;
       d.step = 'pricePrazo';
       await ctx.reply(
         '5/6 — **Preço a prazo** (ex.: 21,90) ou envie **-** para não definir.',
-        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
       );
       return;
     }
@@ -1121,7 +1233,7 @@ bot.on('message:text', async (ctx) => {
         if (pz == null) {
           await ctx.reply('Valor inválido ou use **-** para pular.', {
             parse_mode: 'Markdown',
-            reply_markup: opsMenuReplyKeyboard(),
+            reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
           });
           return;
         }
@@ -1136,7 +1248,7 @@ bot.on('message:text', async (ctx) => {
           'Envie uma ou várias **fotos** (uma foto por mensagem), ou envie **-** para criar sem imagem.',
           'Depois mostramos o resumo para confirmar.',
         ].join('\n'),
-        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
       );
       return;
     }
@@ -1148,13 +1260,13 @@ bot.on('message:text', async (ctx) => {
       }
       await ctx.reply(
         'Envie uma **foto** por mensagem ou **-** para terminar e ver o resumo.',
-        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+        { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
       );
       return;
     }
     if (d.step === 'confirm') {
       await ctx.reply('Use os botões Confirmar ou Cancelar na mensagem do resumo.', {
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
@@ -1166,12 +1278,12 @@ bot.on('message:text', async (ctx) => {
     if (!ctx.session.productMode) ctx.session.productMode = 'cadastro';
     const res = await getTelegramProductSearch(baseUrl!, integrationKey!, telegramUserId, text, 10);
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const items = (res.data as any)?.items;
     if (!Array.isArray(items) || items.length === 0) {
-      await ctx.reply('Nenhum produto encontrado.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Nenhum produto encontrado.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
 
@@ -1192,7 +1304,7 @@ bot.on('message:text', async (ctx) => {
   if (ctx.session.awaiting === 'stock_delta') {
     const qty = parseInt(text, 10);
     if (!Number.isFinite(qty) || qty <= 0) {
-      await ctx.reply('Informe um número válido (ex.: 2).', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Informe um número válido (ex.: 2).', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const productId = ctx.session.selectedProductId;
@@ -1200,7 +1312,7 @@ bot.on('message:text', async (ctx) => {
     if (!productId || !sign) {
       ctx.session.awaiting = undefined;
       await ctx.reply('Fluxo perdido. Volte em Estoque e selecione o produto novamente.', {
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
@@ -1212,12 +1324,12 @@ bot.on('message:text', async (ctx) => {
       reason: 'Ajuste via Telegram',
     });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     await ctx.reply(
       `Estoque atualizado.\nAntes: ${(res.data as any)?.before ?? '?'} → Depois: ${(res.data as any)?.after ?? '?'}`,
-      { reply_markup: opsMenuReplyKeyboard() }
+      { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -1227,7 +1339,7 @@ bot.on('message:text', async (ctx) => {
     ctx.session.awaiting = undefined;
     ctx.session.pendingQuoteId = undefined;
     if (!quoteId) {
-      await ctx.reply('Fluxo perdido. Abra Orçamentos novamente.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido. Abra Orçamentos novamente.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const note = text.trim();
@@ -1235,10 +1347,10 @@ bot.on('message:text', async (ctx) => {
       followUpNote: note,
     });
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
-    await ctx.reply('Nota salva.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Nota salva.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
 
@@ -1247,13 +1359,13 @@ bot.on('message:text', async (ctx) => {
     const id = text.trim();
     if (!/^[a-f\d]{24}$/i.test(id)) {
       await ctx.reply('ID inválido. Use os 24 caracteres hex da solicitação.', {
-        reply_markup: opsMenuReplyKeyboard(),
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
       });
       return;
     }
     const res = await getTelegramQuoteById(baseUrl!, integrationKey!, telegramUserId, id);
     if (!res.ok) {
-      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const q = res.data as Record<string, unknown>;
@@ -1560,19 +1672,19 @@ async function sendTelegramQuoteList(
     ...listParams,
   });
   if (!res.ok) {
-    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const list = (res.data as any)?.solicitacoes;
   const pag = (res.data as any)?.pagination;
   if (!Array.isArray(list) || list.length === 0) {
-    await ctx.reply(`${title}\n\nNada encontrado com este filtro.`, { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(`${title}\n\nNada encontrado com este filtro.`, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const total = typeof pag?.total === 'number' ? pag.total : list.length;
   const extra =
     total > list.length ? `\n…mostrando ${Math.min(5, list.length)} de ${total}.` : '';
-  await ctx.reply(`${title}${extra}`, { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply(`${title}${extra}`, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
   for (const raw of list.slice(0, 5)) {
     const row = raw as Record<string, unknown>;
     const id = String(row?.id ?? '');
@@ -1594,7 +1706,7 @@ bot.callbackQuery(/^backcad:([a-f\d]{24})$/i, async (ctx) => {
   const staff = isStaffNotClient(ctx.session.userRole);
   const markup = staff ? kbProductCadastro(productId) : kbProductClienteConsulta();
   await ctx.editMessageReplyMarkup({ reply_markup: markup }).catch(async () => {
-    await ctx.reply('Abra o produto outra vez pela busca.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Abra o produto outra vez pela busca.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
   });
 });
 
@@ -1659,7 +1771,7 @@ bot.callbackQuery(/^imdone:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.awaiting = undefined;
   ctx.session.prodPhotoMode = undefined;
   await ctx.reply('Envio de imagens encerrado. Pode voltar ao produto pela busca.', {
-    reply_markup: opsMenuReplyKeyboard(),
+    reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
   });
 });
 
@@ -1667,7 +1779,7 @@ bot.callbackQuery('pcok', async (ctx) => {
   await ctx.answerCallbackQuery();
   const draft = ctx.session.prodCreate;
   if (!draft || draft.step !== 'confirm') {
-    await ctx.reply('Nada a confirmar.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Nada a confirmar.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const { telegramUserId } = telegramIds(ctx);
@@ -1678,7 +1790,7 @@ bot.callbackQuery('pcok', async (ctx) => {
   if (!name || !description || !categoryId || price == null || !Number.isFinite(price)) {
     ctx.session.prodCreate = undefined;
     ctx.session.awaiting = undefined;
-    await ctx.reply('Dados incompletos. Recomece o cadastro.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Dados incompletos. Recomece o cadastro.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const res = await postTelegramProductCreate(baseUrl!, integrationKey!, telegramUserId, {
@@ -1689,7 +1801,7 @@ bot.callbackQuery('pcok', async (ctx) => {
     stock: 0,
   });
   if (!res.ok) {
-    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const newId = String((res.data as any)?.id ?? '').trim();
@@ -1706,7 +1818,7 @@ bot.callbackQuery('pcok', async (ctx) => {
     if (!pr.ok) {
       await ctx.reply(
         `Produto criado (ID ${newId}), mas falhou ao aplicar imagens/preço a prazo: ${formatApiError(pr.data as any, pr.status)}`,
-        { reply_markup: opsMenuReplyKeyboard() }
+        { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
       );
       ctx.session.prodCreate = undefined;
       ctx.session.awaiting = undefined;
@@ -1717,7 +1829,7 @@ bot.callbackQuery('pcok', async (ctx) => {
   ctx.session.awaiting = undefined;
   await ctx.reply(
     `✅ Produto criado no banco.\nID: **${newId}**${urls.length ? `\n${urls.length} imagem(ns).` : ''}`,
-    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
@@ -1725,7 +1837,7 @@ bot.callbackQuery('pcnx', async (ctx) => {
   await ctx.answerCallbackQuery();
   ctx.session.prodCreate = undefined;
   ctx.session.awaiting = undefined;
-  await ctx.reply('Cadastro cancelado.', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Cadastro cancelado.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery(/^p_(.+)$/is, async (ctx) => {
@@ -1816,7 +1928,7 @@ bot.callbackQuery(/^s:(in|out):(.+)$/i, async (ctx) => {
   ctx.session.selectedProductId = productId;
   ctx.session.pendingStockSign = dir === 'in' ? 1 : -1;
   ctx.session.awaiting = 'stock_delta';
-  await ctx.reply('Informe a quantidade:', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Informe a quantidade:', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery(/^q:detail:(.+)$/i, async (ctx) => {
@@ -1826,7 +1938,7 @@ bot.callbackQuery(/^q:detail:(.+)$/i, async (ctx) => {
   const { telegramUserId } = telegramIds(ctx);
   const res = await getTelegramQuoteById(baseUrl!, integrationKey!, telegramUserId, id);
   if (!res.ok) {
-    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const q = res.data as Record<string, unknown>;
@@ -1868,7 +1980,7 @@ bot.callbackQuery(/^q:(claim|contact|release|note):(.+)$/i, async (ctx) => {
   if (action === 'note') {
     ctx.session.awaiting = 'quote_note';
     ctx.session.pendingQuoteId = quoteId;
-    await ctx.reply('Digite a nota:', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Digite a nota:', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
 
@@ -1881,17 +1993,17 @@ bot.callbackQuery(/^q:(claim|contact|release|note):(.+)$/i, async (ctx) => {
 
   const res = await patchTelegramQuoteRequest(baseUrl!, integrationKey!, telegramUserId, quoteId, body);
   if (!res.ok) {
-    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(res.data as any, res.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
-  await ctx.reply('Ok.', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Ok.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery('search_again', async (ctx) => {
   await ctx.answerCallbackQuery();
   ctx.session.awaiting = 'product_search';
   if (!ctx.session.productMode) ctx.session.productMode = 'cadastro';
-  await ctx.reply('Digite nome, código ou EAN do produto:', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Digite nome, código ou EAN do produto:', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.callbackQuery('goto_menu', async (ctx) => {
@@ -1937,11 +2049,11 @@ bot.on('message:photo', async (ctx) => {
   try {
     file = await ctx.api.getFile(best.file_id);
   } catch {
-    await ctx.reply('Não foi possível ler a foto.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Não foi possível ler a foto.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   if (!file.file_path) {
-    await ctx.reply('Ficheiro inválido.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Ficheiro inválido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const dlUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
@@ -1950,7 +2062,7 @@ bot.on('message:photo', async (ctx) => {
     const res = await fetch(dlUrl);
     buf = Buffer.from(await res.arrayBuffer());
   } catch {
-    await ctx.reply('Falha ao transferir a imagem.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Falha ao transferir a imagem.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const ext = (file.file_path.split('.').pop() || 'jpg').toLowerCase();
@@ -1970,12 +2082,12 @@ bot.on('message:photo', async (ctx) => {
   });
   const upData = (await up.json().catch(() => ({}))) as Record<string, unknown>;
   if (!up.ok) {
-    await ctx.reply(formatApiError(upData, up.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(upData, up.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const imageUrl = String(upData.imageUrl ?? '').trim();
   if (!imageUrl) {
-    await ctx.reply('Upload sem URL.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Upload sem URL.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
 
@@ -1985,7 +2097,7 @@ bot.on('message:photo', async (ctx) => {
     const n = draft.imageUrls.length;
     await ctx.reply(
       `Foto ${n} anexada ao cadastro. Envie mais fotos ou uma mensagem **-** para ver o resumo.`,
-      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -1995,12 +2107,12 @@ bot.on('message:photo', async (ctx) => {
     if (!productId) {
       ctx.session.awaiting = undefined;
       ctx.session.prodPhotoMode = undefined;
-      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const cur = await getTelegramProductById(baseUrl!, integrationKey!, telegramUserId, productId);
     if (!cur.ok) {
-      await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     const p = cur.data as Record<string, unknown>;
@@ -2014,12 +2126,12 @@ bot.on('message:photo', async (ctx) => {
       imageUrls,
     });
     if (!patch.ok) {
-      await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard() });
+      await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
     await ctx.reply(
       `Imagem adicionada à galeria. Envie mais ou toque **Concluir envio** quando terminar.`,
-      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard() }
+      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
     );
     return;
   }
@@ -2031,7 +2143,7 @@ bot.on('message:photo', async (ctx) => {
   if (!productId) {
     ctx.session.awaiting = undefined;
     ctx.session.prodPhotoMode = undefined;
-    await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
 
@@ -2039,7 +2151,7 @@ bot.on('message:photo', async (ctx) => {
   if (!cur.ok) {
     ctx.session.awaiting = undefined;
     ctx.session.prodPhotoMode = undefined;
-    await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
   const p = cur.data as Record<string, unknown>;
@@ -2069,10 +2181,10 @@ bot.on('message:photo', async (ctx) => {
   ctx.session.awaiting = undefined;
   ctx.session.prodPhotoMode = undefined;
   if (!patch.ok) {
-    await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard() });
+    await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
-  await ctx.reply('Imagem guardada na base.', { reply_markup: opsMenuReplyKeyboard() });
+  await ctx.reply('Imagem guardada na base.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
 });
 
 bot.catch((err: unknown) => {

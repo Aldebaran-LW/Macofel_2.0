@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mongoPrisma from '@/lib/mongodb';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,20 @@ export async function POST(req: NextRequest) {
         status: true,
       },
       include: { category: true },
+    });
+
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: linked.user.userId,
+      actorEmail: linked.user.email,
+      action: 'telegram.product.created',
+      targetType: 'product',
+      targetId: product.id,
+      metadata: {
+        name: product.name,
+        categoryId,
+        telegramUserId: linked.user.telegramUserId,
+      },
     });
 
     return NextResponse.json(

@@ -25,7 +25,7 @@ const cards = [
   {
     href: '/admin/master/auditoria',
     title: 'Auditoria',
-    desc: 'Registo completo de ações sensíveis (em implementação).',
+    desc: 'Site, PDV e Telegram: filtros por origem, datas, autor e texto; paginação.',
     icon: ScrollText,
   },
   {

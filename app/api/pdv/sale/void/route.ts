@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getCatalogCorsHeaders } from '@/lib/api-catalog-guard';
 import { authenticatePdvWrite } from '@/lib/pdv-write-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,6 +138,18 @@ export async function POST(req: NextRequest) {
     if (process.env.NODE_ENV === 'development') {
       console.info('[PDV void] Estorno aplicado', { vendaId: vendaId.slice(0, 8) });
     }
+
+    writeAuditLogDeferred({
+      source: 'pdv',
+      action: 'pdv.sale.voided',
+      targetType: 'pdv_sale',
+      targetId: vendaId,
+      metadata: {
+        operador: body.operador ?? null,
+        motivo: body.motivo?.trim() ?? null,
+        numero: doc.numero ?? null,
+      },
+    });
 
     return NextResponse.json(
       {

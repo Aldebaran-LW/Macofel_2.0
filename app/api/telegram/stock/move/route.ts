@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,22 @@ export async function POST(req: NextRequest) {
         createdAt: now,
       })
       .catch(() => {});
+
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: linked.user.userId,
+      actorEmail: linked.user.email,
+      action: 'telegram.stock.move',
+      targetType: 'product',
+      targetId: productId,
+      metadata: {
+        delta: Math.trunc(delta),
+        before,
+        after,
+        reason,
+        telegramUserId: linked.user.telegramUserId,
+      },
+    });
 
     return NextResponse.json({ ok: true, productId, before, after });
   } catch (error: unknown) {

@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/mongodb-native';
 import { getCatalogCorsHeaders } from '@/lib/api-catalog-guard';
 import { getTaxDefaultPercent } from '@/lib/server-app-settings';
 import { authenticatePdvWrite } from '@/lib/pdv-write-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -158,6 +159,23 @@ export async function POST(req: NextRequest) {
         pdvPrefix: body.id.slice(0, 8),
       });
     }
+
+    writeAuditLogDeferred({
+      source: 'pdv',
+      actorEmail: null,
+      actorId: null,
+      action: 'pdv.sale.synced',
+      targetType: 'pdv_sale',
+      targetId: body.id,
+      metadata: {
+        operador: body.operador ?? null,
+        numero: body.numero ?? null,
+        total: body.total,
+        formaPagamento: body.forma_pagamento,
+        itens: body.itens.length,
+        terminal: body.terminal ?? null,
+      },
+    });
 
     return NextResponse.json(
       {

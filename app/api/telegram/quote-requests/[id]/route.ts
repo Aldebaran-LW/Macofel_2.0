@@ -8,6 +8,7 @@ import {
   markQuoteRequestContacted,
   releaseQuoteRequest,
 } from '@/lib/mongodb-native';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           { status: 409 }
         );
       }
+      writeAuditLogDeferred({
+        source: 'telegram',
+        actorId: linked.user.userId,
+        actorEmail: linked.user.email,
+        action: 'telegram.quote_request.claimed',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { force: body?.force === true, telegramUserId: linked.user.telegramUserId },
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -82,6 +92,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           { status: 403 }
         );
       }
+      writeAuditLogDeferred({
+        source: 'telegram',
+        actorId: linked.user.userId,
+        actorEmail: linked.user.email,
+        action: 'telegram.quote_request.released',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { force: body?.force === true, telegramUserId: linked.user.telegramUserId },
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -92,12 +111,33 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         actorName: linked.user.name,
       });
       if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      writeAuditLogDeferred({
+        source: 'telegram',
+        actorId: linked.user.userId,
+        actorEmail: linked.user.email,
+        action: 'telegram.quote_request.contacted',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { telegramUserId: linked.user.telegramUserId },
+      });
       return NextResponse.json({ ok: true });
     }
 
     if (typeof body?.followUpNote === 'string') {
       const r = await appendQuoteRequestFollowUpNote({ id, note: body.followUpNote });
       if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      writeAuditLogDeferred({
+        source: 'telegram',
+        actorId: linked.user.userId,
+        actorEmail: linked.user.email,
+        action: 'telegram.quote_request.follow_up_note',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: {
+          noteLen: String(body.followUpNote).length,
+          telegramUserId: linked.user.telegramUserId,
+        },
+      });
       return NextResponse.json({ ok: true });
     }
 

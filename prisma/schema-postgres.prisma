@@ -186,17 +186,25 @@ model AppSetting {
   @@map("app_settings")
 }
 
+enum AuditLogSource {
+  site
+  pdv
+  telegram
+}
+
 model AuditLog {
-  id         String   @id @default(cuid())
+  id         String          @id @default(cuid())
   actorId    String?
   actorEmail String?
   action     String
   targetType String?
   targetId   String?
   metadata   Json?
-  createdAt  DateTime @default(now())
+  source     AuditLogSource @default(site)
+  createdAt  DateTime        @default(now())
 
   @@index([createdAt])
+  @@index([source, createdAt])
   @@map("audit_logs")
 }
 

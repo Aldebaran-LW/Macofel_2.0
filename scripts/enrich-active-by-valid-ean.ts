@@ -6,10 +6,15 @@
  *   npx tsx --require dotenv/config scripts/enrich-active-by-valid-ean.ts
  *   npx tsx --require dotenv/config scripts/enrich-active-by-valid-ean.ts --mark 800 --loops 25
  *
- * Requer: MONGODB_URI, GEMINI_API_KEY. Para confirmação por EAN na web: GOOGLE_API_KEY + GOOGLE_CSE_ID (senão grava `api_incomplete`).
+ * Requer: MONGODB_URI, GEMINI_API_KEY.
+ * EAN na web: por defeito Google CSE+Gemini (GOOGLE_API_KEY + GOOGLE_CSE_ID); quota grátis ~100 pesquisas/dia — cada EAN pode usar até 3.
+ *   BARCODE_ENRICHMENT_PROVIDER=abacus + ABACUS_API_KEY → RouteLLM sem CSE.
+ *   BARCODE_ENRICHMENT_PROVIDER=gemini_ml_only → só ML+Gemini, sem CSE.
+ * Sem Google e sem Abacus: se só existir GEMINI, o serviço usa ML+Gemini automaticamente.
  */
 import { GEMINI_API_KEY, MAX_CATALOG_BATCH } from '../env';
 import {
+  hasBarcodeEanEnrichmentApisConfigured,
   hasBarcodeWebLookupApisConfigured,
   probeGoogleCustomSearchApi,
 } from '../lib/buscar-produto-service';
@@ -35,10 +40,18 @@ async function run(): Promise<void> {
   }
 
   const webApis = hasBarcodeWebLookupApisConfigured();
+  const anyEanBackend = hasBarcodeEanEnrichmentApisConfigured();
+  const prov = (process.env.BARCODE_ENRICHMENT_PROVIDER || '').trim().toLowerCase();
   console.log(
     webApis
-      ? 'Variáveis GOOGLE_API_KEY + GOOGLE_CSE_ID + GEMINI_API_KEY definidas.'
-      : 'AVISO: faltam GOOGLE_API_KEY e/ou GOOGLE_CSE_ID — quem não tiver match no ML ficará com ean_web_match: "api_incomplete" (não confundir com no_listing).'
+      ? 'Variáveis GOOGLE_API_KEY + GOOGLE_CSE_ID + GEMINI_API_KEY definidas (CSE ativo para EAN).'
+      : prov === 'abacus'
+        ? 'Modo BARCODE_ENRICHMENT_PROVIDER=abacus (sem CSE).'
+        : prov === 'gemini_ml_only'
+          ? 'Modo BARCODE_ENRICHMENT_PROVIDER=gemini_ml_only (sem CSE).'
+          : anyEanBackend
+            ? 'Sem Google CSE completo; enriquecimento por EAN usa ML+Gemini (sem chamadas Custom Search).'
+            : 'AVISO: faltam chaves para enriquecer por EAN (Google+CSE+Gemini, ou ABACUS_API_KEY com BARCODE_ENRICHMENT_PROVIDER=abacus, ou GEMINI para ML só) — risco de ean_web_match: "api_incomplete".'
   );
   if (webApis) {
     const probe = await probeGoogleCustomSearchApi();

@@ -4,6 +4,8 @@ const MLB_SEARCH = 'https://api.mercadolibre.com/sites/MLB/search';
 const GOOGLE_CSE = 'https://www.googleapis.com/customsearch/v1';
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+/** OpenAI-compatible chat; mesma chave que RouteLLM / Abacus profile. */
+const ABACUS_ROUTELLM_URL = 'https://routellm.abacus.ai/v1/chat/completions';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const cache = new Map<string, { expires: number; payload: BuscarProdutoResponse }>();
@@ -70,6 +72,23 @@ export function hasBarcodeWebLookupApisConfigured(): boolean {
     process.env.GOOGLE_API_KEY?.trim() &&
       process.env.GOOGLE_CSE_ID?.trim() &&
       process.env.GEMINI_API_KEY?.trim()
+  );
+}
+
+/** Chave Abacus (RouteLLM) para `BARCODE_ENRICHMENT_PROVIDER=abacus`. */
+export function hasAbacusBarcodeEnrichmentConfigured(): boolean {
+  return Boolean(process.env.ABACUS_API_KEY?.trim());
+}
+
+/**
+ * Há backend para enriquecer EAN com LLM (Google+CSE+Gemini, ou só Gemini com ML, ou Abacus).
+ * Usado para distinguir `api_incomplete` de `no_listing` no pipeline.
+ */
+export function hasBarcodeEanEnrichmentApisConfigured(): boolean {
+  return (
+    hasBarcodeWebLookupApisConfigured() ||
+    hasAbacusBarcodeEnrichmentConfigured() ||
+    Boolean(process.env.GEMINI_API_KEY?.trim())
   );
 }
 
@@ -433,16 +452,112 @@ export async function probeGoogleCustomSearchApi(): Promise<GoogleCustomSearchPr
   return { ok: true, httpStatus: status };
 }
 
+async function runGeminiGenerateText(prompt: string): Promise<string | null> {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) return null;
+  const geminiRes = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.15 },
+    }),
+  });
+  if (!geminiRes.ok) {
+    if (process.env.BUSCAR_PRODUTO_DEBUG === '1') {
+      const t = await geminiRes.text().catch(() => '');
+      console.warn(`[buscar-produto] Gemini HTTP ${geminiRes.status}:`, t.slice(0, 400));
+    }
+    return null;
+  }
+  const geminiData = (await geminiRes.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  return geminiData.candidates?.[0]?.content?.parts?.[0]?.text || null;
+}
+
+function buildBarcodeEanEnrichmentPrompt(
+  eanDigits: string,
+  productNameHint: string | null,
+  mlContext: BuscarProdutoResponse | null,
+  googleItems: Record<string, unknown>[],
+  sourceTag: string,
+  filterNote: string
+): string {
+  const hint = (productNameHint ?? '').trim();
+  const hintLabel = hint || 'não indicado';
+  const mlNote =
+    googleItems.length === 0
+      ? 'Se a lista Google estiver vazia mas o contexto ML acima existir, baseia-te só no ML e define matched_ean exatamente "' +
+        eanDigits +
+        '" e um título fiel ao anúncio ML.'
+      : '';
+
+  return `És um assistente que extrai dados de produto para catálogo (Brasil, materiais de construção).
+
+EAN/GTIN confirmado (tem de constar nos resultados abaixo — não inventes outro código):
+${eanDigits}
+
+Nome no nosso cadastro (referência; pode não bater 100% com o título da loja):
+"${hintLabel}"
+
+Mercado Livre já validado por EAN (pode ser null):
+${JSON.stringify(mlContext ?? null)}
+
+Resultados Google Custom Search (${filterNote}):
+${JSON.stringify({ items: googleItems })}
+
+${mlNote}
+
+Regras:
+- Responde APENAS com JSON válido (sem markdown).
+- matched_ean: string "${eanDigits}" quando houver evidência (Google ou ML acima); se não houver evidência nenhuma, usa null.
+- photos: só URLs http(s) que apareçam nos resultados ou no contexto ML; nunca inventar.
+- dimensions_cm: "a × l × p" em cm ou null; weight_grams inteiro em gramas ou null; price_reference BRL ou null.
+- ncm: string com 8 dígitos (sem pontuação) ou null.
+- source exatamente: "${sourceTag}"
+
+Exemplo de formato (substitui valores):
+{"title":"Nome do produto","matched_ean":"${eanDigits}","weight_grams":null,"dimensions_cm":null,"ncm":null,"photos":[],"price_reference":null,"source":"${sourceTag}"}`;
+}
+
+function finalizeBarcodeEanLlmResponse(
+  rawText: string,
+  sourceLabel: string,
+  eanDigits: string,
+  productNameHint: string | null,
+  mlContext: BuscarProdutoResponse | null
+): BuscarProdutoResponse | null {
+  const parsed = normalizeGeminiJson(rawText);
+  if (!parsed) return null;
+  const converted = toResponseFromGemini(parsed, sourceLabel);
+  if (!converted) return null;
+  const me = digitsOnly(String(parsed.matched_ean ?? converted.matched_ean ?? ''));
+  const mlEanOk =
+    mlContext != null && digitsOnly(String(mlContext.matched_ean ?? '')) === eanDigits;
+  if (me !== eanDigits) {
+    if (mlEanOk && converted.title?.trim()) {
+      converted.matched_ean = eanDigits;
+    } else {
+      return null;
+    }
+  }
+  const hintLabel = (productNameHint ?? '').trim() || 'não indicado';
+  if (!converted.title?.trim())
+    converted.title = hintLabel !== 'não indicado' ? hintLabel : `EAN ${eanDigits}`;
+  return converted;
+}
+
 /** Google CSE com o próprio EAN; só passa ao Gemini resultados em que o EAN aparece no blob CSE (incl. pagemap). */
 async function fetchGoogleGeminiEnrichmentByBarcode(
   eanDigits: string,
   productNameHint: string | null,
   mlContext: BuscarProdutoResponse | null
 ): Promise<BuscarProdutoResponse | null> {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!process.env.GOOGLE_API_KEY?.trim() || !process.env.GOOGLE_CSE_ID?.trim() || !geminiKey) {
+  if (!process.env.GOOGLE_API_KEY?.trim() || !process.env.GOOGLE_CSE_ID?.trim()) {
     return null;
   }
+  if (!process.env.GEMINI_API_KEY?.trim()) return null;
   if (!isPlausibleGtinDigits(eanDigits)) return null;
 
   const hint = (productNameHint ?? '').trim();
@@ -465,74 +580,108 @@ async function fetchGoogleGeminiEnrichmentByBarcode(
 
   if (filtered.length === 0 && !mlContext) return null;
 
-  const hintLabel = hint || 'não indicado';
   const filterNote =
     filtered.length > 0
       ? 'cada resultado contém o EAN/GTIN no título, resumo, link ou metadados (pagemap)'
       : 'lista vazia no Google — usa só o contexto ML abaixo, se existir';
-  const geminiPrompt = `És um assistente que extrai dados de produto para catálogo (Brasil, materiais de construção).
+  const geminiPrompt = buildBarcodeEanEnrichmentPrompt(
+    eanDigits,
+    productNameHint,
+    mlContext,
+    filtered,
+    'google_gemini_ean',
+    filterNote
+  );
 
-EAN/GTIN confirmado (tem de constar nos resultados abaixo — não inventes outro código):
-${eanDigits}
+  const text = await runGeminiGenerateText(geminiPrompt);
+  if (!text) return null;
+  return finalizeBarcodeEanLlmResponse(text, 'google_gemini_ean', eanDigits, productNameHint, mlContext);
+}
 
-Nome no nosso cadastro (referência; pode não bater 100% com o título da loja):
-"${hintLabel}"
+/** Zero chamadas Custom Search: só ML validado + Gemini (útil para não gastar quota CSE ~100/dia). */
+async function fetchGeminiEnrichmentByBarcodeMlOnly(
+  eanDigits: string,
+  productNameHint: string | null,
+  mlContext: BuscarProdutoResponse | null
+): Promise<BuscarProdutoResponse | null> {
+  if (!process.env.GEMINI_API_KEY?.trim()) return null;
+  if (!isPlausibleGtinDigits(eanDigits)) return null;
+  if (!mlContext) return null;
 
-Mercado Livre já validado por EAN (pode ser null):
-${JSON.stringify(mlContext ?? null)}
+  const filterNote =
+    'sem Google Custom Search (quota); só Mercado Livre já validado por EAN — não inventar dados fora desse contexto';
+  const geminiPrompt = buildBarcodeEanEnrichmentPrompt(
+    eanDigits,
+    productNameHint,
+    mlContext,
+    [],
+    'gemini_ml_ean',
+    filterNote
+  );
+  const text = await runGeminiGenerateText(geminiPrompt);
+  if (!text) return null;
+  return finalizeBarcodeEanLlmResponse(text, 'gemini_ml_ean', eanDigits, productNameHint, mlContext);
+}
 
-Resultados Google Custom Search (${filterNote}):
-${JSON.stringify({ items: filtered })}
+/** RouteLLM Abacus (OpenAI-compatible); zero CSE. Requer `ABACUS_API_KEY`. */
+async function fetchAbacusRouteLlmEnrichmentByBarcode(
+  eanDigits: string,
+  productNameHint: string | null,
+  mlContext: BuscarProdutoResponse | null
+): Promise<BuscarProdutoResponse | null> {
+  const abacusKey = process.env.ABACUS_API_KEY?.trim();
+  if (!abacusKey) return null;
+  if (!isPlausibleGtinDigits(eanDigits)) return null;
+  if (!mlContext) return null;
 
-Se a lista Google estiver vazia mas o contexto ML acima existir, baseia-te só no ML e define matched_ean exatamente "${eanDigits}" e um título fiel ao anúncio ML.
+  const model =
+    process.env.ABACUS_ROUTELLM_MODEL?.trim() || process.env.ABACUS_CHAT_MODEL?.trim() || 'gpt-4o-mini';
+  const filterNote =
+    'sem Google Custom Search; só Mercado Livre já validado por EAN — não inventar dados fora desse contexto';
+  const userPrompt = buildBarcodeEanEnrichmentPrompt(
+    eanDigits,
+    productNameHint,
+    mlContext,
+    [],
+    'abacus_routellm_ean',
+    filterNote
+  );
 
-Regras:
-- Responde APENAS com JSON válido (sem markdown).
-- matched_ean: string "${eanDigits}" quando houver evidência (Google ou ML acima); se não houver evidência nenhuma, usa null.
-- photos: só URLs http(s) que apareçam nos resultados ou no contexto ML; nunca inventar.
-- dimensions_cm: "a × l × p" em cm ou null; weight_grams inteiro em gramas ou null; price_reference BRL ou null.
-- ncm: string com 8 dígitos (sem pontuação) ou null.
-- source exatamente: "google_gemini_ean"
-
-Exemplo de formato (substitui valores):
-{"title":"Nome do produto","matched_ean":"${eanDigits}","weight_grams":null,"dimensions_cm":null,"ncm":null,"photos":[],"price_reference":null,"source":"google_gemini_ean"}`;
-
-  const geminiRes = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
+  const res = await fetch(ABACUS_ROUTELLM_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${abacusKey}`,
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: { temperature: 0.15 },
+      model,
+      messages: [{ role: 'user', content: userPrompt }],
+      temperature: 0.15,
     }),
   });
-  if (!geminiRes.ok) {
+  if (!res.ok) {
     if (process.env.BUSCAR_PRODUTO_DEBUG === '1') {
-      const t = await geminiRes.text().catch(() => '');
-      console.warn(`[buscar-produto] Gemini HTTP ${geminiRes.status}:`, t.slice(0, 400));
+      const t = await res.text().catch(() => '');
+      console.warn(`[buscar-produto] Abacus RouteLLM HTTP ${res.status}:`, t.slice(0, 400));
     }
     return null;
   }
-  const geminiData = (await geminiRes.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string | null } }[];
+    error?: { message?: string };
   };
-  const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const parsed = normalizeGeminiJson(text);
-  if (!parsed) return null;
-  const converted = toResponseFromGemini(parsed, 'google_gemini_ean');
-  if (!converted) return null;
-  const me = digitsOnly(String(parsed.matched_ean ?? converted.matched_ean ?? ''));
-  const mlEanOk =
-    mlContext != null && digitsOnly(String(mlContext.matched_ean ?? '')) === eanDigits;
-  if (me !== eanDigits) {
-    if (mlEanOk && converted.title?.trim()) {
-      converted.matched_ean = eanDigits;
-    } else {
-      return null;
-    }
+  if (data.error?.message && process.env.BUSCAR_PRODUTO_DEBUG === '1') {
+    console.warn('[buscar-produto] Abacus error:', data.error.message);
   }
-  if (!converted.title?.trim())
-    converted.title = hintLabel !== 'não indicado' ? hintLabel : `EAN ${eanDigits}`;
-  return converted;
+  const text = data.choices?.[0]?.message?.content || '';
+  if (!text) return null;
+  return finalizeBarcodeEanLlmResponse(
+    text,
+    'abacus_routellm_ean',
+    eanDigits,
+    productNameHint,
+    mlContext
+  );
 }
 
 function needsEnrichment(r: BuscarProdutoResponse | null): boolean {
@@ -560,7 +709,7 @@ function mergePreferMl(
     source:
       ml.photos.length && ml.weight_grams != null && ml.dimensions_cm
         ? ml.source || 'mercadolivre'
-        : `${ml.source || 'mercadolivre'}_google_gemini`,
+        : `${ml.source || 'mercadolivre'}_${(gem.source || 'enrichment').replace(/_ean$/, '')}`,
     ml_url: ml.ml_url ?? gem.ml_url,
     matched_ean: ml.matched_ean ?? gem.matched_ean ?? null,
   };
@@ -655,12 +804,30 @@ export async function getBuscarProdutoInfoByBarcode(
   }
 
   let gemResult: BuscarProdutoResponse | null = null;
-  if (hasApiAccessConfigured()) {
-    try {
-      gemResult = await fetchGoogleGeminiEnrichmentByBarcode(eanDigits, hint, mlResult);
-    } catch {
-      gemResult = null;
+  const provider = (process.env.BARCODE_ENRICHMENT_PROVIDER || '').trim().toLowerCase();
+  try {
+    if (provider === 'abacus') {
+      if (hasAbacusBarcodeEnrichmentConfigured()) {
+        gemResult = await fetchAbacusRouteLlmEnrichmentByBarcode(eanDigits, hint, mlResult);
+      }
+      if (!gemResult && process.env.GEMINI_API_KEY?.trim()) {
+        gemResult = await fetchGeminiEnrichmentByBarcodeMlOnly(eanDigits, hint, mlResult);
+      }
+    } else if (provider === 'gemini_ml_only') {
+      gemResult = await fetchGeminiEnrichmentByBarcodeMlOnly(eanDigits, hint, mlResult);
+    } else if (provider === 'google') {
+      if (hasApiAccessConfigured()) {
+        gemResult = await fetchGoogleGeminiEnrichmentByBarcode(eanDigits, hint, mlResult);
+      }
+    } else {
+      if (hasApiAccessConfigured()) {
+        gemResult = await fetchGoogleGeminiEnrichmentByBarcode(eanDigits, hint, mlResult);
+      } else if (process.env.GEMINI_API_KEY?.trim()) {
+        gemResult = await fetchGeminiEnrichmentByBarcodeMlOnly(eanDigits, hint, mlResult);
+      }
     }
+  } catch {
+    gemResult = null;
   }
 
   let finalResult: BuscarProdutoResponse | null = null;

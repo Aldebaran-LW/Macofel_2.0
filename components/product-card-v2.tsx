@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Heart } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/client-favorites';
+
+const MotionLink = motion(Link);
 
 interface Product {
   id: string;
@@ -35,7 +42,20 @@ export default function ProductCardV2({
   priority = false,
   secondaryImageUrl,
 }: ProductCardV2Props) {
+  const { data: session, status } = useSession() ?? {};
+  const router = useRouter();
+  const userId = (session?.user as { id?: string } | undefined)?.id ?? '';
   const [isHovered, setIsHovered] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    if (!userId) {
+      setIsFavorite(false);
+      return;
+    }
+    setIsFavorite(isFavoriteProduct(userId, product.id));
+  }, [userId, product.id]);
+
   const pixPrice = (product.price * 0.9).toFixed(2).replace('.', ',');
   const installment = (product.price / 12).toFixed(2).replace('.', ',');
   const hasPrazo =
@@ -44,8 +64,10 @@ export default function ProductCardV2({
   const hasSecondaryImage = Boolean(secondaryImageUrl && secondaryImageUrl !== product.imageUrl);
 
   return (
-    <motion.div
-      className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow group"
+    <MotionLink
+      href={`/produto/${product.slug}`}
+      scroll
+      className="block bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow group cursor-pointer text-left"
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       whileHover={{
@@ -56,6 +78,26 @@ export default function ProductCardV2({
     >
       {/* Imagem */}
       <div className="relative aspect-square mb-4 overflow-hidden rounded-lg bg-gray-50">
+        <button
+          type="button"
+          title={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (status !== 'authenticated' || !userId) {
+              toast.error('Faça login para usar favoritos');
+              router.push('/login');
+              return;
+            }
+            const added = toggleFavoriteProduct(userId, product.id);
+            setIsFavorite(added);
+            toast.success(added ? 'Adicionado aos favoritos' : 'Removido dos favoritos');
+          }}
+          className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/90 bg-white/90 text-slate-500 shadow-sm backdrop-blur-[2px] transition-colors hover:border-red-200 hover:bg-white hover:text-red-600"
+        >
+          <Heart className={`h-3.5 w-3.5 ${isFavorite ? 'fill-red-600 text-red-600' : 'text-slate-400'}`} />
+        </button>
         {product.imageUrl ? (
           <>
             {/* Imagem Principal */}
@@ -134,13 +176,10 @@ export default function ProductCardV2({
         )}
       </div>
 
-      {/* Botão Comprar */}
-      <Link
-        href={`/produto/${product.slug}`}
-        className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white text-center font-bold py-3 rounded-lg transition-colors"
-      >
+      {/* CTA — mesmo destino que o cartão inteiro */}
+      <span className="block w-full bg-emerald-600 group-hover:bg-emerald-700 text-white text-center font-bold py-3 rounded-lg transition-colors">
         Comprar
-      </Link>
-    </motion.div>
+      </span>
+    </MotionLink>
   );
 }

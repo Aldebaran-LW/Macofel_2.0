@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { authOptions } from '@/lib/auth-options';
 import { canAccessPhysicalStockApi } from '@/lib/store-stock-access';
 import { connectToDatabase } from '@/lib/mongodb-native';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,6 +118,23 @@ export async function POST(req: NextRequest) {
     actorRole,
     actorType: 'admin_session',
     source: 'admin_manual',
+  });
+
+  await writeAuditLog({
+    source: 'site',
+    actorId,
+    actorEmail,
+    action: 'site.stock.manual_movement',
+    targetType: 'product',
+    targetId: productId,
+    metadata: {
+      movementId: String(insert.insertedId),
+      type,
+      quantity: q,
+      note: note || null,
+      productName,
+      actorRole,
+    },
   });
 
   return NextResponse.json(

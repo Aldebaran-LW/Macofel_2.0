@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import { hasPermission } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
@@ -214,6 +215,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { productId:
     }
 
     const normalized = await readProductTelegram(productId);
+
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: linked.user.userId,
+      actorEmail: linked.user.email,
+      action: 'telegram.product.updated',
+      targetType: 'product',
+      targetId: productId,
+      metadata: {
+        fields: Object.keys(updateData).filter((k) => k !== 'updatedAt'),
+        telegramUserId: linked.user.telegramUserId,
+      },
+    });
+
     return NextResponse.json(normalized);
   } catch (error: unknown) {
     console.error('[api/telegram/products/:id PATCH]', error);

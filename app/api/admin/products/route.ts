@@ -6,6 +6,7 @@ import mongoPrisma from '@/lib/mongodb';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 import { applyExtraFieldsFromEnrichment } from '@/lib/product-web-enrichment';
 import { listAdminProductsFromMongo } from '@/lib/mongodb-native';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -162,6 +163,17 @@ export async function POST(req: NextRequest) {
     });
 
     await applyExtraFieldsFromEnrichment(product.id, enriched);
+
+    const u = session.user as { id?: string; email?: string | null };
+    await writeAuditLog({
+      source: 'site',
+      actorId: u.id ?? null,
+      actorEmail: u.email ?? null,
+      action: 'site.product.created',
+      targetType: 'product',
+      targetId: product.id,
+      metadata: { name: product.name, slug: product.slug },
+    });
 
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {

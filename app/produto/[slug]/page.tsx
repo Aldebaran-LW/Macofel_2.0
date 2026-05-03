@@ -28,6 +28,7 @@ import StoreFooter from '@/components/store-footer';
 import StoreWhatsAppFloat from '@/components/store-whatsapp-float';
 import StoreServiceBadges from '@/components/store-service-badges';
 import ProductReviewsBlock from '@/components/product-reviews-block';
+import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/client-favorites';
 import { toast } from 'sonner';
 
 interface Product {
@@ -48,7 +49,8 @@ interface Product {
 export default function ProductPage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession() ?? {};
+  const { data: session, status: sessionStatus } = useSession() ?? {};
+  const userId = (session?.user as { id?: string } | undefined)?.id ?? '';
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -81,6 +83,14 @@ export default function ProductPage() {
   useEffect(() => {
     setActiveImageIdx(0);
   }, [product?.id]);
+
+  useEffect(() => {
+    if (!product?.id || !userId) {
+      setWished(false);
+      return;
+    }
+    setWished(isFavoriteProduct(userId, product.id));
+  }, [product?.id, userId]);
 
   useEffect(() => {
     if (activeImageIdx >= galleryUrls.length) setActiveImageIdx(0);
@@ -298,9 +308,17 @@ export default function ProductPage() {
                 <div className="absolute top-5 right-5 flex flex-col gap-2">
                   <button
                     type="button"
+                    title={wished ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                     onClick={() => {
-                      setWished(!wished);
-                      toast.success(wished ? 'Removido' : 'Adicionado aos favoritos ❤️');
+                      if (sessionStatus !== 'authenticated' || !userId) {
+                        toast.error('Faça login para usar favoritos');
+                        router.push('/login');
+                        return;
+                      }
+                      if (!product?.id) return;
+                      const added = toggleFavoriteProduct(userId, product.id);
+                      setWished(added);
+                      toast.success(added ? 'Adicionado aos favoritos' : 'Removido dos favoritos');
                     }}
                     className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-red-50 transition-colors"
                   >

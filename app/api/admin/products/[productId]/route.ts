@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth-options';
 import { isAdminDashboardRole } from '@/lib/permissions';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -278,6 +279,19 @@ export async function PATCH(
     if (!normalized) {
       return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }
+
+    const u = session.user as { id?: string; email?: string | null };
+    const fieldKeys = Object.keys($set).filter((k) => k !== 'updatedAt');
+    await writeAuditLog({
+      source: 'site',
+      actorId: u.id ?? null,
+      actorEmail: u.email ?? null,
+      action: 'site.product.updated',
+      targetType: 'product',
+      targetId: productId,
+      metadata: { fields: fieldKeys },
+    });
+
     return NextResponse.json(normalized);
   } catch (error: any) {
     console.error('Erro:', error);
@@ -310,6 +324,16 @@ export async function DELETE(
     if (res.deletedCount <= 0) {
       return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }
+
+    const u = session.user as { id?: string; email?: string | null };
+    await writeAuditLog({
+      source: 'site',
+      actorId: u.id ?? null,
+      actorEmail: u.email ?? null,
+      action: 'site.product.deleted',
+      targetType: 'product',
+      targetId: productId,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
