@@ -23,7 +23,7 @@ export function notifyAdminsNewQuoteRequest(payload: {
     return;
   }
   const base = getAppBaseUrl();
-  const link = `${base}/admin/solicitacoes-orcamento/${payload.quoteId}`;
+  const link = `${base}/painel-loja/solicitacoes-orcamento/${payload.quoteId}`;
   const html = layout(
     'Nova solicitação de orçamento',
     `<p><strong>${escapeHtml(payload.clientName)}</strong> (${escapeHtml(payload.clientEmail)}) enviou uma solicitação com <strong>${payload.itemCount}</strong> item(ns).</p>
@@ -72,7 +72,7 @@ export function notifyAdminsProposalAccepted(payload: {
   const admins = getAdminNotificationEmails();
   if (admins.length === 0) return;
   const base = getAppBaseUrl();
-  const link = `${base}/admin/solicitacoes-orcamento/${payload.quoteId}`;
+  const link = `${base}/painel-loja/solicitacoes-orcamento/${payload.quoteId}`;
   const html = layout(
     'Cliente aceitou a proposta',
     `<p><strong>${escapeHtml(payload.clientName)}</strong> (${escapeHtml(payload.clientEmail)}) <strong>aceitou</strong> a proposta de orçamento.</p>
@@ -96,7 +96,7 @@ export function notifyAdminsProposalRejected(payload: {
   const admins = getAdminNotificationEmails();
   if (admins.length === 0) return;
   const base = getAppBaseUrl();
-  const link = `${base}/admin/solicitacoes-orcamento/${payload.quoteId}`;
+  const link = `${base}/painel-loja/solicitacoes-orcamento/${payload.quoteId}`;
   const html = layout(
     'Cliente recusou a proposta',
     `<p><strong>${escapeHtml(payload.clientName)}</strong> (${escapeHtml(payload.clientEmail)}) <strong>não aceitou</strong> a proposta de orçamento.</p>

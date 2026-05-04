@@ -1,7 +1,12 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { hasPermission } from '@/lib/permissions';
+import {
+  canOpenPainelLoja,
+  canUseStaffTelegramBot,
+  hasPermission,
+  isPainelLojaGerenteScopeRole,
+} from '@/lib/permissions';
 import { resolvePdvInstallerDownloadUrl } from '@/lib/pdv-installer-url';
 import { redirect } from 'next/navigation';
 
@@ -13,11 +18,11 @@ export const metadata = {
 export default async function PainelLojaHomePage() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session?.user || (role !== 'STORE_MANAGER' && role !== 'SELLER')) {
+  if (!session?.user || !canOpenPainelLoja(role)) {
     redirect('/login?callbackUrl=/painel-loja');
   }
 
-  const isGerente = role === 'STORE_MANAGER';
+  const isGerente = isPainelLojaGerenteScopeRole(role);
   const installerUrl = resolvePdvInstallerDownloadUrl();
 
   return (
@@ -26,8 +31,10 @@ export default async function PainelLojaHomePage() {
         <h1 className="text-2xl font-bold text-slate-900">Painel da loja</h1>
         <p className="mt-2 text-slate-600">
           {isGerente
-            ? 'Como gerente, tem acesso ao PDV e às funções de gestão da loja (estoque físico, caixas, relatórios, etc.).'
-            : 'Como vendedor, use o PDV no navegador ou a app desktop para vendas; aqui encontra atalhos e o instalador.'}
+            ? 'Como gerente de loja ou gerente site, tem acesso ao PDV e às funções de gestão da loja (estoque físico, caixas, relatórios, etc.).'
+            : role === 'SELLER'
+              ? 'Como vendedor, use o PDV no navegador ou a app desktop para vendas; aqui encontra atalhos e o instalador.'
+              : 'Atalhos da área da loja (incluindo solicitações de orçamento dos clientes, quando tiver permissão).'}
         </p>
       </div>
 
@@ -48,15 +55,17 @@ export default async function PainelLojaHomePage() {
             <p className="mt-1 text-sm text-slate-600">Descarregar PDV Desktop para o PC do caixa.</p>
           </a>
         ) : null}
-        <Link
-          href="/equipa/telegram"
-          className="rounded-xl border border-violet-200 bg-violet-50/90 p-5 shadow-sm transition hover:border-violet-400"
-        >
-          <p className="font-semibold text-violet-950">Telegram — código de vínculo</p>
-          <p className="mt-1 text-sm text-slate-600">
-            Gerar o código para associar o bot ao seu utilizador no sistema.
-          </p>
-        </Link>
+        {canUseStaffTelegramBot(role) ? (
+          <Link
+            href="/equipa/telegram"
+            className="rounded-xl border border-violet-200 bg-violet-50/90 p-5 shadow-sm transition hover:border-violet-400"
+          >
+            <p className="font-semibold text-violet-950">Telegram — código de vínculo</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Gerar o código para associar o bot ao seu utilizador no sistema.
+            </p>
+          </Link>
+        ) : null}
       </div>
 
       {isGerente && (

@@ -4,6 +4,7 @@ import type { NextFetchEvent, NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { DIRECT_CHECKOUT_ENABLED } from '@/lib/sales-mode';
 import {
+  canOpenPainelLoja,
   hasPdvFullWebAccess,
   isAdminDashboardRole,
   isMasterAdminPathname,
@@ -154,7 +155,7 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
       u.searchParams.set('callbackUrl', `${pathname}${req.nextUrl.search}`);
       return NextResponse.redirect(u);
     }
-    if (!isPainelLojaRole(token.role as string | undefined)) {
+    if (!canOpenPainelLoja(token.role as string | undefined)) {
       return NextResponse.redirect(new URL('/', req.url));
     }
     return NextResponse.next();

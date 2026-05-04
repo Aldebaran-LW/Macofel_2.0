@@ -8,7 +8,7 @@ import {
   type QuoteRequestItem,
 } from '@/lib/mongodb-native';
 import { notifyAdminsNewQuoteRequest } from '@/lib/email-notifications';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManageClientQuoteRequests } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const role = auth.role;
     const userId = auth.userId;
 
-    if (canManageQuotesAndOrcamentos(role)) {
+    if (canManageClientQuoteRequests(role)) {
       const { searchParams } = new URL(req.url);
       const page = parseInt(searchParams.get('page') ?? '1', 10);
       const limit = parseInt(searchParams.get('limit') ?? '30', 10);

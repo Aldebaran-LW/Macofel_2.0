@@ -24,7 +24,12 @@ import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { hasPermission, isPainelLojaRole } from '@/lib/permissions';
+import {
+  canOpenPainelLoja,
+  canUseStaffTelegramBot,
+  hasPermission,
+  isPainelLojaGerenteScopeRole,
+} from '@/lib/permissions';
 
 type Item = {
   href: string;
@@ -34,7 +39,7 @@ type Item = {
   permission?: Parameters<typeof hasPermission>[1];
 };
 
-const baseItems: Item[] = [
+const baseItemsAll: Item[] = [
   { href: '/painel-loja', label: 'Visão geral', icon: LayoutDashboard },
   { href: '/loja', label: 'PDV no navegador', icon: Monitor },
   { href: '/painel-loja/historico-caixa', label: 'Histórico do caixa', icon: History },
@@ -45,7 +50,12 @@ const baseItems: Item[] = [
 const orcamentoItems: Item[] = [
   { href: '/painel-loja/orcamento', label: 'Montar orçamento', icon: FileText },
   { href: '/painel-loja/orcamentos', label: 'Orçamentos salvos', icon: FolderOpen },
-  { href: '/painel-loja/solicitacoes-orcamento', label: 'Solicitações de clientes', icon: ClipboardList },
+  {
+    href: '/painel-loja/solicitacoes-orcamento',
+    label: 'Solicitações de clientes',
+    icon: ClipboardList,
+    permission: 'site:client_quote_requests',
+  },
 ];
 
 const gerenteItems: Item[] = [
@@ -93,7 +103,7 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
   const [pendingQuoteRequests, setPendingQuoteRequests] = useState(0);
 
   useEffect(() => {
-    if (!isPainelLojaRole(role)) return;
+    if (!hasPermission(role, 'site:client_quote_requests')) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -130,6 +140,10 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
     (it) => !it.permission || hasPermission(role, it.permission)
   );
 
+  const baseItems = baseItemsAll.filter(
+    (it) => it.href !== '/equipa/telegram' || canUseStaffTelegramBot(role)
+  );
+
   return (
     <aside className="flex w-64 min-h-screen flex-col bg-slate-900 p-4 text-white">
       <div className="mb-8">
@@ -159,13 +173,15 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
           );
         })}
 
-        {isPainelLojaRole(role) && (
+        {canOpenPainelLoja(role) && (
           <div className="pt-4">
             <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-emerald-500/90">
               Orçamentos
             </p>
             <div className="space-y-1">
-              {orcamentoItems.map(({ href, label, icon: Icon }) => {
+              {orcamentoItems
+                .filter((it) => !it.permission || hasPermission(role, it.permission))
+                .map(({ href, label, icon: Icon }) => {
                 const active =
                   href === '/painel-loja/orcamentos'
                     ? pathname === href || pathname?.startsWith('/painel-loja/orcamentos/')
@@ -205,7 +221,7 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
           </div>
         )}
 
-        {isPainelLojaRole(role) && role === 'STORE_MANAGER' && visibleGerente.length > 0 && (
+        {canOpenPainelLoja(role) && isPainelLojaGerenteScopeRole(role) && visibleGerente.length > 0 && (
           <div className="pt-4">
             <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-emerald-500/90">
               Gestão (gerente)

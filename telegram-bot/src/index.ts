@@ -96,6 +96,8 @@ startHealthServerIfPortSet();
 type SessionData = {
   /** Estado conhecido pela última vez em `sendWelcome` (para escolher teclado correto em Ajuda). */
   linked?: boolean;
+  /** Conta no site tem Telegram ligado, mas o papel não usa o bot (vendedor / gerente de loja). */
+  telegramStaffDisabled?: boolean;
   /** Papel do usuário Prisma quando vinculado (ex.: mostrar links do painel /admin apenas a ADMIN). */
   userRole?: string;
   awaiting?:
@@ -242,9 +244,26 @@ async function sendWelcome(ctx: BotContext) {
 
   const me = await getTelegramMe(baseUrl!, integrationKey!, telegramUserId);
   const linked = me.ok && (me.data as any)?.linked === true;
+  const staffTelegramEnabled =
+    !linked || (me.data as any)?.staffTelegramEnabled !== false;
 
-  ctx.session.linked = linked ? true : false;
+  ctx.session.telegramStaffDisabled = linked && !staffTelegramEnabled;
   ctx.session.userRole = linked ? String((me.data as any)?.user?.role ?? '').trim() : undefined;
+  ctx.session.linked = linked && staffTelegramEnabled;
+
+  if (ctx.session.telegramStaffDisabled) {
+    await ctx.reply(
+      [
+        'A sua conta está associada ao Macofel, mas **o seu perfil (vendedor ou gerente de loja) não utiliza o bot Telegram** nesta fase.',
+        '',
+        'Use o **painel web** (/painel-loja) para PDV, orçamentos e operações da loja.',
+        '',
+        'Se precisar de ajuda, fale com um administrador.',
+      ].join('\n'),
+      { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } }
+    );
+    return;
+  }
 
   if (linked) {
     const name = (me.data as any)?.user?.name ?? '';
@@ -344,7 +363,11 @@ bot.hears(['❓ Ajuda', 'Ajuda'], async (ctx) => {
     ].join('\n'),
     {
       reply_markup:
-        ctx.session.linked === true ? opsMenuReplyKeyboard(ctx.session.userRole) : mainMenuReplyKeyboard(),
+        ctx.session.telegramStaffDisabled === true
+          ? { remove_keyboard: true }
+          : ctx.session.linked === true
+            ? opsMenuReplyKeyboard(ctx.session.userRole)
+            : mainMenuReplyKeyboard(),
     }
   );
 });
@@ -379,8 +402,10 @@ function isStaffNotClient(role: string | undefined): boolean {
   return !!role?.trim() && role !== 'CLIENT';
 }
 
-function canManageQuotesRole(role: string | undefined): boolean {
-  return isStaffNotClient(role);
+/** Solicitações de orçamento no site — alinhado a `canManageClientQuoteRequests` na API. */
+function canManageTelegramClientQuoteRequests(role: string | undefined): boolean {
+  const r = (role ?? '').trim();
+  return r === 'MASTER_ADMIN' || r === 'ADMIN' || r === 'GERENTE_SITE';
 }
 
 /** Perfil operacional de armazém: no Telegram só o menu Estoque (política Macofel). */
@@ -395,7 +420,13 @@ function painelTrocasDevolucoesUrl(): string {
 /** Quem pode abrir no browser a área formal de trocas/devoluções no painel da loja. */
 function canOpenPainelTrocasWeb(role: string | undefined): boolean {
   const r = (role ?? '').trim();
-  return r === 'STORE_MANAGER' || r === 'SELLER' || r === 'ADMIN' || r === 'MASTER_ADMIN';
+  return (
+    r === 'STORE_MANAGER' ||
+    r === 'GERENTE_SITE' ||
+    r === 'SELLER' ||
+    r === 'ADMIN' ||
+    r === 'MASTER_ADMIN'
+  );
 }
 
 /** Tem de ficar ANTES de `bot.on('message:text')`, senão o handler genérico consome o update e estes nunca correm. */
@@ -463,7 +494,7 @@ bot.hears(['📋 Orçamentos', 'Orçamentos'], async (ctx) => {
     );
     return;
   }
-  if (!canManageQuotesRole(ctx.session.userRole)) {
+  if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
     await ctx.reply(
       [
         '📋 Solicitações de orçamento exigem conta de funcionário vinculada (não cliente).',
@@ -832,6 +863,12 @@ bot.callbackQuery(/^tg:name:(.+)$/i, async (ctx) => {
 
 bot.callbackQuery(/^qr:list:(.+)$/i, async (ctx) => {
   await ctx.answerCallbackQuery();
+  if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
+    await ctx.reply('Sem permissão para a fila de solicitações do site.', {
+      reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
+    });
+    return;
+  }
   const kind = String(ctx.match?.[1] ?? '').trim();
 
   const titles: Record<string, string> = {
@@ -882,6 +919,10 @@ bot.callbackQuery(/^qr:list:(.+)$/i, async (ctx) => {
 
 bot.callbackQuery('qr:lookup_prompt', async (ctx) => {
   await ctx.answerCallbackQuery();
+  if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
+    await ctx.reply('Sem permissão.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
   ctx.session.awaiting = 'quote_id_lookup';
   await ctx.reply(
     'Envie o ID da solicitação (24 caracteres, ex.: 674a…). Copie da lista ou do site.',
@@ -1335,6 +1376,14 @@ bot.on('message:text', async (ctx) => {
   }
 
   if (ctx.session.awaiting === 'quote_note') {
+    if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
+      ctx.session.awaiting = undefined;
+      ctx.session.pendingQuoteId = undefined;
+      await ctx.reply('Sem permissão para notas em solicitações do site.', {
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
+      });
+      return;
+    }
     const quoteId = ctx.session.pendingQuoteId;
     ctx.session.awaiting = undefined;
     ctx.session.pendingQuoteId = undefined;
@@ -1355,6 +1404,13 @@ bot.on('message:text', async (ctx) => {
   }
 
   if (ctx.session.awaiting === 'quote_id_lookup') {
+    if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
+      ctx.session.awaiting = undefined;
+      await ctx.reply('Sem permissão para consultar solicitações do site.', {
+        reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
+      });
+      return;
+    }
     ctx.session.awaiting = undefined;
     const id = text.trim();
     if (!/^[a-f\d]{24}$/i.test(id)) {
@@ -1933,6 +1989,10 @@ bot.callbackQuery(/^s:(in|out):(.+)$/i, async (ctx) => {
 
 bot.callbackQuery(/^q:detail:(.+)$/i, async (ctx) => {
   await ctx.answerCallbackQuery();
+  if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
+    await ctx.reply('Sem permissão.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
   const id = String(ctx.match?.[1] ?? '').trim();
   if (!id) return;
   const { telegramUserId } = telegramIds(ctx);
@@ -1972,6 +2032,10 @@ bot.callbackQuery(/^q:detail:(.+)$/i, async (ctx) => {
 
 bot.callbackQuery(/^q:(claim|contact|release|note):(.+)$/i, async (ctx) => {
   await ctx.answerCallbackQuery();
+  if (!canManageTelegramClientQuoteRequests(ctx.session.userRole)) {
+    await ctx.reply('Sem permissão.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
   const action = String(ctx.match?.[1] ?? '');
   const quoteId = String(ctx.match?.[2] ?? '').trim();
   if (!quoteId) return;

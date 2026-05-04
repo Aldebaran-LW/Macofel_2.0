@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManageClientQuoteRequests } from '@/lib/permissions';
 import { listQuoteRequestsAdmin } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: linked.error }, { status: linked.status });
     }
 
-    if (!canManageQuotesAndOrcamentos(linked.user.role)) {
+    if (!canManageClientQuoteRequests(linked.user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 

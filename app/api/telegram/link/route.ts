@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { authenticateTelegramIntegration } from '@/lib/telegram-integration-auth';
+import { canUseStaffTelegramBot } from '@/lib/permissions';
 import { normalizePhoneE164 } from '@/lib/phone-e164';
 import { hashTelegramLinkCode } from '@/lib/telegram-link-code';
 
@@ -52,10 +53,25 @@ export async function POST(req: NextRequest) {
 
       const linkCode = await prisma.telegramLinkCode.findUnique({
         where: { codeHash },
-        select: { id: true, userId: true, expiresAt: true, usedAt: true },
+        select: {
+          id: true,
+          userId: true,
+          expiresAt: true,
+          usedAt: true,
+          user: { select: { role: true } },
+        },
       });
 
       if (!linkCode) return NextResponse.json({ error: 'Código inválido' }, { status: 404 });
+      if (!canUseStaffTelegramBot(linkCode.user.role)) {
+        return NextResponse.json(
+          {
+            error:
+              'Este código pertence a um perfil que não pode usar o bot Telegram (vendedor/gerente de loja).',
+          },
+          { status: 403 }
+        );
+      }
       if (linkCode.usedAt) {
         return NextResponse.json({ error: 'Código já utilizado' }, { status: 409 });
       }
@@ -157,6 +173,16 @@ export async function POST(req: NextRequest) {
     }
 
     const user = candidates[0];
+
+    if (!canUseStaffTelegramBot(user.role)) {
+      return NextResponse.json(
+        {
+          error:
+            'Este perfil (vendedor ou gerente de loja) não pode vincular o bot Telegram. Use o painel web.',
+        },
+        { status: 403 }
+      );
+    }
 
     await prisma.telegramAccount.upsert({
       where: { telegramUserId },

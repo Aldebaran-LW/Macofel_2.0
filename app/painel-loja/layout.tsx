@@ -8,7 +8,7 @@ import { PainelLojaSidebar } from '@/components/painel-loja-sidebar';
 import { Toaster } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { isPainelLojaRole } from '@/lib/permissions';
+import { canOpenPainelLoja } from '@/lib/permissions';
 
 export default function PainelLojaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -40,7 +40,7 @@ export default function PainelLojaLayout({ children }: { children: React.ReactNo
   useEffect(() => {
     if (status !== 'loading' && session?.user) {
       const role = (session.user as { role?: string }).role;
-      if (!isPainelLojaRole(role)) {
+      if (!canOpenPainelLoja(role)) {
         router.replace('/');
       }
     }
@@ -58,7 +58,7 @@ export default function PainelLojaLayout({ children }: { children: React.ReactNo
     );
   }
 
-  if (!isPainelLojaRole((session.user as { role?: string }).role)) {
+  if (!canOpenPainelLoja((session.user as { role?: string }).role)) {
     return null;
   }
 

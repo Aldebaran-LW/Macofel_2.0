@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManagePdvOrcamentos } from '@/lib/permissions';
+import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
 import { createOrcamento, getOrcamentos, OrcamentoDoc } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -10,8 +11,13 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
+    if (!session?.user || !canManagePdvOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+    }
+
+    const userId = String((session.user as { id?: string }).id ?? '').trim();
+    if (!userId) {
+      return NextResponse.json({ error: 'Sessão inválida' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -57,7 +63,13 @@ export async function POST(req: NextRequest) {
       total: Number(total ?? 0),
     };
 
-    const id = await createOrcamento(payload);
+    const role = String((session.user as { role?: string }).role ?? '').trim();
+    const pdvUserName = (session.user as { pdvUserName?: string | null }).pdvUserName ?? null;
+    const id = await createOrcamento(payload, {
+      createdByUserId: userId,
+      createdByRole: role || 'CLIENT',
+      createdByPdvUserName: pdvUserName,
+    });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (error: any) {
@@ -76,7 +88,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
+    if (!session?.user || !canManagePdvOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -85,7 +97,11 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') ?? '1');
     const limit = parseInt(searchParams.get('limit') ?? '20');
 
-    const result = await getOrcamentos({ search, page, limit });
+    const userId = String((session.user as { id?: string }).id ?? '').trim();
+    const role = (session.user as { role?: string }).role;
+    const scope = getOrcamentoMongoListScope(role, userId || undefined);
+
+    const result = await getOrcamentos({ search, page, limit, scope });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Erro ao listar orçamentos:', error);

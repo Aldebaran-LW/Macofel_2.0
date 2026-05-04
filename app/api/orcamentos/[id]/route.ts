@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManagePdvOrcamentos } from '@/lib/permissions';
+import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
 import {
   deleteOrcamento,
   getOrcamentoById,
@@ -61,16 +62,20 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
+    if (!session?.user || !canManagePdvOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
+
+    const userId = String((session.user as { id?: string }).id ?? '').trim();
+    const role = (session.user as { role?: string }).role;
+    const scope = getOrcamentoMongoListScope(role, userId || undefined);
 
     const { id } = params;
     if (!id) {
       return NextResponse.json({ error: 'ID do orçamento é obrigatório' }, { status: 400 });
     }
 
-    const orcamento = await getOrcamentoById(id);
+    const orcamento = await getOrcamentoById(id, scope);
     if (!orcamento) {
       return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });
     }
@@ -95,9 +100,13 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
+    if (!session?.user || !canManagePdvOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
+
+    const userId = String((session.user as { id?: string }).id ?? '').trim();
+    const role = (session.user as { role?: string }).role;
+    const scope = getOrcamentoMongoListScope(role, userId || undefined);
 
     const { id } = params;
     if (!id) {
@@ -108,7 +117,7 @@ export async function PATCH(
     const payload = parseOrcamentoBody(body);
     if (payload instanceof NextResponse) return payload;
 
-    const ok = await updateOrcamento(id, payload);
+    const ok = await updateOrcamento(id, payload, scope);
     if (!ok) {
       return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });
     }
@@ -133,16 +142,20 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !canManageQuotesAndOrcamentos((session.user as any).role)) {
+    if (!session?.user || !canManagePdvOrcamentos((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
+
+    const userId = String((session.user as { id?: string }).id ?? '').trim();
+    const role = (session.user as { role?: string }).role;
+    const scope = getOrcamentoMongoListScope(role, userId || undefined);
 
     const { id } = params;
     if (!id) {
       return NextResponse.json({ error: 'ID do orçamento é obrigatório' }, { status: 400 });
     }
 
-    const ok = await deleteOrcamento(id);
+    const ok = await deleteOrcamento(id, scope);
     if (!ok) {
       return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });
     }

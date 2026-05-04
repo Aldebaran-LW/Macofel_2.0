@@ -2,6 +2,8 @@
 import { MongoClient, Db, ObjectId } from 'mongodb';
 import type { QuoteProposalStored } from './quote-proposal-totals';
 import { sanitizePublicProductDescription } from './product-description-public';
+import type { OrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
+import { orcamentoDocMatchesScope, orcamentoScopeToMongoFilter } from '@/lib/pdv-orcamento-scope';
 
 // Função para garantir que a connection string tenha nome do banco
 function ensureDatabaseName(uri: string): string {
@@ -1293,10 +1295,19 @@ export type OrcamentoDoc = {
   total: number;
 };
 
+export type OrcamentoAuthorMeta = {
+  createdByUserId: string;
+  createdByRole: string;
+  createdByPdvUserName?: string | null;
+};
+
 export type OrcamentoNormalized = OrcamentoDoc & {
   id: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  createdByUserId?: string;
+  createdByRole?: string;
+  createdByPdvUserName?: string;
 };
 
 function normalizeOrcamento(doc: any): OrcamentoNormalized {
@@ -1317,19 +1328,37 @@ function normalizeOrcamento(doc: any): OrcamentoNormalized {
     total: typeof doc.total === 'number' ? doc.total : 0,
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
+    ...(doc.createdByUserId != null && String(doc.createdByUserId).trim() !== ''
+      ? { createdByUserId: String(doc.createdByUserId) }
+      : {}),
+    ...(doc.createdByRole != null && String(doc.createdByRole).trim() !== ''
+      ? { createdByRole: String(doc.createdByRole) }
+      : {}),
+    ...(doc.createdByPdvUserName != null && String(doc.createdByPdvUserName).trim() !== ''
+      ? { createdByPdvUserName: String(doc.createdByPdvUserName) }
+      : {}),
   };
 }
 
-export async function createOrcamento(data: OrcamentoDoc) {
+export async function createOrcamento(data: OrcamentoDoc, meta?: OrcamentoAuthorMeta) {
   const db = await connectToDatabase();
   const orcamentosCollection = db.collection('orcamentos');
 
   const now = new Date();
-  const result = await orcamentosCollection.insertOne({
+  const insert: Record<string, unknown> = {
     ...data,
     createdAt: now,
     updatedAt: now,
-  });
+  };
+  if (meta) {
+    insert.createdByUserId = meta.createdByUserId;
+    insert.createdByRole = meta.createdByRole;
+    if (meta.createdByPdvUserName != null && String(meta.createdByPdvUserName).trim() !== '') {
+      insert.createdByPdvUserName = String(meta.createdByPdvUserName).trim();
+    }
+  }
+
+  const result = await orcamentosCollection.insertOne(insert as any);
 
   return result.insertedId.toString();
 }
@@ -1338,6 +1367,7 @@ export async function getOrcamentos(filters?: {
   search?: string;
   page?: number;
   limit?: number;
+  scope?: OrcamentoMongoListScope;
 }) {
   const db = await connectToDatabase();
   const orcamentosCollection = db.collection('orcamentos');
@@ -1346,14 +1376,21 @@ export async function getOrcamentos(filters?: {
   const limit = filters?.limit ?? 20;
   const skip = (page - 1) * limit;
 
-  const query: any = {};
+  const query: Record<string, unknown> = {};
   if (filters?.search?.trim()) {
     query.clienteNome = { $regex: filters.search.trim(), $options: 'i' };
   }
 
-  const total = await orcamentosCollection.countDocuments(query);
+  const scopeFilter = orcamentoScopeToMongoFilter(filters?.scope ?? { kind: 'full' });
+  let finalQuery: Record<string, unknown> = query;
+  if (Object.keys(scopeFilter).length > 0) {
+    finalQuery =
+      Object.keys(query).length > 0 ? { $and: [query, scopeFilter] } : { ...scopeFilter };
+  }
+
+  const total = await orcamentosCollection.countDocuments(finalQuery);
   const docs = await orcamentosCollection
-    .find(query)
+    .find(finalQuery)
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
@@ -1370,7 +1407,7 @@ export async function getOrcamentos(filters?: {
   };
 }
 
-export async function getOrcamentoById(id: string) {
+async function loadOrcamentoRawById(id: string): Promise<any | null> {
   const db = await connectToDatabase();
   const orcamentosCollection = db.collection('orcamentos');
 
@@ -1381,13 +1418,25 @@ export async function getOrcamentoById(id: string) {
     return null;
   }
 
-  const doc = await orcamentosCollection.findOne({ _id: oid });
-  if (!doc) return null;
+  return orcamentosCollection.findOne({ _id: oid });
+}
 
+export async function getOrcamentoById(id: string, scope?: OrcamentoMongoListScope) {
+  const doc = await loadOrcamentoRawById(id);
+  if (!doc) return null;
+  if (scope && !orcamentoDocMatchesScope(doc, scope)) return null;
   return normalizeOrcamento(doc);
 }
 
-export async function updateOrcamento(id: string, data: OrcamentoDoc): Promise<boolean> {
+export async function updateOrcamento(
+  id: string,
+  data: OrcamentoDoc,
+  scope?: OrcamentoMongoListScope
+): Promise<boolean> {
+  const doc = await loadOrcamentoRawById(id);
+  if (!doc) return false;
+  if (scope && !orcamentoDocMatchesScope(doc, scope)) return false;
+
   const db = await connectToDatabase();
   const orcamentosCollection = db.collection('orcamentos');
 
@@ -1411,7 +1460,11 @@ export async function updateOrcamento(id: string, data: OrcamentoDoc): Promise<b
   return result.matchedCount > 0;
 }
 
-export async function deleteOrcamento(id: string): Promise<boolean> {
+export async function deleteOrcamento(id: string, scope?: OrcamentoMongoListScope): Promise<boolean> {
+  const doc = await loadOrcamentoRawById(id);
+  if (!doc) return false;
+  if (scope && !orcamentoDocMatchesScope(doc, scope)) return false;
+
   const db = await connectToDatabase();
   const orcamentosCollection = db.collection('orcamentos');
 

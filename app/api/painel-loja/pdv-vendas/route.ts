@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { connectToDatabase } from '@/lib/mongodb-native';
-import { isPainelLojaRole } from '@/lib/permissions';
+import { canOpenPainelLoja, isPainelLojaGerenteScopeRole } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const role = (session?.user as { role?: string; pdvUserName?: string | null } | undefined)?.role;
   const pdvUserName = (session?.user as { pdvUserName?: string | null } | undefined)?.pdvUserName;
 
-  if (!session?.user || !isPainelLojaRole(role)) {
+  if (!session?.user || !canOpenPainelLoja(role)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
   }
 
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       items,
-      scope: role === 'STORE_MANAGER' ? 'loja' : 'operador',
+      scope: isPainelLojaGerenteScopeRole(role ?? undefined) ? 'loja' : 'operador',
     });
   } catch (e) {
     console.error('[painel-loja/pdv-vendas]', e);

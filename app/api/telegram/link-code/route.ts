@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/db';
 import { authOptions } from '@/lib/auth-options';
-import { isOperationalStaffRole } from '@/lib/permissions';
+import { canUseStaffTelegramBot } from '@/lib/permissions';
 import { generateTelegramLinkCode, hashTelegramLinkCode } from '@/lib/telegram-link-code';
 
 export const dynamic = 'force-dynamic';
@@ -16,8 +16,14 @@ export async function POST(_req: NextRequest) {
   const role = (session?.user as any)?.role as string | undefined;
   const userId = (session?.user as any)?.id as string | undefined;
 
-  if (!session?.user || !userId || !isOperationalStaffRole(role)) {
-    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  if (!session?.user || !userId || !canUseStaffTelegramBot(role)) {
+    return NextResponse.json(
+      {
+        error:
+          'Telegram não está disponível para o seu perfil (vendedor e gerente de loja usam apenas o site).',
+      },
+      { status: 403 }
+    );
   }
 
   const code = generateTelegramLinkCode();

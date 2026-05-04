@@ -3,7 +3,9 @@
 import { useCallback, useState } from 'react';
 import { Bot, Copy, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { canUseStaffTelegramBot } from '@/lib/permissions';
 
 const BOT_USERNAME = 'Macofel_bot';
 
@@ -21,6 +23,10 @@ export function TelegramLinkPanel({
   lead = 'Vincule a sua conta do painel ao bot',
   showEnvHint = false,
 }: TelegramLinkPanelProps) {
+  const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const allowed = canUseStaffTelegramBot(role);
+
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -73,6 +79,29 @@ export function TelegramLinkPanel({
       toast.error('Não foi possível copiar');
     }
   };
+
+  if (status === 'loading') {
+    return (
+      <div className="mx-auto max-w-2xl py-12 text-center text-sm text-gray-600">A carregar…</div>
+    );
+  }
+
+  if (session?.user && !allowed) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex flex-wrap items-start gap-3">
+          <Bot className="h-10 w-10 shrink-0 text-slate-400" aria-hidden />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              O bot Telegram não está disponível para o perfil <strong>vendedor</strong> ou{' '}
+              <strong>gerente de loja</strong>. Use o painel web (PDV e orçamentos em /painel-loja).
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

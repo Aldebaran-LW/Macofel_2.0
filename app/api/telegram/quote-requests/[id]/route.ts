@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManageClientQuoteRequests } from '@/lib/permissions';
 import {
   appendQuoteRequestFollowUpNote,
   claimQuoteRequest,
@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (!linked.ok) {
       return NextResponse.json({ error: linked.error }, { status: linked.status });
     }
-    if (!canManageQuotesAndOrcamentos(linked.user.role)) {
+    if (!canManageClientQuoteRequests(linked.user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
     const id = String(params?.id ?? '').trim();
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!linked.ok) {
       return NextResponse.json({ error: linked.error }, { status: linked.status });
     }
-    if (!canManageQuotesAndOrcamentos(linked.user.role)) {
+    if (!canManageClientQuoteRequests(linked.user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 

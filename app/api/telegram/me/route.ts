@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { authenticateTelegramIntegration } from '@/lib/telegram-integration-auth';
+import { canUseStaffTelegramBot } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,8 +45,10 @@ export async function GET(req: NextRequest) {
     }
 
     const name = `${account.user.firstName ?? ''} ${account.user.lastName ?? ''}`.trim();
+    const staffTelegramEnabled = canUseStaffTelegramBot(account.user.role);
     return NextResponse.json({
       linked: true,
+      staffTelegramEnabled,
       user: {
         id: account.user.id,
         email: account.user.email,

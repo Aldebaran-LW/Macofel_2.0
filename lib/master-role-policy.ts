@@ -7,6 +7,7 @@ export const ASSIGNABLE_ROLES: UserRole[] = [
   'EMPLOYEE',
   'SELLER',
   'STORE_MANAGER',
+  'GERENTE_SITE',
   'ADMIN',
   'MASTER_ADMIN',
 ];
@@ -22,6 +23,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   EMPLOYEE: 'Funcionário',
   SELLER: 'Vendedor',
   STORE_MANAGER: 'Gerente de loja',
+  GERENTE_SITE: 'Gerente site',
   ADMIN: 'Administrador',
   MASTER_ADMIN: 'Master Admin',
 };

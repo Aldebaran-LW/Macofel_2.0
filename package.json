@@ -31,6 +31,7 @@
     "catalog:list-ean-reports:relatorio": "tsx --require dotenv/config scripts/list-active-ean-products.ts --out ./docs/relatorio",
     "catalog:abacus-specs-json": "tsx --require dotenv/config scripts/abacus-product-specs-json.ts",
     "catalog:abacus-specs-from-xls": "tsx --require dotenv/config scripts/abacus-specs-from-xls.ts",
+    "catalog:apply-specs-json": "tsx --require dotenv/config scripts/apply-product-specs-from-json.ts",
     "catalog:enrich-active-ean": "tsx --require dotenv/config scripts/enrich-active-by-valid-ean.ts",
     "catalog:reset-enrich-pending": "tsx --require dotenv/config scripts/reset-active-enrichment-pending.ts",
     "test:ai-studio-enrich": "tsx --require dotenv/config scripts/test-ai-studio-enrich-local.ts",

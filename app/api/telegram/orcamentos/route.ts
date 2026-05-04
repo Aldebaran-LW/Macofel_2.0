@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManagePdvOrcamentos } from '@/lib/permissions';
+import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
 import { createOrcamento } from '@/lib/mongodb-native';
 import type { OrcamentoItemDoc } from '@/lib/mongodb-native';
 
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
     if (!linked.ok) {
       return NextResponse.json({ error: linked.error }, { status: linked.status });
     }
-    if (!canManageQuotesAndOrcamentos(linked.user.role)) {
+    if (!canManagePdvOrcamentos(linked.user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
@@ -78,7 +79,11 @@ export async function POST(req: NextRequest) {
       total,
     };
 
-    const id = await createOrcamento(doc);
+    const id = await createOrcamento(doc, {
+      createdByUserId: linked.user.userId,
+      createdByRole: linked.user.role,
+      createdByPdvUserName: linked.user.pdvUserName,
+    });
     return NextResponse.json({ id, ok: true });
   } catch (error: unknown) {
     console.error('[api/telegram/orcamentos POST]', error);

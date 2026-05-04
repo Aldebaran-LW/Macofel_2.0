@@ -4,6 +4,8 @@ export type TelegramMeResponse =
   | { linked: false }
   | {
       linked: true;
+      /** false = conta vinculada mas perfil sem acesso ao bot (ex.: vendedor / gerente de loja). */
+      staffTelegramEnabled?: boolean;
       user: { id: string; email: string; role: string; name: string };
       telegram: {
         telegramUserId: string;

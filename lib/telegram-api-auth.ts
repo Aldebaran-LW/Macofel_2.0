@@ -1,12 +1,15 @@
 import type { NextRequest } from 'next/server';
 import prisma from '@/lib/db';
 import { authenticateTelegramIntegration } from '@/lib/telegram-integration-auth';
+import { canUseStaffTelegramBot } from '@/lib/permissions';
 
 export type TelegramLinkedUser = {
   userId: string;
   email: string;
   role: string;
   name: string;
+  /** Login curto PDV (mesmo campo do utilizador no site). */
+  pdvUserName: string | null;
   telegramUserId: string;
   telegramChatId: string | null;
   telegramUsername: string | null;
@@ -51,12 +54,30 @@ export async function requireLinkedTelegramUser(
       telegramUserId: true,
       telegramChatId: true,
       telegramUsername: true,
-      user: { select: { id: true, email: true, role: true, firstName: true, lastName: true } },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          firstName: true,
+          lastName: true,
+          pdvUserName: true,
+        },
+      },
     },
   });
 
   if (!account?.user) {
     return { ok: false, status: 403, error: 'Telegram não vinculado a um usuário' };
+  }
+
+  if (!canUseStaffTelegramBot(account.user.role)) {
+    return {
+      ok: false,
+      status: 403,
+      error:
+        'Este perfil (vendedor ou gerente de loja) não utiliza o bot Telegram. Use o painel web.',
+    };
   }
 
   const name = `${account.user.firstName ?? ''} ${account.user.lastName ?? ''}`.trim();
@@ -67,6 +88,7 @@ export async function requireLinkedTelegramUser(
       email: account.user.email,
       role: account.user.role,
       name: name || account.user.email,
+      pdvUserName: account.user.pdvUserName ?? null,
       telegramUserId: account.telegramUserId,
       telegramChatId: account.telegramChatId ?? null,
       telegramUsername: account.telegramUsername ?? null,

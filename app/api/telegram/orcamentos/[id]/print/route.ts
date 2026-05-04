@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManagePdvOrcamentos } from '@/lib/permissions';
+import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
 import { getOrcamentoById } from '@/lib/mongodb-native';
 import { buildOrcamentoPrintHtml } from '@/lib/orcamento-print-html';
 
@@ -13,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (!linked.ok) {
       return NextResponse.json({ error: linked.error }, { status: linked.status });
     }
-    if (!canManageQuotesAndOrcamentos(linked.user.role)) {
+    if (!canManagePdvOrcamentos(linked.user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
@@ -22,7 +23,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
     }
 
-    const o = await getOrcamentoById(id);
+    const scope = getOrcamentoMongoListScope(linked.user.role, linked.user.userId);
+    const o = await getOrcamentoById(id, scope);
     if (!o) {
       return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });
     }

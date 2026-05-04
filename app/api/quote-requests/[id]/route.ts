@@ -19,7 +19,7 @@ import {
   notifyAdminsProposalRejected,
 } from '@/lib/email-notifications';
 import { createOrderFromAcceptedQuote } from '@/lib/create-order-from-accepted-quote';
-import { canManageQuotesAndOrcamentos } from '@/lib/permissions';
+import { canManageClientQuoteRequests } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +43,7 @@ export async function GET(
 
     const role = auth.role;
     const userId = auth.userId;
-    if (canManageQuotesAndOrcamentos(role)) {
+    if (canManageClientQuoteRequests(role)) {
       return NextResponse.json(doc);
     }
     if (role === 'CLIENT' && doc.userId === userId) {
@@ -112,7 +112,7 @@ export async function PATCH(
       return NextResponse.json({ ok: true });
     }
 
-    if (!canManageQuotesAndOrcamentos(auth.role)) {
+    if (!canManageClientQuoteRequests(auth.role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
