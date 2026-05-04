@@ -7,6 +7,7 @@ import {
   canOpenPainelLoja,
   hasPdvFullWebAccess,
   isAdminDashboardRole,
+  isGerenteSiteRole,
   isMasterAdminPathname,
   isMasterAdminRole,
   isPainelLojaRole,
@@ -15,6 +16,12 @@ import { pingTelegramBotWakeIfStale } from '@/lib/telegram-render-wake';
 
 function isLojaRoute(pathname: string) {
   return pathname === '/loja' || pathname.startsWith('/loja/');
+}
+
+/** Ficheiros em `public/` servidos na raiz — não podem exigir login (ex.: logo, favicon). */
+function isPublicRootStaticFile(pathname: string): boolean {
+  if (pathname === '/robots.txt' || pathname === '/favicon.ico') return true;
+  return /\.(ico|png|jpg|jpeg|webp|gif|svg|woff2?|ttf|eot|pdf|txt|xml|map)$/i.test(pathname);
 }
 
 /**
@@ -81,6 +88,9 @@ const authMiddleware = withAuth(
         return NextResponse.redirect(new URL('/admin/dashboard?master=forbidden', req.url));
       }
       if (!isMasterArea && !isAdmin) {
+        if (isGerenteSiteRole(role)) {
+          return NextResponse.redirect(new URL('/painel-loja/gestao-site/dashboard', req.url));
+        }
         if (isPainelLojaRole(role)) {
           return NextResponse.redirect(new URL('/painel-loja', req.url));
         }
@@ -91,6 +101,9 @@ const authMiddleware = withAuth(
     if (isAdminLoginRoute && token) {
       if (isAdmin) {
         return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+      }
+      if (isGerenteSiteRole(role)) {
+        return NextResponse.redirect(new URL('/painel-loja/gestao-site/dashboard', req.url));
       }
       if (isPainelLojaRole(role)) {
         return NextResponse.redirect(new URL('/painel-loja', req.url));
@@ -120,9 +133,7 @@ const authMiddleware = withAuth(
             return isMasterAdminRole(token.role as string | undefined);
           }
           const r = token.role as string | undefined;
-          if (isAdminDashboardRole(r)) return true;
-          if (isPainelLojaRole(r)) return true;
-          return false;
+          return isAdminDashboardRole(r);
         }
 
         return !!token;
@@ -133,6 +144,10 @@ const authMiddleware = withAuth(
 
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const pathname = req.nextUrl.pathname;
+
+  if (isPublicRootStaticFile(pathname)) {
+    return NextResponse.next();
+  }
 
   /**
    * “Wake” opcional do bot na Render: quando alguém navega páginas públicas do site em produção,
@@ -157,6 +172,9 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
     }
     if (!canOpenPainelLoja(token.role as string | undefined)) {
       return NextResponse.redirect(new URL('/', req.url));
+    }
+    if (pathname.startsWith('/painel-loja/gestao-site') && !isGerenteSiteRole(token.role as string | undefined)) {
+      return NextResponse.redirect(new URL('/painel-loja', req.url));
     }
     return NextResponse.next();
   }

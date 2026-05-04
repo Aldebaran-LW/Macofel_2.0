@@ -96,7 +96,9 @@ export default function AdminHeroImagesPage() {
 
       if (res.status === 401) {
         toast.error('Sessão expirada. Faça login novamente.');
-        window.location.href = '/admin/login';
+        const qs = searchParams?.toString();
+        const back = qs ? `${pathname}?${qs}` : pathname || '/';
+        window.location.href = `/login?callbackUrl=${encodeURIComponent(back)}`;
         return;
       }
 

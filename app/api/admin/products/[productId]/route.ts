@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { getBuscarProdutoInfo } from '@/lib/buscar-produto-service';
 import { writeAuditLog } from '@/lib/audit-log';
@@ -95,7 +95,7 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -310,7 +310,7 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

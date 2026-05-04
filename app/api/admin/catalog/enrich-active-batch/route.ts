@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import { CATALOG_INTERNAL_SECRET, CRON_SECRET } from '@/env';
 import { enrichActiveCatalogPendingProducts } from '@/lib/catalog-active-enrich-queue';
 
@@ -13,7 +13,7 @@ function authorized(
   session: Awaited<ReturnType<typeof getServerSession>>
 ) {
   const u = (session as { user?: { role?: string } } | null)?.user;
-  const admin = Boolean(u && isAdminDashboardRole(u.role));
+  const admin = Boolean(u && canAccessAdminCatalogSession(u.role));
   const secretOk =
     Boolean(CATALOG_INTERNAL_SECRET) &&
     request.headers.get('x-catalog-secret') === CATALOG_INTERNAL_SECRET;

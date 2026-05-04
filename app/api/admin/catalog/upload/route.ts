@@ -7,14 +7,14 @@ import {
   RENDER_CATALOG_AGENT_URL,
   RENDER_CATALOG_WEBHOOK_SECRET,
 } from '@/env';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user || !isAdminDashboardRole((session.user as { role?: string }).role)) {
+  if (!session?.user || !canAccessAdminCatalogSession((session.user as { role?: string }).role)) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 

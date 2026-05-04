@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { ObjectId } from 'mongodb';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import {
   CATEGORY_TAXONOMY,
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(_req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -55,7 +55,7 @@ export async function GET(_req: NextRequest) {
 export async function POST(_req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

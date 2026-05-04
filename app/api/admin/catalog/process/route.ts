@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import { CATALOG_INTERNAL_SECRET } from '@/env';
 import { saveProductsForReviewFast } from '@/lib/catalog-pending-mongo';
 import {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { fileUrl, fileName, importType = 'full-catalog' } = body;
 
     const session = await getServerSession(authOptions);
-    const isAdmin = isAdminDashboardRole((session?.user as { role?: string })?.role);
+    const isAdmin = canAccessAdminCatalogSession((session?.user as { role?: string })?.role);
     const hasSecret =
       Boolean(CATALOG_INTERNAL_SECRET) &&
       request.headers.get('x-catalog-secret') === CATALOG_INTERNAL_SECRET;

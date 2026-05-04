@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { TelegramLinkPanel } from '@/components/telegram-link-panel';
-import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isGerenteSiteRole, isPainelLojaRole } from '@/lib/permissions';
 
 export default function EquipaTelegramPage() {
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
   const showPainelLoja = isPainelLojaRole(role);
   const showAdmin = isAdminDashboardRole(role);
+  const showGestaoSite = isGerenteSiteRole(role);
 
   return (
     <div className="space-y-6">
@@ -25,6 +26,14 @@ export default function EquipaTelegramPage() {
         {showAdmin && (
           <Link href="/admin/dashboard" className="font-semibold text-slate-700 hover:underline">
             ← Área admin
+          </Link>
+        )}
+        {showGestaoSite && (
+          <Link
+            href="/painel-loja/gestao-site/dashboard"
+            className="font-semibold text-violet-700 hover:underline"
+          >
+            ← Gestão site (catálogo)
           </Link>
         )}
         <Link href="/" className="text-red-600 hover:underline">

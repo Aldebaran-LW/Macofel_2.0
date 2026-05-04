@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { useSession, signOut } from 'next-auth/react';
 import { ShoppingCart, User, LogOut, Menu, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isGerenteSiteRole, isPainelLojaRole } from '@/lib/permissions';
 
 export default function Header() {
   const [mounted, setMounted] = useState(false);
@@ -17,6 +17,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
+  const isGerenteSite = isGerenteSiteRole((session?.user as any)?.role);
   const isPainelLoja = isPainelLojaRole((session?.user as any)?.role);
 
   useEffect(() => {
@@ -66,15 +67,11 @@ export default function Header() {
           {/* Logo Macofel */}
           <Link href="/" className="flex items-center gap-4">
             <div className="relative h-16 w-auto">
-              <Image
-                src="/logo-macofel.png"
+              <MacofelLogoImage
                 alt="Logo MACOFEL"
                 width={64}
                 height={64}
                 className="h-16 w-auto object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
               />
             </div>
             <div className="flex flex-col leading-none">
@@ -99,6 +96,14 @@ export default function Header() {
             )}
             {isAdmin && (
               <Link href="/admin/dashboard" className="hover:text-red-600 transition-colors">Admin</Link>
+            )}
+            {isGerenteSite && (
+              <Link
+                href="/painel-loja/gestao-site/dashboard"
+                className="hover:text-violet-600 transition-colors"
+              >
+                Gestão site
+              </Link>
             )}
             {isPainelLoja && (
               <Link href="/painel-loja" className="hover:text-red-600 transition-colors">
@@ -211,6 +216,15 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Admin
+              </Link>
+            )}
+            {isGerenteSite && (
+              <Link
+                href="/painel-loja/gestao-site/dashboard"
+                className="block py-2 text-sm font-bold uppercase tracking-widest text-gray-700 hover:text-violet-600"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Gestão site
               </Link>
             )}
             {isPainelLoja && (

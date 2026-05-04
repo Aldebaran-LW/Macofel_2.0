@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAdminUiBasePath } from '@/hooks/use-admin-ui-base-path';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import {
@@ -97,6 +98,7 @@ interface CatalogImportPreviewSample {
 
 export default function AdminProdutosPage() {
   const router = useRouter();
+  const adminBase = useAdminUiBasePath();
   const { data: session } = useSession();
   const catalogAiFileRef = useRef<HTMLInputElement>(null);
   const quickBarcodeRef = useRef<HTMLInputElement>(null);
@@ -795,7 +797,7 @@ export default function AdminProdutosPage() {
         typeof data.message === 'string' ? data.message : 'Ficheiro enviado ao pipeline de catálogo.'
       );
       if (isMasterAdminRole((session?.user as { role?: string })?.role)) {
-        setTimeout(() => router.push('/admin/estoque/produtos-pendentes'), 1200);
+        setTimeout(() => router.push(`${adminBase}/estoque/produtos-pendentes`), 1200);
       } else {
         toast.info(
           'Rascunhos ficam em revisão: um utilizador Master pode aprovar em Master → Produtos pendentes.'

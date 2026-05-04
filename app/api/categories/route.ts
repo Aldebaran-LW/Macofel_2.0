@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import { getCategories, connectToDatabase } from '@/lib/mongodb-native';
 import { filterCategoriesForStorefront } from '@/lib/storefront-categories';
 import { ObjectId } from 'mongodb';
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -140,7 +140,7 @@ export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
@@ -396,7 +396,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

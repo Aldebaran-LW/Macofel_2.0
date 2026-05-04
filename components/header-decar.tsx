@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import {
@@ -226,15 +226,11 @@ export default function HeaderDecar() {
             {/* Logo */}
             <Link href="/" className="shrink-0 flex items-center gap-3 group">
               <div className="relative w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center overflow-hidden group-hover:bg-red-700 transition-colors">
-                <Image
-                  src="/logo-macofel.png"
+                <MacofelLogoImage
                   alt="MACOFEL"
                   width={32}
                   height={32}
                   className="object-contain invert"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
                 />
                 <span className="absolute text-white font-black text-xs italic">M</span>
               </div>

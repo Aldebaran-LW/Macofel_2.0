@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { ShoppingCart, Menu, X, User, LogOut } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { toast } from 'sonner';
-import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isGerenteSiteRole, isPainelLojaRole } from '@/lib/permissions';
 
 interface NavCategory {
   name: string;
@@ -29,6 +29,7 @@ export default function HeaderMobile() {
   const currentCategory = pathname === '/catalogo' ? (searchParams?.get('category') ?? '') : '';
 
   const isAdmin = isAdminDashboardRole((session?.user as any)?.role);
+  const isGerenteSite = isGerenteSiteRole((session?.user as any)?.role);
   const isPainelLoja = isPainelLojaRole((session?.user as any)?.role);
   const isLoggedIn = status === 'authenticated' && !!session?.user;
 
@@ -115,8 +116,7 @@ export default function HeaderMobile() {
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <Image
-              src="/logo-macofel.png"
+            <MacofelLogoImage
               alt="MACOFEL"
               width={60}
               height={60}
@@ -164,6 +164,13 @@ export default function HeaderMobile() {
                 {isAdmin ? (
                   <Link href="/admin/dashboard" className="text-gray-600 hover:text-emerald-600 font-semibold">
                     Painel admin
+                  </Link>
+                ) : isGerenteSite ? (
+                  <Link
+                    href="/painel-loja/gestao-site/dashboard"
+                    className="text-gray-600 hover:text-violet-600 font-semibold"
+                  >
+                    Gestão site
                   </Link>
                 ) : isPainelLoja ? (
                   <Link href="/painel-loja" className="text-gray-600 hover:text-emerald-600 font-semibold">
@@ -283,6 +290,14 @@ export default function HeaderMobile() {
                       className="block w-full text-center py-3 px-4 bg-gray-900 text-white font-bold rounded-lg"
                     >
                       Painel administrativo
+                    </Link>
+                  ) : isGerenteSite ? (
+                    <Link
+                      href="/painel-loja/gestao-site/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block w-full text-center py-3 px-4 bg-violet-700 text-white font-bold rounded-lg"
+                    >
+                      Gestão site (catálogo)
                     </Link>
                   ) : isPainelLoja ? (
                     <>

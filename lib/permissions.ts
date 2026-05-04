@@ -19,7 +19,7 @@
  * - LOGISTICS: fila envio, status entrega, retirada balcão, dados de entrega — PDV só leitura quando existir UI.
  * - CLIENT: apenas portal (pedidos, perfil, carrinho).
  *
- * Uso: `hasPermission(role, '…')` para gates finos; `isAdminDashboardRole` / `hasPdvFullWebAccess` /
+ * Uso: `hasPermission(role, '…')` para gates finos; `isAdminDashboardRole` / `canAccessAdminCatalogSession` /
  * `isPainelLojaRole` / `canOpenPainelLoja` para rotas (`/admin`, `/loja`, `/painel-loja`).
  */
 
@@ -186,12 +186,17 @@ export function hasPermission(
   return ROLE_PERMISSIONS[r].has(permission);
 }
 
-/**
- * Painel web `/admin` (produtos, pedidos, clientes, hero, etc.).
- * Inclui GERENTE_SITE para operar loja online; exclusões finas (equipa) usam `canManageStaffDirectory`.
- */
+/** Painel web `/admin` — apenas ADMIN e MASTER (layout e rotas `/admin/*`). */
 export function isAdminDashboardRole(role: string | undefined | null): boolean {
-  return role === 'ADMIN' || role === 'MASTER_ADMIN' || role === 'GERENTE_SITE';
+  return role === 'ADMIN' || role === 'MASTER_ADMIN';
+}
+
+/**
+ * APIs de catálogo / pedidos / clientes / hero (mesmas permissões que o admin usa nas routes).
+ * Gerente site usa `/painel-loja/gestao-site/*` no browser, mas as mesmas APIs com esta sessão.
+ */
+export function canAccessAdminCatalogSession(role: string | undefined | null): boolean {
+  return isAdminDashboardRole(role) || role === 'GERENTE_SITE';
 }
 
 /** Criar/editar funcionários e senhas da equipa — só ADMIN e MASTER (não Gerente site). */

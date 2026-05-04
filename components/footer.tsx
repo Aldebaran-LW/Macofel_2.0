@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { MapPin, Clock, Instagram, Linkedin, Facebook, Send } from 'lucide-react';
 
 export default function Footer() {
@@ -10,15 +10,11 @@ export default function Footer() {
           <div className="col-span-1">
             <div className="flex items-center gap-4 mb-8">
               <div className="relative h-12 w-auto">
-                <Image
-                  src="/logo-macofel.png"
+                <MacofelLogoImage
                   alt="Logo MACOFEL"
                   width={48}
                   height={48}
                   className="h-12 w-auto object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
                 />
               </div>
               <div className="flex flex-col leading-none">

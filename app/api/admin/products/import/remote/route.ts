@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import {
   getRenderCatalogImportBaseUrl,
   getRenderCatalogImportSecret,
@@ -18,7 +18,7 @@ const REMOTE_TIMEOUT_ENRICH_MS = 28 * 60 * 1000;
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAdminDashboardRole((session.user as { role?: string }).role)) {
+    if (!session?.user || !canAccessAdminCatalogSession((session.user as { role?: string }).role)) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 

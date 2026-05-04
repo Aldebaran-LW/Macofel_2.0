@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAdminUiBasePath } from '@/hooks/use-admin-ui-base-path';
 import { Package, ShoppingBag, Users, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -15,6 +16,7 @@ interface Stats {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const adminBase = useAdminUiBasePath();
   const [stats, setStats] = useState<Stats>({
     totalProducts: 0,
     totalOrders: 0,
@@ -33,9 +35,9 @@ export default function DashboardPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('master') === 'forbidden') {
       toast.error('Esta área é exclusiva do Master Admin.');
-      router.replace('/admin/dashboard', { scroll: false });
+      router.replace(`${adminBase}/dashboard`, { scroll: false });
     }
-  }, [router]);
+  }, [router, adminBase]);
 
   const fetchStats = async () => {
     try {

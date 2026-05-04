@@ -233,6 +233,9 @@ async function dispatchCommand(ctx: BotContext, cmd: 'start'): Promise<void> {
     ctx.session.selectedProductId = undefined;
     ctx.session.pendingStockSign = undefined;
     ctx.session.pendingQuoteId = undefined;
+    ctx.session.prodPhotoMode = undefined;
+    ctx.session.prodPhotoNextPrimary = undefined;
+    ctx.session.prodCreate = undefined;
     await sendWelcome(ctx);
   }
 }
@@ -341,6 +344,9 @@ bot.command('cancelar', async (ctx) => {
   ctx.session.selectedProductId = undefined;
   ctx.session.pendingStockSign = undefined;
   ctx.session.pendingQuoteId = undefined;
+  ctx.session.prodPhotoMode = undefined;
+  ctx.session.prodPhotoNextPrimary = undefined;
+  ctx.session.prodCreate = undefined;
   await ctx.reply('Teclado removido.', { reply_markup: { remove_keyboard: true } });
 });
 
@@ -380,6 +386,9 @@ bot.hears(['✖️ Cancelar', 'Cancelar'], async (ctx) => {
   ctx.session.selectedProductId = undefined;
   ctx.session.pendingStockSign = undefined;
   ctx.session.pendingQuoteId = undefined;
+  ctx.session.prodPhotoMode = undefined;
+  ctx.session.prodPhotoNextPrimary = undefined;
+  ctx.session.prodCreate = undefined;
   await ctx.reply('Ok. Toque em Início ou envie /start.', { reply_markup: { remove_keyboard: true } });
 });
 
@@ -796,11 +805,16 @@ bot.callbackQuery(/^ir1:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.awaiting = 'prod_photo';
   ctx.session.prodPhotoMode = 'replace_first';
   await ctx.reply(
-    'Envie uma **foto** para substituir a imagem principal (capa + primeira da galeria).',
+    [
+      '📷 **Só a capa (mantém galeria)**',
+      '',
+      'Envie uma **foto**: ela passa a ser a **capa** e a 1.ª da galeria; **as restantes fotos do produto mantêm-se**.',
+    ].join('\n'),
     { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
 });
 
+/** Mensagens antigas podem ainda ter o botão `ir0`; comportamento = substituir tudo (igual a `ims`). */
 bot.callbackQuery(/^ir0:([a-f\d]{24})$/i, async (ctx) => {
   await ctx.answerCallbackQuery();
   const productId = String(ctx.match?.[1] ?? '').trim();
@@ -808,10 +822,15 @@ bot.callbackQuery(/^ir0:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_photo';
   ctx.session.prodPhotoMode = 'replace_all';
-  await ctx.reply('Envie uma **foto** — a galeria passará a ter só esta imagem.', {
-    parse_mode: 'Markdown',
-    reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
-  });
+  await ctx.reply(
+    [
+      '🔄 **Substituir todas as imagens**',
+      '',
+      '**Atenção:** a próxima foto **substitui todas** as imagens atuais deste produto; no site ficará **só essa**.',
+      'Envie a foto quando estiver pronto.',
+    ].join('\n'),
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+  );
 });
 
 bot.callbackQuery('flow:orc_novo', async (ctx) => {
@@ -1694,16 +1713,16 @@ function kbSubDesc(productId: string): InlineKeyboard {
 function kbSubImagens(productId: string, hasExisting: boolean): InlineKeyboard {
   const kb = new InlineKeyboard().text('📷 Nova imagem (várias)', `imn:${productId}`).row();
   if (hasExisting) {
-    kb.text('🔄 Substituir existente', `ims:${productId}`).row();
+    kb.text('🔄 Substituir (todas as fotos)', `ims:${productId}`).row();
   }
   kb.text('◀ Voltar', `backcad:${productId}`);
   return kb;
 }
 
+/** Após **Substituir** (substitui tudo): opção de mudar para “só capa” antes de enviar a foto. */
 function kbSubSubstituirImagens(productId: string): InlineKeyboard {
   return new InlineKeyboard()
-    .text('📷 Capa / 1ª', `ir1:${productId}`)
-    .text('📷 Só esta', `ir0:${productId}`)
+    .text('📷 Só a capa (mantém galeria)', `ir1:${productId}`)
     .row()
     .text('◀ Voltar', `sub:img:${productId}`);
 }
@@ -1822,14 +1841,16 @@ bot.callbackQuery(/^ims:([a-f\d]{24})$/i, async (ctx) => {
   // Antes só se atualizava o teclado — sem `awaiting`, o envio da foto era ignorado em `message:photo`.
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_photo';
-  ctx.session.prodPhotoMode = 'replace_first';
+  ctx.session.prodPhotoMode = 'replace_all';
   await ctx.editMessageReplyMarkup({ reply_markup: kbSubSubstituirImagens(productId) }).catch(() => {});
   await ctx.reply(
     [
-      '🔄 **Substituir imagem**',
+      '🔄 **Substituir imagens do produto**',
       '',
-      'Envie já a **nova foto** — passa a ser a **capa** (e 1.ª na galeria); as outras mantêm-se.',
-      'Para a galeria ficar **só** com a próxima foto: na mensagem do **produto** (botões em baixo), toque **📷 Só esta** e depois envie a foto.',
+      '**Atenção:** a próxima foto que enviar vai **apagar todas as imagens atuais** deste produto (capa e galeria). No site ficará **só essa** imagem.',
+      'Se quiser **manter as outras fotos** e trocar apenas a capa, toque **📷 Só a capa (mantém galeria)** na mensagem do produto **antes** de enviar a foto.',
+      '',
+      'Envie a **nova foto** quando estiver pronto.',
     ].join('\n'),
     { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
   );
@@ -1849,7 +1870,7 @@ bot.callbackQuery(/^imn:([a-f\d]{24})$/i, async (ctx) => {
       'Toque **📌 Próxima = capa** antes de enviar se quiser que a **próxima** foto substitua a imagem principal (mantém o resto na galeria).',
       'Quando terminar, toque **✅ Concluir envio**.',
       '',
-      'Para só trocar a capa sem este modo: no produto use **🖼 Imagens** → **🔄 Substituir existente** → **Capa / 1ª**.',
+      '**Substituir (todas as fotos)** no produto apaga a galeria inteira; use **📷 Só a capa** se quiser manter as outras imagens.',
     ].join('\n'),
     {
       parse_mode: 'Markdown',
@@ -2159,57 +2180,20 @@ bot.callbackQuery('ops:sales', async (ctx) => {
   });
 });
 
-bot.on('message:photo', async (ctx) => {
+/** Evita upload para o Macofel quando não há fluxo ativo (antes o update era ignorado em silêncio). */
+function isAwaitingProductImageUpload(
+  awaiting: SessionData['awaiting'],
+  draft: SessionData['prodCreate'] | undefined
+): boolean {
+  if (awaiting === 'prod_photo_multi' || awaiting === 'prod_photo') return true;
+  if (awaiting === 'prod_create_flow' && draft?.step === 'images') return true;
+  return false;
+}
+
+async function continueAfterProductImageUpload(ctx: BotContext, imageUrl: string): Promise<void> {
   const aw = ctx.session.awaiting;
   const draft = ctx.session.prodCreate;
-  const photos = ctx.message?.photo;
-  if (!photos?.length) return;
-  const best = photos[photos.length - 1];
-  let file: { file_path?: string };
-  try {
-    file = await ctx.api.getFile(best.file_id);
-  } catch {
-    await ctx.reply('Não foi possível ler a foto.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
-    return;
-  }
-  if (!file.file_path) {
-    await ctx.reply('Ficheiro inválido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
-    return;
-  }
-  const dlUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-  let buf: Buffer;
-  try {
-    const res = await fetch(dlUrl);
-    buf = Buffer.from(await res.arrayBuffer());
-  } catch {
-    await ctx.reply('Falha ao transferir a imagem.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
-    return;
-  }
-  const ext = (file.file_path.split('.').pop() || 'jpg').toLowerCase();
-  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-  const filename = `tg_${Date.now()}.${ext}`;
-  const form = new FormData();
-  form.append('file', new Blob([buf], { type: mime }), filename);
-
   const { telegramUserId } = telegramIds(ctx);
-  const up = await fetch(`${baseUrl!.replace(/\/$/, '')}/api/telegram/products/upload-image`, {
-    method: 'POST',
-    headers: {
-      'X-Telegram-Key': integrationKey!,
-      'x-telegram-userid': telegramUserId,
-    },
-    body: form,
-  });
-  const upData = (await up.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!up.ok) {
-    await ctx.reply(formatApiError(upData, up.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
-    return;
-  }
-  const imageUrl = String(upData.imageUrl ?? '').trim();
-  if (!imageUrl) {
-    await ctx.reply('Upload sem URL.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
-    return;
-  }
 
   if (aw === 'prod_create_flow' && draft?.step === 'images') {
     if (!draft.imageUrls) draft.imageUrls = [];
@@ -2290,6 +2274,7 @@ bot.on('message:photo', async (ctx) => {
   if (!productId) {
     ctx.session.awaiting = undefined;
     ctx.session.prodPhotoMode = undefined;
+    ctx.session.prodPhotoNextPrimary = undefined;
     await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
@@ -2298,6 +2283,7 @@ bot.on('message:photo', async (ctx) => {
   if (!cur.ok) {
     ctx.session.awaiting = undefined;
     ctx.session.prodPhotoMode = undefined;
+    ctx.session.prodPhotoNextPrimary = undefined;
     await ctx.reply(formatApiError(cur.data as any, cur.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
@@ -2327,11 +2313,122 @@ bot.on('message:photo', async (ctx) => {
   });
   ctx.session.awaiting = undefined;
   ctx.session.prodPhotoMode = undefined;
+  ctx.session.prodPhotoNextPrimary = undefined;
   if (!patch.ok) {
     await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
     return;
   }
-  await ctx.reply('Imagem guardada na base.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+  const doneMsg =
+    mode === 'replace_all'
+      ? '✅ **Todas as imagens anteriores foram substituídas.** Este produto fica agora só com esta foto na loja.'
+      : mode === 'replace_first'
+        ? '✅ **Capa atualizada.** As outras fotos da galeria mantiveram-se.'
+        : 'Imagem guardada na base.';
+  await ctx.reply(doneMsg, {
+    parse_mode: 'Markdown',
+    reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
+  });
+}
+
+async function downloadTelegramFileToBuffer(fileId: string): Promise<
+  { ok: true; buf: Buffer; ext: string; mime: string } | { ok: false; error: string }
+> {
+  let file: { file_path?: string };
+  try {
+    file = await bot.api.getFile(fileId);
+  } catch {
+    return { ok: false, error: 'Não foi possível ler o ficheiro.' };
+  }
+  if (!file.file_path) {
+    return { ok: false, error: 'Ficheiro inválido.' };
+  }
+  const dlUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+  let buf: Buffer;
+  try {
+    const res = await fetch(dlUrl);
+    buf = Buffer.from(await res.arrayBuffer());
+  } catch {
+    return { ok: false, error: 'Falha ao transferir a imagem.' };
+  }
+  const ext = (file.file_path.split('.').pop() || 'jpg').toLowerCase();
+  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  return { ok: true, buf, ext, mime };
+}
+
+async function uploadBufferToMacofelProductImage(
+  telegramUserId: string,
+  buf: Buffer,
+  mime: string,
+  filename: string
+): Promise<{ ok: true; imageUrl: string } | { ok: false; error: string; data?: any; status?: number }> {
+  const form = new FormData();
+  form.append('file', new Blob([buf], { type: mime }), filename);
+  const up = await fetch(`${baseUrl!.replace(/\/$/, '')}/api/telegram/products/upload-image`, {
+    method: 'POST',
+    headers: {
+      'X-Telegram-Key': integrationKey!,
+      'x-telegram-userid': telegramUserId,
+    },
+    body: form,
+  });
+  const upData = (await up.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!up.ok) {
+    return { ok: false, error: formatApiError(upData, up.status), data: upData, status: up.status };
+  }
+  const imageUrl = String(upData.imageUrl ?? '').trim();
+  if (!imageUrl) {
+    return { ok: false, error: 'Upload sem URL.' };
+  }
+  return { ok: true, imageUrl };
+}
+
+bot.on('message:photo', async (ctx) => {
+  const aw = ctx.session.awaiting;
+  const draft = ctx.session.prodCreate;
+  const photos = ctx.message?.photo;
+  if (!photos?.length) return;
+  if (!isAwaitingProductImageUpload(aw, draft)) return;
+
+  const best = photos[photos.length - 1];
+  const got = await downloadTelegramFileToBuffer(best.file_id);
+  if (!got.ok) {
+    await ctx.reply(got.error, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
+  const { telegramUserId } = telegramIds(ctx);
+  const filename = `tg_${Date.now()}.${got.ext}`;
+  const uploaded = await uploadBufferToMacofelProductImage(telegramUserId, got.buf, got.mime, filename);
+  if (!uploaded.ok) {
+    await ctx.reply(uploaded.error, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
+  await continueAfterProductImageUpload(ctx, uploaded.imageUrl);
+});
+
+/** Imagem enviada como ficheiro (comum no Telegram Desktop) — mesmo fluxo que `message:photo`. */
+bot.on('message:document', async (ctx) => {
+  const aw = ctx.session.awaiting;
+  const draft = ctx.session.prodCreate;
+  const doc = ctx.message?.document;
+  if (!doc?.file_id) return;
+  const mime = String(doc.mime_type ?? '');
+  if (!mime.startsWith('image/')) return;
+  if (!isAwaitingProductImageUpload(aw, draft)) return;
+
+  const got = await downloadTelegramFileToBuffer(doc.file_id);
+  if (!got.ok) {
+    await ctx.reply(got.error, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
+  const { telegramUserId } = telegramIds(ctx);
+  const baseName = doc.file_name ? String(doc.file_name).replace(/[^\w.\-]+/g, '_').slice(0, 80) : `tg_${Date.now()}.${got.ext}`;
+  const filename = baseName.includes('.') ? baseName : `${baseName}.${got.ext}`;
+  const uploaded = await uploadBufferToMacofelProductImage(telegramUserId, got.buf, got.mime, filename);
+  if (!uploaded.ok) {
+    await ctx.reply(uploaded.error, { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
+    return;
+  }
+  await continueAfterProductImageUpload(ctx, uploaded.imageUrl);
 });
 
 bot.catch((err: unknown) => {

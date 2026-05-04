@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -106,12 +106,7 @@ export default function CadastroPage() {
           <div className="flex justify-center mb-6">
             <Link href="/" aria-label="Voltar para a página inicial" className="block">
               <div className="relative h-14 w-44">
-                <Image
-                  src="/logo-macofel.png"
-                  alt="MACOFEL"
-                  fill
-                  className="object-contain"
-                />
+                <MacofelLogoImage fill sizes="176px" className="object-contain" alt="MACOFEL" />
               </div>
             </Link>
           </div>

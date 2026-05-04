@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import mongoPrisma from '@/lib/mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { ObjectId } from 'mongodb';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const MAX_LABEL = 500;
 
 function requireAdmin(session: any) {
-  if (!session?.user || !isAdminDashboardRole((session.user as { role?: string }).role)) {
+  if (!session?.user || !canAccessAdminCatalogSession((session.user as { role?: string }).role)) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
   return null;

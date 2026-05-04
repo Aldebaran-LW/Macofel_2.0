@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { getSession, signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
-import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isGerenteSiteRole, isPainelLojaRole } from '@/lib/permissions';
 
 /** Evita open redirect: só caminhos relativos internos. */
 function safeCallbackPath(raw: string | null | undefined): string | null {
@@ -70,6 +70,12 @@ export default function LoginPage() {
           return;
         }
 
+        if (isGerenteSiteRole(userRole)) {
+          toast.success('Login realizado! A abrir a gestão do site…');
+          window.location.assign('/painel-loja/gestao-site/dashboard');
+          return;
+        }
+
         if (isPainelLojaRole(userRole)) {
           toast.success('Login realizado! A abrir o painel da loja…');
           window.location.assign('/painel-loja');
@@ -101,12 +107,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-8">
             <Link href="/" aria-label="Voltar para a página inicial" className="block">
               <div className="relative h-20 w-64">
-                <Image
-                  src="/logo-macofel.png"
-                  alt="MACOFEL"
-                  fill
-                  className="object-contain"
-                />
+                <MacofelLogoImage fill sizes="256px" className="object-contain" alt="MACOFEL" />
               </div>
             </Link>
           </div>

@@ -28,7 +28,7 @@ export default function AdminSenhasPage() {
   useEffect(() => {
     if (status === 'loading') return;
     if (role && isGerenteSiteRole(role)) {
-      router.replace('/admin/dashboard');
+      router.replace('/painel-loja/gestao-site/dashboard');
     }
   }, [role, status, router]);
 

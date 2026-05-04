@@ -18,7 +18,8 @@ import {
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { useQuotesPortalBase } from '@/hooks/use-quotes-portal-base';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { useAdminUiBasePath } from '@/hooks/use-admin-ui-base-path';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import {
   computeQuoteProposalTotals,
   type QuoteProposalStored,
@@ -64,9 +65,10 @@ export default function AdminSolicitacaoDetailPage() {
   const params = useParams();
   const id = String(params?.id ?? '');
   const quotesBase = useQuotesPortalBase();
+  const adminBase = useAdminUiBasePath();
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
-  const canOpenOrdersAdmin = isAdminDashboardRole(role);
+  const canOpenOrdersAdmin = canAccessAdminCatalogSession(role);
 
   const [loading, setLoading] = useState(true);
   const [doc, setDoc] = useState<Doc | null>(null);
@@ -192,7 +194,7 @@ export default function AdminSolicitacaoDetailPage() {
             <span className="text-gray-600">Pedido gerado: </span>
             {canOpenOrdersAdmin ? (
               <Link
-                href="/admin/pedidos"
+                href={`${adminBase}/pedidos`}
                 className="font-semibold text-red-600 hover:underline"
               >
                 #{doc.linkedOrderId.slice(0, 8)}… — ver em Pedidos

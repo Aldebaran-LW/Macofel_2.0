@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import bcrypt from 'bcryptjs';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import prisma from '@/lib/db';
 import { isValidCpf, normalizeCpf } from '@/lib/cpf';
 
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
-  if (!session?.user || !isAdminDashboardRole((session.user as any).role)) {
+  if (!session?.user || !canAccessAdminCatalogSession((session.user as any).role)) {
     return null;
   }
   return session;

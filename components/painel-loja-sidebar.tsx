@@ -186,11 +186,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               Catálogo &amp; site (admin)
             </p>
             <Link
-              href="/admin/dashboard"
+              href="/painel-loja/gestao-site/dashboard"
               onClick={nav}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
-                pathname?.startsWith('/admin/dashboard')
+                pathname?.startsWith('/painel-loja/gestao-site/dashboard')
                   ? 'bg-violet-600 text-white'
                   : 'text-slate-200 hover:bg-slate-800'
               )}
@@ -199,11 +199,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               Dashboard
             </Link>
             <Link
-              href="/admin/produtos"
+              href="/painel-loja/gestao-site/produtos"
               onClick={nav}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
-                pathname?.startsWith('/admin/produtos')
+                pathname?.startsWith('/painel-loja/gestao-site/produtos')
                   ? 'bg-violet-600 text-white'
                   : 'text-slate-200 hover:bg-slate-800'
               )}
@@ -212,11 +212,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               Produtos
             </Link>
             <Link
-              href="/admin/pedidos"
+              href="/painel-loja/gestao-site/pedidos"
               onClick={nav}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
-                pathname?.startsWith('/admin/pedidos')
+                pathname?.startsWith('/painel-loja/gestao-site/pedidos')
                   ? 'bg-violet-600 text-white'
                   : 'text-slate-200 hover:bg-slate-800'
               )}
@@ -225,11 +225,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               Pedidos
             </Link>
             <Link
-              href="/admin/clientes"
+              href="/painel-loja/gestao-site/clientes"
               onClick={nav}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
-                pathname?.startsWith('/admin/clientes')
+                pathname?.startsWith('/painel-loja/gestao-site/clientes')
                   ? 'bg-violet-600 text-white'
                   : 'text-slate-200 hover:bg-slate-800'
               )}
@@ -241,17 +241,17 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
             <details
               className="px-1"
               open={
-                pathname === '/admin/orcamento' ||
-                pathname?.startsWith('/admin/orcamentos') ||
-                pathname?.startsWith('/admin/solicitacoes-orcamento')
+                pathname === '/painel-loja/gestao-site/orcamento' ||
+                pathname?.startsWith('/painel-loja/gestao-site/orcamentos') ||
+                pathname?.startsWith('/painel-loja/gestao-site/solicitacoes-orcamento')
               }
             >
               <summary
                 className={cn(
                   'cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800',
-                  pathname === '/admin/orcamento' ||
-                    pathname?.startsWith('/admin/orcamentos') ||
-                    pathname?.startsWith('/admin/solicitacoes-orcamento')
+                  pathname === '/painel-loja/gestao-site/orcamento' ||
+                    pathname?.startsWith('/painel-loja/gestao-site/orcamentos') ||
+                    pathname?.startsWith('/painel-loja/gestao-site/solicitacoes-orcamento')
                     ? 'bg-slate-800 text-white'
                     : ''
                 )}
@@ -264,11 +264,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               <div className="space-y-0.5 py-1 pl-2">
                 {hasPermission(role, 'site:client_quote_requests') ? (
                   <Link
-                    href="/admin/solicitacoes-orcamento"
+                    href="/painel-loja/gestao-site/solicitacoes-orcamento"
                     onClick={nav}
                     className={cn(
                       'flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                      pathname?.startsWith('/admin/solicitacoes-orcamento')
+                      pathname?.startsWith('/painel-loja/gestao-site/solicitacoes-orcamento')
                         ? 'bg-violet-600 text-white'
                         : 'text-slate-300 hover:bg-slate-800'
                     )}
@@ -279,7 +279,7 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
                       <span
                         className={cn(
                           'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                          pathname?.startsWith('/admin/solicitacoes-orcamento')
+                          pathname?.startsWith('/painel-loja/gestao-site/solicitacoes-orcamento')
                             ? 'bg-white/25 text-white'
                             : 'bg-amber-500 text-slate-950'
                         )}
@@ -290,11 +290,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
                   </Link>
                 ) : null}
                 <Link
-                  href="/admin/orcamento"
+                  href="/painel-loja/gestao-site/orcamento"
                   onClick={nav}
                   className={cn(
                     'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                    pathname === '/admin/orcamento'
+                    pathname === '/painel-loja/gestao-site/orcamento'
                       ? 'bg-violet-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800'
                   )}
@@ -302,11 +302,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
                   Montar orçamento
                 </Link>
                 <Link
-                  href="/admin/orcamentos"
+                  href="/painel-loja/gestao-site/orcamentos"
                   onClick={nav}
                   className={cn(
                     'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                    pathname === '/admin/orcamentos' || pathname?.startsWith('/admin/orcamentos/')
+                    pathname === '/painel-loja/gestao-site/orcamentos' || pathname?.startsWith('/painel-loja/gestao-site/orcamentos/')
                       ? 'bg-violet-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800'
                   )}
@@ -316,7 +316,7 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               </div>
             </details>
 
-            <details className="px-1" open={pathname?.startsWith('/admin/categorias')}>
+            <details className="px-1" open={pathname?.startsWith('/painel-loja/gestao-site/categorias')}>
               <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">
                 <span className="flex items-center gap-2">
                   <FolderTree className="h-4 w-4 shrink-0" />
@@ -325,11 +325,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               </summary>
               <div className="py-1 pl-2">
                 <Link
-                  href="/admin/categorias"
+                  href="/painel-loja/gestao-site/categorias"
                   onClick={nav}
                   className={cn(
                     'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                    pathname?.startsWith('/admin/categorias')
+                    pathname?.startsWith('/painel-loja/gestao-site/categorias')
                       ? 'bg-violet-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800'
                   )}
@@ -339,7 +339,7 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               </div>
             </details>
 
-            <details className="px-1" open={pathname?.startsWith('/admin/hero-images')}>
+            <details className="px-1" open={pathname?.startsWith('/painel-loja/gestao-site/hero-images')}>
               <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">
                 <span className="flex items-center gap-2">
                   <ImageHeroIcon className="h-4 w-4 shrink-0" />
@@ -348,11 +348,11 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
               </summary>
               <div className="py-1 pl-2">
                 <Link
-                  href="/admin/hero-images"
+                  href="/painel-loja/gestao-site/hero-images"
                   onClick={nav}
                   className={cn(
                     'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                    pathname?.startsWith('/admin/hero-images')
+                    pathname?.startsWith('/painel-loja/gestao-site/hero-images')
                       ? 'bg-violet-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800'
                   )}

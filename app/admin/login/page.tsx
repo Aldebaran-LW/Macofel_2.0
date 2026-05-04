@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Shield, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import { isAdminDashboardRole, isPainelLojaRole } from '@/lib/permissions';
+import { isAdminDashboardRole, isGerenteSiteRole, isPainelLojaRole } from '@/lib/permissions';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -23,6 +23,8 @@ export default function AdminLoginPage() {
       const role = (session.user as any)?.role;
       if (isAdminDashboardRole(role)) {
         router.push('/admin/dashboard');
+      } else if (isGerenteSiteRole(role)) {
+        router.push('/painel-loja/gestao-site/dashboard');
       } else if (isPainelLojaRole(role)) {
         router.push('/painel-loja');
       } else if (role && !isAdminDashboardRole(role)) {
@@ -57,6 +59,10 @@ export default function AdminLoginPage() {
         if (isAdminDashboardRole(userRole)) {
           toast.success('Acesso autorizado');
           router.push('/admin/dashboard');
+          router.refresh();
+        } else if (isGerenteSiteRole(userRole)) {
+          toast.success('Acesso ao painel de gestão do site…');
+          router.push('/painel-loja/gestao-site/dashboard');
           router.refresh();
         } else if (isPainelLojaRole(userRole)) {
           toast.success('Redirecionando para o painel da loja…');

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import MacofelLogoImage from '@/components/macofel-logo-image';
 import { useSession, signOut } from 'next-auth/react';
 import { ShoppingCart, User, Search, Percent, Menu, X, Phone } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -94,15 +94,11 @@ export default function HeaderDemo() {
             {/* Logo */}
             <Link href="/" className="shrink-0 flex items-center gap-3">
               <div className="relative h-10 w-auto">
-                <Image
-                  src="/logo-macofel.png"
+                <MacofelLogoImage
                   alt="MACOFEL"
                   width={40}
                   height={40}
                   className="h-10 w-auto object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
                 />
               </div>
               <span className="text-2xl font-bold tracking-tighter italic">

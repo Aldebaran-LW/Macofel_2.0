@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 import {
   createHeroSlide,
   deleteHeroSlide,
@@ -19,7 +19,7 @@ async function assertAdmin() {
   }
 
   const userRole = (session.user as any).role;
-  if (!isAdminDashboardRole(userRole)) {
+  if (!canAccessAdminCatalogSession(userRole)) {
     return { ok: false as const, res: NextResponse.json({ error: 'Acesso negado' }, { status: 403 }) };
   }
 

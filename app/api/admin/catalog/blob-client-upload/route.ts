@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ const MAX_BYTES = 100 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || !isAdminDashboardRole((session.user as { role?: string }).role)) {
+  if (!session?.user || !canAccessAdminCatalogSession((session.user as { role?: string }).role)) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 

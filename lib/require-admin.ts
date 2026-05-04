@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { canManageStaffDirectory, isAdminDashboardRole } from '@/lib/permissions';
+import { canAccessAdminCatalogSession, canManageStaffDirectory } from '@/lib/permissions';
 
-/** Para API routes: sessão obrigatória com role de Admin (inclui Master Admin e Gerente site). */
+/** Para API routes: Admin/Master ou Gerente site (catálogo / pedidos / APIs do painel). */
 export async function requireAdminSession() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session?.user || !isAdminDashboardRole(role)) {
+  if (!session?.user || !canAccessAdminCatalogSession(role)) {
     return {
       ok: false as const,
       response: NextResponse.json({ error: 'Acesso exclusivo Admin' }, { status: 403 }),
