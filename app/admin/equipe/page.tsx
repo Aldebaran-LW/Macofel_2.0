@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Users, RefreshCw, UserPlus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ASSIGNABLE_ROLES, MASTER_STAFF_CREATION_ROLES, ROLE_LABELS } from '@/lib/master-role-policy';
-import { isMasterAdminRole, type UserRole } from '@/lib/permissions';
+import { isGerenteSiteRole, isMasterAdminRole, type UserRole } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 
 type StaffUser = {
@@ -36,8 +37,18 @@ const defaultCreateForm = {
 };
 
 export default function AdminEquipePage() {
-  const { data: session } = useSession();
-  const actorIsMaster = isMasterAdminRole((session?.user as { role?: string } | undefined)?.role);
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const actorIsMaster = isMasterAdminRole(role);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (role && isGerenteSiteRole(role)) {
+      router.replace('/admin/dashboard');
+    }
+  }, [role, status, router]);
+
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -48,6 +59,7 @@ export default function AdminEquipePage() {
   const [pdvSaving, setPdvSaving] = useState(false);
 
   const load = useCallback(async () => {
+    if (isGerenteSiteRole(role)) return;
     setLoading(true);
     try {
       const res = await fetch('/api/admin/users', { cache: 'no-store' });
@@ -64,11 +76,13 @@ export default function AdminEquipePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
+    if (status === 'loading') return;
+    if (role && isGerenteSiteRole(role)) return;
     void load();
-  }, [load]);
+  }, [load, role, status]);
 
   const handleRoleChange = async (user: StaffUser, newRole: UserRole) => {
     if (newRole === user.role) return;
@@ -150,6 +164,14 @@ export default function AdminEquipePage() {
       setPdvSaving(false);
     }
   };
+
+  if (status !== 'loading' && role && isGerenteSiteRole(role)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
+        A redirecionar…
+      </div>
+    );
+  }
 
   return (
     <div>

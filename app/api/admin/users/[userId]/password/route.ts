@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { requireAdminSession } from '@/lib/require-admin';
+import { requireStaffDirectoryAdminSession } from '@/lib/require-admin';
 import { isMasterAdminRole } from '@/lib/permissions';
 import { hashPassword } from '@/lib/password-hash';
 import { writeAuditLog } from '@/lib/audit-log';
@@ -14,7 +14,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { userId: string } }
 ) {
-  const auth = await requireAdminSession();
+  const auth = await requireStaffDirectoryAdminSession();
   if (!auth.ok) return auth.response;
   const actorRole = (auth.session.user as { role?: string } | undefined)?.role;
   const actorIsMaster = isMasterAdminRole(actorRole);

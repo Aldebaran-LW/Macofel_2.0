@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/db';
-import { requireAdminSession } from '@/lib/require-admin';
+import { requireStaffDirectoryAdminSession } from '@/lib/require-admin';
 import { MASTER_STAFF_CREATION_ROLES } from '@/lib/master-role-policy';
 import { isMasterAdminRole, type UserRole } from '@/lib/permissions';
 import { validatePdvUserNameInput } from '@/lib/pdv-user-name';
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 /** Lista equipa interna (sem `CLIENT` — clientes ficam em /admin/clientes). */
 export async function GET() {
-  const auth = await requireAdminSession();
+  const auth = await requireStaffDirectoryAdminSession();
   if (!auth.ok) return auth.response;
   const actorRole = (auth.session.user as { role?: string } | undefined)?.role;
   const actorIsMaster = isMasterAdminRole(actorRole);
@@ -40,7 +40,7 @@ export async function GET() {
  * Cria funcionário interno (não-CLIENT). User Name único para login no PDV; senha = mesma do site (email).
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireAdminSession();
+  const auth = await requireStaffDirectoryAdminSession();
   if (!auth.ok) return auth.response;
   const actorRole = (auth.session.user as { role?: string } | undefined)?.role;
   const actorIsMaster = isMasterAdminRole(actorRole);

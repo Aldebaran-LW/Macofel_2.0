@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Boxes, UserCog, Shield, Search, ArrowRight, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isGerenteSiteRole } from '@/lib/permissions';
 
 type QuickAction = {
   id: string;
@@ -19,8 +20,16 @@ type QuickAction = {
 
 export default function AdminAreaPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
   const [q, setQ] = useState('');
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (role && isGerenteSiteRole(role)) {
+      router.replace('/admin/dashboard');
+    }
+  }, [role, status, router]);
 
   const actions = useMemo<QuickAction[]>(
     () => [
@@ -105,6 +114,14 @@ export default function AdminAreaPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [actions, router]);
+
+  if (status !== 'loading' && role && isGerenteSiteRole(role)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
+        A redirecionar…
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

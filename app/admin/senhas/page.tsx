@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { KeyRound, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { isMasterAdminRole, type UserRole } from '@/lib/permissions';
+import { isGerenteSiteRole, isMasterAdminRole, type UserRole } from '@/lib/permissions';
 
 type Row = {
   id: string;
@@ -19,8 +20,18 @@ type Row = {
 };
 
 export default function AdminSenhasPage() {
-  const { data: session } = useSession();
-  const actorIsMaster = isMasterAdminRole((session?.user as { role?: string } | undefined)?.role);
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const actorIsMaster = isMasterAdminRole(role);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (role && isGerenteSiteRole(role)) {
+      router.replace('/admin/dashboard');
+    }
+  }, [role, status, router]);
+
   const [users, setUsers] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState('');
@@ -29,6 +40,7 @@ export default function AdminSenhasPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
+    if (isGerenteSiteRole(role)) return;
     setLoading(true);
     try {
       const res = await fetch('/api/admin/users', { cache: 'no-store' });
@@ -45,11 +57,13 @@ export default function AdminSenhasPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
+    if (status === 'loading') return;
+    if (role && isGerenteSiteRole(role)) return;
     void load();
-  }, [load]);
+  }, [load, role, status]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +100,14 @@ export default function AdminSenhasPage() {
       setSaving(false);
     }
   };
+
+  if (status !== 'loading' && role && isGerenteSiteRole(role)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
+        A redirecionar…
+      </div>
+    );
+  }
 
   return (
     <div>

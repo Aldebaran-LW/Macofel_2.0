@@ -135,6 +135,8 @@ type SessionData = {
   pendingQuoteId?: string;
   prodDescMode?: 'append' | 'replace';
   prodPhotoMode?: 'add' | 'replace_first' | 'replace_all';
+  /** Em `prod_photo_multi`: a próxima foto enviada passa a ser a capa (`imageUrl`) e a 1.ª da galeria. */
+  prodPhotoNextPrimary?: boolean;
   orcClienteNome?: string;
   orcClienteEmail?: string | null;
 };
@@ -1287,6 +1289,7 @@ bot.on('message:text', async (ctx) => {
           '6/6 — **Imagens**',
           '',
           'Envie uma ou várias **fotos** (uma foto por mensagem), ou envie **-** para criar sem imagem.',
+          'Se errar a última foto, envie **trocar** ou **desfazer** para remover a última anexada.',
           'Depois mostramos o resumo para confirmar.',
         ].join('\n'),
         { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
@@ -1299,8 +1302,26 @@ bot.on('message:text', async (ctx) => {
         await showProdCreateConfirm(ctx, d);
         return;
       }
+      const undo = /^(trocar|desfazer|voltar)$/i.test(t);
+      if (undo) {
+        const urls = d.imageUrls ?? [];
+        if (urls.length === 0) {
+          await ctx.reply('Não há foto para remover. Envie uma **foto** ou **-** para o resumo.', {
+            parse_mode: 'Markdown',
+            reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
+          });
+          return;
+        }
+        urls.pop();
+        d.imageUrls = urls;
+        await ctx.reply(
+          `Última foto removida (${urls.length} na fila). Envie outra foto ou **-** para o resumo.`,
+          { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+        );
+        return;
+      }
       await ctx.reply(
-        'Envie uma **foto** por mensagem ou **-** para terminar e ver o resumo.',
+        'Envie uma **foto** por mensagem, **trocar** para apagar a última, ou **-** para terminar e ver o resumo.',
         { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
       );
       return;
@@ -1798,7 +1819,20 @@ bot.callbackQuery(/^ims:([a-f\d]{24})$/i, async (ctx) => {
   await ctx.answerCallbackQuery();
   const productId = String(ctx.match?.[1] ?? '').trim();
   if (!productId) return;
+  // Antes só se atualizava o teclado — sem `awaiting`, o envio da foto era ignorado em `message:photo`.
+  ctx.session.selectedProductId = productId;
+  ctx.session.awaiting = 'prod_photo';
+  ctx.session.prodPhotoMode = 'replace_first';
   await ctx.editMessageReplyMarkup({ reply_markup: kbSubSubstituirImagens(productId) }).catch(() => {});
+  await ctx.reply(
+    [
+      '🔄 **Substituir imagem**',
+      '',
+      'Envie já a **nova foto** — passa a ser a **capa** (e 1.ª na galeria); as outras mantêm-se.',
+      'Para a galeria ficar **só** com a próxima foto: na mensagem do **produto** (botões em baixo), toque **📷 Só esta** e depois envie a foto.',
+    ].join('\n'),
+    { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+  );
 });
 
 bot.callbackQuery(/^imn:([a-f\d]{24})$/i, async (ctx) => {
@@ -1808,16 +1842,37 @@ bot.callbackQuery(/^imn:([a-f\d]{24})$/i, async (ctx) => {
   ctx.session.selectedProductId = productId;
   ctx.session.awaiting = 'prod_photo_multi';
   ctx.session.prodPhotoMode = 'add';
+  ctx.session.prodPhotoNextPrimary = false;
   await ctx.reply(
     [
       '📷 Envie **uma foto por mensagem** (pode enviar várias seguidas).',
+      'Toque **📌 Próxima = capa** antes de enviar se quiser que a **próxima** foto substitua a imagem principal (mantém o resto na galeria).',
       'Quando terminar, toque **✅ Concluir envio**.',
+      '',
+      'Para só trocar a capa sem este modo: no produto use **🖼 Imagens** → **🔄 Substituir existente** → **Capa / 1ª**.',
     ].join('\n'),
     {
       parse_mode: 'Markdown',
-      reply_markup: new InlineKeyboard().text('✅ Concluir envio', `imdone:${productId}`),
+      reply_markup: new InlineKeyboard()
+        .text('📌 Próxima = capa', `imcap:${productId}`)
+        .row()
+        .text('✅ Concluir envio', `imdone:${productId}`),
     }
   );
+});
+
+bot.callbackQuery(/^imcap:([a-f\d]{24})$/i, async (ctx) => {
+  const productId = String(ctx.match?.[1] ?? '').trim();
+  if (!productId || ctx.session.selectedProductId !== productId) {
+    await ctx.answerCallbackQuery({ text: 'Abra o envio múltiplo outra vez.', show_alert: true });
+    return;
+  }
+  if (ctx.session.awaiting !== 'prod_photo_multi') {
+    await ctx.answerCallbackQuery({ text: 'Fluxo inválido.', show_alert: true });
+    return;
+  }
+  ctx.session.prodPhotoNextPrimary = true;
+  await ctx.answerCallbackQuery({ text: 'A próxima foto será a capa.' });
 });
 
 bot.callbackQuery(/^imdone:([a-f\d]{24})$/i, async (ctx) => {
@@ -1826,6 +1881,7 @@ bot.callbackQuery(/^imdone:([a-f\d]{24})$/i, async (ctx) => {
   if (!productId || ctx.session.selectedProductId !== productId) return;
   ctx.session.awaiting = undefined;
   ctx.session.prodPhotoMode = undefined;
+  ctx.session.prodPhotoNextPrimary = undefined;
   await ctx.reply('Envio de imagens encerrado. Pode voltar ao produto pela busca.', {
     reply_markup: opsMenuReplyKeyboard(ctx.session.userRole),
   });
@@ -2171,6 +2227,7 @@ bot.on('message:photo', async (ctx) => {
     if (!productId) {
       ctx.session.awaiting = undefined;
       ctx.session.prodPhotoMode = undefined;
+      ctx.session.prodPhotoNextPrimary = undefined;
       await ctx.reply('Fluxo perdido.', { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
@@ -2183,8 +2240,28 @@ bot.on('message:photo', async (ctx) => {
     const existingRaw = Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [];
     const existing = existingRaw.map(String).filter(Boolean);
     const primary = typeof p.imageUrl === 'string' ? p.imageUrl.trim() : '';
-    const imageUrls = existing.includes(imageUrl) ? existing : [...existing, imageUrl];
-    const imageUrlOut = primary || imageUrls[0] || imageUrl;
+    const nextPrimary = ctx.session.prodPhotoNextPrimary === true;
+    let imageUrls: string[];
+    let imageUrlOut: string;
+    if (nextPrimary) {
+      ctx.session.prodPhotoNextPrimary = false;
+      const seen = new Set<string>();
+      const rest: string[] = [];
+      const push = (u: string) => {
+        const t = u.trim();
+        if (!t || t === imageUrl || seen.has(t)) return;
+        seen.add(t);
+        rest.push(t);
+      };
+      if (primary) push(primary);
+      for (const u of existing) push(String(u));
+      imageUrls = [imageUrl, ...rest];
+      imageUrlOut = imageUrl;
+    } else {
+      const merged = existing.includes(imageUrl) ? existing : [...existing, imageUrl];
+      imageUrls = merged;
+      imageUrlOut = primary || merged[0] || imageUrl;
+    }
     const patch = await patchTelegramProduct(baseUrl!, integrationKey!, telegramUserId, productId, {
       imageUrl: imageUrlOut,
       imageUrls,
@@ -2193,9 +2270,15 @@ bot.on('message:photo', async (ctx) => {
       await ctx.reply(formatApiError(patch.data as any, patch.status), { reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) });
       return;
     }
+    const kb = new InlineKeyboard()
+      .text('📌 Próxima = capa', `imcap:${productId}`)
+      .row()
+      .text('✅ Concluir envio', `imdone:${productId}`);
     await ctx.reply(
-      `Imagem adicionada à galeria. Envie mais ou toque **Concluir envio** quando terminar.`,
-      { parse_mode: 'Markdown', reply_markup: opsMenuReplyKeyboard(ctx.session.userRole) }
+      nextPrimary
+        ? `**Capa atualizada** com a última foto. Envie mais imagens ou toque **Concluir envio**.`
+        : `Imagem adicionada à galeria. Envie mais ou toque **Concluir envio** quando terminar.`,
+      { parse_mode: 'Markdown', reply_markup: kb }
     );
     return;
   }

@@ -26,7 +26,12 @@ import { cn } from '@/lib/utils';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
-import { hasPdvFullWebAccess, isAdminDashboardRole, isMasterAdminRole } from '@/lib/permissions';
+import {
+  hasPdvFullWebAccess,
+  isAdminDashboardRole,
+  isGerenteSiteRole,
+  isMasterAdminRole,
+} from '@/lib/permissions';
 
 const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -101,6 +106,8 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
   };
 
   const nav = () => onNavigate?.();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const hideAdminExtrasForGerenteSite = isGerenteSiteRole(role);
 
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen p-4 flex flex-col">
@@ -126,7 +133,7 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
           </Link>
         )}
 
-        {!isMasterAdminRole((session?.user as any)?.role) && (
+        {!isMasterAdminRole((session?.user as any)?.role) && !hideAdminExtrasForGerenteSite && (
           <Link
             href="/admin/area"
             onClick={nav}
@@ -158,33 +165,37 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
           </Link>
         )}
 
-        <Link
-          href="/admin/pdv-desktop"
-          onClick={nav}
-          className={cn(
-            'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-emerald-700/35 bg-emerald-950/30',
-            pathname === '/admin/pdv-desktop'
-              ? 'bg-emerald-600 text-white border-emerald-500'
-              : 'text-emerald-100 hover:bg-emerald-950/60'
-          )}
-        >
-          <Download className="h-5 w-5 shrink-0" />
-          <span className="font-semibold">PDV Desktop</span>
-        </Link>
+        {!hideAdminExtrasForGerenteSite && (
+          <Link
+            href="/admin/pdv-desktop"
+            onClick={nav}
+            className={cn(
+              'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-emerald-700/35 bg-emerald-950/30',
+              pathname === '/admin/pdv-desktop'
+                ? 'bg-emerald-600 text-white border-emerald-500'
+                : 'text-emerald-100 hover:bg-emerald-950/60'
+            )}
+          >
+            <Download className="h-5 w-5 shrink-0" />
+            <span className="font-semibold">PDV Desktop</span>
+          </Link>
+        )}
 
-        <Link
-          href="/admin/telegram"
-          onClick={nav}
-          className={cn(
-            'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-sky-700/35 bg-sky-950/25',
-            pathname === '/admin/telegram'
-              ? 'bg-sky-600 text-white border-sky-500'
-              : 'text-sky-100 hover:bg-sky-950/55'
-          )}
-        >
-          <Bot className="h-5 w-5 shrink-0" />
-          <span className="font-semibold">Telegram</span>
-        </Link>
+        {!hideAdminExtrasForGerenteSite && (
+          <Link
+            href="/admin/telegram"
+            onClick={nav}
+            className={cn(
+              'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors border border-sky-700/35 bg-sky-950/25',
+              pathname === '/admin/telegram'
+                ? 'bg-sky-600 text-white border-sky-500'
+                : 'text-sky-100 hover:bg-sky-950/55'
+            )}
+          >
+            <Bot className="h-5 w-5 shrink-0" />
+            <span className="font-semibold">Telegram</span>
+          </Link>
+        )}
 
         {menuItems.map((item) => {
           const Icon = item.icon;

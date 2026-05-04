@@ -20,6 +20,10 @@ import {
   ClipboardList,
   Bot,
   Globe2,
+  ShoppingBag,
+  Users,
+  FolderTree,
+  Image as ImageHeroIcon,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -106,8 +110,6 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
 
   useEffect(() => {
     if (!hasPermission(role, 'site:client_quote_requests')) return;
-    /** Contador de pendentes na página `/painel-loja/area` (menu lateral compacto). */
-    if (isGerenteSiteRole(role)) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -176,6 +178,190 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
             <Globe2 className="h-5 w-5 shrink-0" />
             Gerente site
           </Link>
+        )}
+
+        {isGerenteSiteRole(role) && (
+          <div className="mb-3 space-y-1 border-b border-slate-700/80 pb-3">
+            <p className="mb-1.5 px-4 text-[10px] font-semibold uppercase tracking-wide text-violet-400/90">
+              Catálogo &amp; site (admin)
+            </p>
+            <Link
+              href="/admin/dashboard"
+              onClick={nav}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
+                pathname?.startsWith('/admin/dashboard')
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-200 hover:bg-slate-800'
+              )}
+            >
+              <LayoutDashboard className="h-4 w-4 shrink-0 opacity-90" />
+              Dashboard
+            </Link>
+            <Link
+              href="/admin/produtos"
+              onClick={nav}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
+                pathname?.startsWith('/admin/produtos')
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-200 hover:bg-slate-800'
+              )}
+            >
+              <Package className="h-4 w-4 shrink-0 opacity-90" />
+              Produtos
+            </Link>
+            <Link
+              href="/admin/pedidos"
+              onClick={nav}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
+                pathname?.startsWith('/admin/pedidos')
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-200 hover:bg-slate-800'
+              )}
+            >
+              <ShoppingBag className="h-4 w-4 shrink-0 opacity-90" />
+              Pedidos
+            </Link>
+            <Link
+              href="/admin/clientes"
+              onClick={nav}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
+                pathname?.startsWith('/admin/clientes')
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-200 hover:bg-slate-800'
+              )}
+            >
+              <Users className="h-4 w-4 shrink-0 opacity-90" />
+              Clientes
+            </Link>
+
+            <details
+              className="px-1"
+              open={
+                pathname === '/admin/orcamento' ||
+                pathname?.startsWith('/admin/orcamentos') ||
+                pathname?.startsWith('/admin/solicitacoes-orcamento')
+              }
+            >
+              <summary
+                className={cn(
+                  'cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800',
+                  pathname === '/admin/orcamento' ||
+                    pathname?.startsWith('/admin/orcamentos') ||
+                    pathname?.startsWith('/admin/solicitacoes-orcamento')
+                    ? 'bg-slate-800 text-white'
+                    : ''
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 shrink-0" />
+                  Orçamento
+                </span>
+              </summary>
+              <div className="space-y-0.5 py-1 pl-2">
+                {hasPermission(role, 'site:client_quote_requests') ? (
+                  <Link
+                    href="/admin/solicitacoes-orcamento"
+                    onClick={nav}
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                      pathname?.startsWith('/admin/solicitacoes-orcamento')
+                        ? 'bg-violet-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    )}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">Solicitações (site)</span>
+                    {pendingQuoteRequests > 0 ? (
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold',
+                          pathname?.startsWith('/admin/solicitacoes-orcamento')
+                            ? 'bg-white/25 text-white'
+                            : 'bg-amber-500 text-slate-950'
+                        )}
+                      >
+                        {pendingQuoteRequests > 99 ? '99+' : pendingQuoteRequests}
+                      </span>
+                    ) : null}
+                  </Link>
+                ) : null}
+                <Link
+                  href="/admin/orcamento"
+                  onClick={nav}
+                  className={cn(
+                    'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                    pathname === '/admin/orcamento'
+                      ? 'bg-violet-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  )}
+                >
+                  Montar orçamento
+                </Link>
+                <Link
+                  href="/admin/orcamentos"
+                  onClick={nav}
+                  className={cn(
+                    'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                    pathname === '/admin/orcamentos' || pathname?.startsWith('/admin/orcamentos/')
+                      ? 'bg-violet-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  )}
+                >
+                  Orçamentos salvos
+                </Link>
+              </div>
+            </details>
+
+            <details className="px-1" open={pathname?.startsWith('/admin/categorias')}>
+              <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">
+                <span className="flex items-center gap-2">
+                  <FolderTree className="h-4 w-4 shrink-0" />
+                  Categorias
+                </span>
+              </summary>
+              <div className="py-1 pl-2">
+                <Link
+                  href="/admin/categorias"
+                  onClick={nav}
+                  className={cn(
+                    'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                    pathname?.startsWith('/admin/categorias')
+                      ? 'bg-violet-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  )}
+                >
+                  Gerenciar categorias
+                </Link>
+              </div>
+            </details>
+
+            <details className="px-1" open={pathname?.startsWith('/admin/hero-images')}>
+              <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">
+                <span className="flex items-center gap-2">
+                  <ImageHeroIcon className="h-4 w-4 shrink-0" />
+                  Imagens Hero
+                </span>
+              </summary>
+              <div className="py-1 pl-2">
+                <Link
+                  href="/admin/hero-images"
+                  onClick={nav}
+                  className={cn(
+                    'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                    pathname?.startsWith('/admin/hero-images')
+                      ? 'bg-violet-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  )}
+                >
+                  Gerenciar slides
+                </Link>
+              </div>
+            </details>
+          </div>
         )}
 
         {baseItems.map(({ href, label, icon: Icon }) => {

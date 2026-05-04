@@ -9,8 +9,9 @@
  * - STORE_MANAGER: tudo do vendedor + relatórios da loja, trocas/devoluções, estoque físico, caixas PDV;
  *   no Mongo de orçamentos PDV: os seus, os dos vendedores e legados sem autor — não vê solicitações do site;
  *   sem integração Telegram (`canUseStaffTelegramBot`).
- * - GERENTE_SITE: igual ao gerente de loja no PDV/painel; orçamentos Mongo como gerente de loja;
- *   solicitações de orçamento (site) e futuras vendas online: Master, Admin e este papel.
+ * - GERENTE_SITE: gerente de loja + canal site; acede ao painel `/admin` para catálogo (produtos,
+ *   pedidos, clientes, categorias, hero, orçamentos admin). Gestão de equipa (`/admin/equipe`,
+ *   APIs `users`) fica só para ADMIN e MASTER_ADMIN.
  * - SELLER: PDV completo, estoque em tempo real, NFC-e, cliente rápido, histórico do caixa;
  *   orçamentos PDV só os que criou; vendas PDV só as suas; não vê solicitações de clientes no site;
  *   sem integração Telegram (`canUseStaffTelegramBot`).
@@ -133,6 +134,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<AppPermission>> = {
   SELLER: new Set<AppPermission>([...ALL_SELLER]),
   STORE_MANAGER: new Set<AppPermission>([...ALL_SELLER, ...ALL_STORE_MANAGER]),
   GERENTE_SITE: new Set<AppPermission>([
+    ...ALL_ADMIN,
     ...ALL_SELLER,
     ...ALL_STORE_MANAGER,
     ...SITE_CHANNEL_STAFF,
@@ -184,8 +186,16 @@ export function hasPermission(
   return ROLE_PERMISSIONS[r].has(permission);
 }
 
-/** Painel web `/admin` (produtos, clientes, hero, etc.) — hoje só ADMIN + MASTER. */
+/**
+ * Painel web `/admin` (produtos, pedidos, clientes, hero, etc.).
+ * Inclui GERENTE_SITE para operar loja online; exclusões finas (equipa) usam `canManageStaffDirectory`.
+ */
 export function isAdminDashboardRole(role: string | undefined | null): boolean {
+  return role === 'ADMIN' || role === 'MASTER_ADMIN' || role === 'GERENTE_SITE';
+}
+
+/** Criar/editar funcionários e senhas da equipa — só ADMIN e MASTER (não Gerente site). */
+export function canManageStaffDirectory(role: string | undefined | null): boolean {
   return role === 'ADMIN' || role === 'MASTER_ADMIN';
 }
 
