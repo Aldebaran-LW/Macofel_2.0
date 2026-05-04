@@ -4,6 +4,7 @@ import { authenticateTelegramIntegration } from '@/lib/telegram-integration-auth
 import { canUseStaffTelegramBot } from '@/lib/permissions';
 import { normalizePhoneE164 } from '@/lib/phone-e164';
 import { hashTelegramLinkCode } from '@/lib/telegram-link-code';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
           userId: true,
           expiresAt: true,
           usedAt: true,
-          user: { select: { role: true } },
+          user: { select: { id: true, email: true, role: true } },
         },
       });
 
@@ -100,6 +101,20 @@ export async function POST(req: NextRequest) {
         data: {
           usedAt: now,
           usedByTelegramUserId: telegramUserId,
+        },
+      });
+
+      writeAuditLogDeferred({
+        source: 'telegram',
+        actorId: linkCode.user.id,
+        actorEmail: linkCode.user.email,
+        action: 'telegram.account.linked',
+        targetType: 'telegram_user_id',
+        targetId: telegramUserId,
+        metadata: {
+          mode: 'code',
+          telegramUsername,
+          telegramChatId,
         },
       });
 
@@ -198,6 +213,21 @@ export async function POST(req: NextRequest) {
         telegramChatId,
         telegramUsername,
         phoneE164,
+      },
+    });
+
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: user.id,
+      actorEmail: user.email,
+      action: 'telegram.account.linked',
+      targetType: 'telegram_user_id',
+      targetId: telegramUserId,
+      metadata: {
+        mode: 'phone',
+        phoneE164,
+        telegramUsername,
+        telegramChatId,
       },
     });
 

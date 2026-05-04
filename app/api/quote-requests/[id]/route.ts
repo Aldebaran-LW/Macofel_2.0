@@ -20,6 +20,7 @@ import {
 } from '@/lib/email-notifications';
 import { createOrderFromAcceptedQuote } from '@/lib/create-order-from-accepted-quote';
 import { canManageClientQuoteRequests } from '@/lib/permissions';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,6 +110,16 @@ export async function PATCH(
         }
       }
 
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.client_decision',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { decision },
+      });
+
       return NextResponse.json({ ok: true });
     }
 
@@ -131,6 +142,15 @@ export async function PATCH(
           { status: 409 }
         );
       }
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.claimed',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { force: body?.force === true },
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -147,6 +167,15 @@ export async function PATCH(
           { status: 403 }
         );
       }
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.released',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { force: body?.force === true },
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -158,12 +187,30 @@ export async function PATCH(
         actorName: name,
       });
       if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.mark_contacted',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: {},
+      });
       return NextResponse.json({ ok: true });
     }
 
     if (typeof body?.followUpNote === 'string') {
       const r = await appendQuoteRequestFollowUpNote({ id, note: body.followUpNote });
       if (r.notFound) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.follow_up_note',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { noteLen: String(body.followUpNote).length },
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -178,12 +225,30 @@ export async function PATCH(
           clientName: sent.userName || sent.userEmail,
         });
       }
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.proposal_sent',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: {},
+      });
       return NextResponse.json({ ok: true });
     }
 
     if (body?.saveProposalDraft === true && body?.proposal) {
       const ok = await saveQuoteRequestProposalDraft(id, body.proposal);
       if (!ok) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.proposal_draft_saved',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: {},
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -191,6 +256,15 @@ export async function PATCH(
     if (status && ALLOWED.includes(status)) {
       const ok = await updateQuoteRequestStatus(id, status);
       if (!ok) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      writeAuditLogDeferred({
+        source: 'site',
+        actorId: auth.userId,
+        actorEmail: auth.email,
+        action: 'site.quote_request.status_changed',
+        targetType: 'quote_request',
+        targetId: id,
+        metadata: { status },
+      });
       return NextResponse.json({ ok: true });
     }
 

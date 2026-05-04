@@ -88,6 +88,19 @@ export async function POST(req: NextRequest) {
 
     const existing = await sales.findOne({ pdvVendaId: body.id });
     if (existing) {
+      writeAuditLogDeferred({
+        source: 'pdv',
+        actorId: null,
+        actorEmail: null,
+        action: 'pdv.sale.sync_duplicate',
+        targetType: 'pdv_sale',
+        targetId: body.id,
+        metadata: {
+          operador: body.operador ?? null,
+          numero: body.numero ?? null,
+          total: body.total,
+        },
+      });
       return NextResponse.json(
         {
           success: true,

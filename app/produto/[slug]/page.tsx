@@ -28,6 +28,7 @@ import StoreFooter from '@/components/store-footer';
 import StoreWhatsAppFloat from '@/components/store-whatsapp-float';
 import StoreServiceBadges from '@/components/store-service-badges';
 import ProductReviewsBlock from '@/components/product-reviews-block';
+import { ProductDescriptionFormatted } from '@/components/product-description-formatted';
 import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/client-favorites';
 import { toast } from 'sonner';
 
@@ -504,7 +505,7 @@ export default function ProductPage() {
 
           {activeTab === 'desc' && (
             <div className="max-w-3xl">
-              <p className="text-slate-600 leading-relaxed text-base">{product?.description}</p>
+              <ProductDescriptionFormatted text={product?.description ?? ''} />
             </div>
           )}
 

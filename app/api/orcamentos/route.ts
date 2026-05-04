@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { canManagePdvOrcamentos } from '@/lib/permissions';
 import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import { createOrcamento, getOrcamentos, OrcamentoDoc } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,21 @@ export async function POST(req: NextRequest) {
       createdByUserId: userId,
       createdByRole: role || 'CLIENT',
       createdByPdvUserName: pdvUserName,
+    });
+
+    writeAuditLogDeferred({
+      source: 'site',
+      actorId: userId,
+      actorEmail: (session.user as { email?: string | null }).email ?? null,
+      action: 'site.orcamento.created',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: {
+        clienteNome: payload.clienteNome,
+        total: payload.total,
+        itemCount: payload.itens.length,
+        role,
+      },
     });
 
     return NextResponse.json({ id }, { status: 201 });

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { canManagePdvOrcamentos } from '@/lib/permissions';
 import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import {
   deleteOrcamento,
   getOrcamentoById,
@@ -122,6 +123,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });
     }
 
+    writeAuditLogDeferred({
+      source: 'site',
+      actorId: userId,
+      actorEmail: (session.user as { email?: string | null }).email ?? null,
+      action: 'site.orcamento.updated',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: { total: payload.total, itemCount: payload.itens.length },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error('Erro ao atualizar orçamento:', error);
@@ -159,6 +170,16 @@ export async function DELETE(
     if (!ok) {
       return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });
     }
+
+    writeAuditLogDeferred({
+      source: 'site',
+      actorId: userId,
+      actorEmail: (session.user as { email?: string | null }).email ?? null,
+      action: 'site.orcamento.deleted',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: {},
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

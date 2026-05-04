@@ -9,6 +9,7 @@ import {
 } from '@/lib/mongodb-native';
 import { notifyAdminsNewQuoteRequest } from '@/lib/email-notifications';
 import { canManageClientQuoteRequests } from '@/lib/permissions';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,6 +110,16 @@ export async function POST(req: NextRequest) {
       clientName: String(name),
       clientEmail: String(email),
       itemCount: normalized.length,
+    });
+
+    writeAuditLogDeferred({
+      source: 'site',
+      actorId: userId,
+      actorEmail: String(email),
+      action: 'site.quote_request.created',
+      targetType: 'quote_request',
+      targetId: id,
+      metadata: { itemCount: normalized.length, name: String(name) },
     });
 
     return NextResponse.json({ id }, { status: 201 });

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import prisma from '@/lib/db';
 import { authOptions } from '@/lib/auth-options';
 import { canUseStaffTelegramBot } from '@/lib/permissions';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import { generateTelegramLinkCode, hashTelegramLinkCode } from '@/lib/telegram-link-code';
 
 export const dynamic = 'force-dynamic';
@@ -49,6 +50,16 @@ export async function POST(_req: NextRequest) {
       codeHash,
       expiresAt,
     },
+  });
+
+  writeAuditLogDeferred({
+    source: 'site',
+    actorId: userId,
+    actorEmail: (session.user as { email?: string | null }).email ?? null,
+    action: 'telegram.link_code.issued',
+    targetType: 'user',
+    targetId: userId,
+    metadata: { ttlMinutes, expiresAt: expiresAt.toISOString() },
   });
 
   return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb-native';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,20 @@ export async function POST(
         },
       }
     );
+
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: linked.user.userId,
+      actorEmail: linked.user.email,
+      action: 'telegram.product.images_appended',
+      targetType: 'product',
+      targetId: productId,
+      metadata: {
+        addedUrl: imageUrl,
+        gallerySize: merged.length,
+        telegramUserId: linked.user.telegramUserId,
+      },
+    });
 
     return NextResponse.json({
       ok: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
 import { canManagePdvOrcamentos } from '@/lib/permissions';
 import { getOrcamentoMongoListScope } from '@/lib/pdv-orcamento-scope';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import { createOrcamento } from '@/lib/mongodb-native';
 import type { OrcamentoItemDoc } from '@/lib/mongodb-native';
 
@@ -83,6 +84,20 @@ export async function POST(req: NextRequest) {
       createdByUserId: linked.user.userId,
       createdByRole: linked.user.role,
       createdByPdvUserName: linked.user.pdvUserName,
+    });
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: linked.user.userId,
+      actorEmail: linked.user.email,
+      action: 'telegram.orcamento.created',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: {
+        clienteNome: doc.clienteNome,
+        total: doc.total,
+        itemCount: doc.itens.length,
+        telegramUserId: linked.user.telegramUserId,
+      },
     });
     return NextResponse.json({ id, ok: true });
   } catch (error: unknown) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadImage } from '@/lib/gridfs';
 import { requireLinkedTelegramUser } from '@/lib/telegram-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,20 @@ export async function POST(req: NextRequest) {
     });
 
     const imageUrl = `/api/images/${fileId}`;
+    writeAuditLogDeferred({
+      source: 'telegram',
+      actorId: linked.user.userId,
+      actorEmail: linked.user.email,
+      action: 'telegram.product.image_uploaded',
+      targetType: 'gridfs_image',
+      targetId: fileId,
+      metadata: {
+        filename,
+        mimeType: file.type,
+        size: file.size,
+        telegramUserId: linked.user.telegramUserId,
+      },
+    });
     return NextResponse.json({ success: true, fileId, imageUrl, filename });
   } catch (error: unknown) {
     console.error('[api/telegram/products/upload-image]', error);

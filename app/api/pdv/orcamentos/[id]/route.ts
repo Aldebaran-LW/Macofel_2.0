@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCatalogCorsHeaders } from '@/lib/api-catalog-guard';
 import { authenticatePdvWrite } from '@/lib/pdv-write-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import {
   deleteOrcamento,
   getOrcamentoById,
@@ -148,6 +149,15 @@ export async function PATCH(
       );
     }
 
+    writeAuditLogDeferred({
+      source: 'pdv',
+      actorId: null,
+      actorEmail: null,
+      action: 'pdv.orcamento.updated',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: { total: payload.total, itemCount: payload.itens.length },
+    });
     return NextResponse.json({ ok: true }, { headers: cors });
   } catch (error: any) {
     console.error('[PDV orcamentos] PATCH:', error);
@@ -194,6 +204,15 @@ export async function DELETE(
       );
     }
 
+    writeAuditLogDeferred({
+      source: 'pdv',
+      actorId: null,
+      actorEmail: null,
+      action: 'pdv.orcamento.deleted',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: {},
+    });
     return NextResponse.json({ ok: true }, { headers: cors });
   } catch (error: any) {
     console.error('[PDV orcamentos] DELETE:', error);

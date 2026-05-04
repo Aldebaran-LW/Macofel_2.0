@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCatalogCorsHeaders } from '@/lib/api-catalog-guard';
 import { authenticatePdvWrite } from '@/lib/pdv-write-api-auth';
+import { writeAuditLogDeferred } from '@/lib/audit-log';
 import { createOrcamento, getOrcamentos, OrcamentoDoc } from '@/lib/mongodb-native';
 
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,19 @@ export async function POST(req: NextRequest) {
     };
 
     const id = await createOrcamento(payload);
+    writeAuditLogDeferred({
+      source: 'pdv',
+      actorId: null,
+      actorEmail: null,
+      action: 'pdv.orcamento.created',
+      targetType: 'orcamento_mongo',
+      targetId: id,
+      metadata: {
+        clienteNome: payload.clienteNome,
+        total: payload.total,
+        itemCount: payload.itens.length,
+      },
+    });
     return NextResponse.json({ id }, { status: 201, headers: cors });
   } catch (error: any) {
     console.error('[PDV orcamentos] POST:', error);
