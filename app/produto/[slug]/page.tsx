@@ -482,8 +482,8 @@ export default function ProductPage() {
         </div>
 
         {/* ── TABS ───────────────────────────── */}
-        <div className="mb-16">
-          <div className="flex gap-1 border-b border-slate-200 mb-8">
+        <div className="mb-20 md:mb-24 pb-2">
+          <div className="flex flex-wrap gap-1 border-b border-slate-200 mb-8 md:mb-10">
             {[
               { id: 'desc', label: 'Descrição' },
               { id: 'specs', label: 'Especificações' },
@@ -492,7 +492,7 @@ export default function ProductPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-6 py-4 text-sm font-bold uppercase tracking-wider border-b-2 transition-all -mb-px ${
+                className={`px-5 py-3.5 md:px-7 md:py-4 text-sm md:text-base font-bold uppercase tracking-wider border-b-2 transition-all -mb-px ${
                   activeTab === tab.id
                     ? 'border-red-600 text-red-600'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -504,7 +504,7 @@ export default function ProductPage() {
           </div>
 
           {activeTab === 'desc' && (
-            <div className="max-w-3xl">
+            <div className="w-full max-w-6xl xl:max-w-[72rem] pr-0 md:pr-4 xl:pr-8 pb-6 md:pb-10">
               <ProductDescriptionFormatted text={product?.description ?? ''} />
             </div>
           )}

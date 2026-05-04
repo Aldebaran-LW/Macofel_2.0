@@ -11,7 +11,7 @@ export function ProductDescriptionFormatted({ text }: { text: string }) {
   const blocks = trimmed.split(/\n\n+/).filter((b) => b.trim());
 
   return (
-    <div className="space-y-6 text-slate-600 leading-relaxed text-base max-w-prose">
+    <div className="space-y-8 md:space-y-10 text-slate-700 leading-relaxed text-lg md:text-xl max-w-none">
       {blocks.map((block, i) => {
         const lines = block.split('\n');
         const first = (lines[0] ?? '').trim();
@@ -25,15 +25,20 @@ export function ProductDescriptionFormatted({ text }: { text: string }) {
             .trim();
           return (
             <section key={i} className="scroll-mt-4">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-100 pb-2">
+              <h3 className="text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 mb-4 md:mb-5 border-b border-slate-200 pb-3 md:pb-4">
                 {title}
               </h3>
-              <div className="whitespace-pre-line text-slate-600">{body}</div>
+              <div className="whitespace-pre-line text-slate-700 leading-[1.65] md:leading-[1.7] max-w-[85ch]">
+                {body}
+              </div>
             </section>
           );
         }
         return (
-          <p key={i} className="whitespace-pre-line text-slate-600">
+          <p
+            key={i}
+            className="whitespace-pre-line text-slate-700 leading-[1.65] md:leading-[1.7] max-w-[85ch]"
+          >
             {block.trim()}
           </p>
         );

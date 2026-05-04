@@ -29,6 +29,16 @@ type AuditRow = {
   createdAt: string;
 };
 
+type StaffUser = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+};
+
+const ACTOR_EMAIL_ANY = '__any__';
+
 const SOURCE_LABEL: Record<AuditSource | 'all', string> = {
   all: 'Todos',
   site: 'Site (painel)',
@@ -63,6 +73,37 @@ export default function MasterAuditoriaPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const [staffLoading, setStaffLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setStaffLoading(true);
+      try {
+        const res = await fetch('/api/admin/master/users', { cache: 'no-store' });
+        if (!res.ok) {
+          if (!cancelled) toast.error('Não foi possível carregar a lista de funcionários');
+          return;
+        }
+        const data = (await res.json()) as StaffUser[];
+        if (!cancelled && Array.isArray(data)) {
+          const sorted = [...data].sort((a, b) =>
+            a.email.localeCompare(b.email, 'pt', { sensitivity: 'base' })
+          );
+          setStaff(sorted);
+        }
+      } catch {
+        if (!cancelled) toast.error('Erro ao carregar funcionários');
+      } finally {
+        if (!cancelled) setStaffLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const applied = useMemo(
     () => ({ source, from, to, actorEmail, action, q }),
@@ -219,15 +260,27 @@ export default function MasterAuditoriaPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[200px] flex-1 space-y-1.5">
+          <div className="min-w-[220px] flex-[1.2] space-y-1.5">
             <Label htmlFor="audit-actor">E-mail do autor</Label>
-            <Input
-              id="audit-actor"
-              type="email"
-              placeholder="contém…"
-              value={actorEmail}
-              onChange={(e) => setActorEmail(e.target.value)}
-            />
+            <Select
+              value={actorEmail ? actorEmail : ACTOR_EMAIL_ANY}
+              onValueChange={(v) => setActorEmail(v === ACTOR_EMAIL_ANY ? '' : v)}
+              disabled={staffLoading}
+            >
+              <SelectTrigger id="audit-actor" className="w-full">
+                <SelectValue placeholder={staffLoading ? 'A carregar…' : 'Escolher funcionário'} />
+              </SelectTrigger>
+              <SelectContent className="max-h-[min(320px,70vh)]">
+                <SelectItem value={ACTOR_EMAIL_ANY}>Qualquer e-mail</SelectItem>
+                {staff.map((u) => (
+                  <SelectItem key={u.id} value={u.email}>
+                    <span className="truncate">
+                      {`${u.firstName} ${u.lastName}`.trim() || u.email} ({u.email})
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="min-w-[200px] flex-1 space-y-1.5">
             <Label htmlFor="audit-action">Ação (contém)</Label>
