@@ -23,6 +23,7 @@ import {
 import {
   canUseStaffTelegramBot,
   hasPermission,
+  isGerenteSiteRole,
   isPainelLojaGerenteScopeRole,
 } from '@/lib/permissions';
 import type { AppPermission } from '@/lib/permissions';
@@ -42,6 +43,29 @@ export default function PainelLojaGerenteAreaPage() {
   const { data: session, status } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
   const [q, setQ] = useState('');
+  const [pendingQuoteRequests, setPendingQuoteRequests] = useState(0);
+
+  useEffect(() => {
+    if (!hasPermission(role, 'site:client_quote_requests')) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/quote-requests?page=1&limit=1&status=pending');
+        if (!res.ok) return;
+        const data = await res.json();
+        const total = data?.pagination?.total;
+        if (!cancelled && typeof total === 'number') setPendingQuoteRequests(total);
+      } catch {
+        /* ignore */
+      }
+    };
+    void load();
+    const interval = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [role]);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -235,7 +259,11 @@ export default function PainelLojaGerenteAreaPage() {
           <span className="rounded-md bg-violet-400 px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-950">
             Gerente site • Área
           </span>
-          <p className="text-sm text-white/80">Atalhos às mesmas funções de gerente de loja + canal site.</p>
+          <p className="text-sm text-white/80">
+            {isGerenteSiteRole(role)
+              ? 'Orçamentos, estoque, Telegram e gestão estão aqui; o menu lateral ficou só com atalhos rápidos.'
+              : 'Atalhos às mesmas funções de gerente de loja + canal site.'}
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -256,6 +284,11 @@ export default function PainelLojaGerenteAreaPage() {
                 >
                   <ClipboardList className="h-4 w-4 shrink-0" />
                   Solicitações (site)
+                  {pendingQuoteRequests > 0 ? (
+                    <span className="rounded-full bg-slate-950 px-2 py-0.5 text-xs font-bold text-violet-200">
+                      {pendingQuoteRequests > 99 ? '99+' : pendingQuoteRequests}
+                    </span>
+                  ) : null}
                 </Link>
               ) : null}
               {hasPermission(role, 'store:physical_stock') ? (
@@ -305,7 +338,9 @@ export default function PainelLojaGerenteAreaPage() {
         <div className="border-b border-gray-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-gray-900">Ações</h2>
           <p className="mt-0.5 text-xs text-gray-600">
-            Só aparecem entradas permitidas ao seu papel. Teclas de atalho quando listadas à direita.
+            {isGerenteSiteRole(role)
+              ? 'Menu principal para gerente site: orçamentos, estoque, PDV, Telegram e relatórios.'
+              : 'Só aparecem entradas permitidas ao seu papel. Teclas de atalho quando listadas à direita.'}
           </p>
         </div>
 
@@ -315,6 +350,8 @@ export default function PainelLojaGerenteAreaPage() {
           ) : (
             filtered.map((a) => {
               const Icon = a.icon;
+              const showPendingBadge =
+                a.id === 'quotes-site' && pendingQuoteRequests > 0;
               return (
                 <Link
                   key={a.id}
@@ -328,6 +365,14 @@ export default function PainelLojaGerenteAreaPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-semibold text-gray-900">{a.label}</span>
+                        {showPendingBadge ? (
+                          <span
+                            className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-slate-950"
+                            title="Solicitações pendentes"
+                          >
+                            {pendingQuoteRequests > 99 ? '99+' : pendingQuoteRequests}
+                          </span>
+                        ) : null}
                         {a.hotkey ? (
                           <kbd className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700">
                             {a.hotkey}

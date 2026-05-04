@@ -106,6 +106,8 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
 
   useEffect(() => {
     if (!hasPermission(role, 'site:client_quote_requests')) return;
+    /** Contador de pendentes na página `/painel-loja/area` (menu lateral compacto). */
+    if (isGerenteSiteRole(role)) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -142,9 +144,15 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
     (it) => !it.permission || hasPermission(role, it.permission)
   );
 
-  const baseItems = baseItemsAll.filter(
-    (it) => it.href !== '/equipa/telegram' || canUseStaffTelegramBot(role)
-  );
+  /** Gerente site: funções repetidas passam para `/painel-loja/area` — liberta o menu. */
+  const gerenteSiteCompactNav = isGerenteSiteRole(role);
+
+  const baseItems = baseItemsAll
+    .filter((it) => it.href !== '/equipa/telegram' || canUseStaffTelegramBot(role))
+    .filter((it) => {
+      if (!gerenteSiteCompactNav) return true;
+      return it.href === '/painel-loja' || it.href === '/loja';
+    });
 
   return (
     <aside className="flex w-64 min-h-screen flex-col bg-slate-900 p-4 text-white">
@@ -191,7 +199,7 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
           );
         })}
 
-        {canOpenPainelLoja(role) && (
+        {canOpenPainelLoja(role) && !gerenteSiteCompactNav && (
           <div className="pt-4">
             <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-emerald-500/90">
               Orçamentos
@@ -239,7 +247,10 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
           </div>
         )}
 
-        {canOpenPainelLoja(role) && isPainelLojaGerenteScopeRole(role) && visibleGerente.length > 0 && (
+        {canOpenPainelLoja(role) &&
+          !gerenteSiteCompactNav &&
+          isPainelLojaGerenteScopeRole(role) &&
+          visibleGerente.length > 0 && (
           <div className="pt-4">
             <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-emerald-500/90">
               Gestão (gerente)
