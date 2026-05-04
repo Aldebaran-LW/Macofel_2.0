@@ -228,6 +228,11 @@ export function isPainelLojaGerenteScopeRole(role: string | undefined | null): b
   return role === 'STORE_MANAGER' || role === 'GERENTE_SITE';
 }
 
+/** Gerente site: mesmo âmbito de gerente de loja no painel + canal site (solicitações de orçamento, etc.). */
+export function isGerenteSiteRole(role: string | undefined | null): boolean {
+  return role === 'GERENTE_SITE';
+}
+
 /** Orçamentos salvos no PDV (Mongo `orcamentos`) — equipa operacional, exceto cliente. */
 export function canManagePdvOrcamentos(role: string | undefined | null): boolean {
   return isOperationalStaffRole(role);

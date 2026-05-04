@@ -19,6 +19,7 @@ import {
   FolderOpen,
   ClipboardList,
   Bot,
+  Globe2,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ import {
   canOpenPainelLoja,
   canUseStaffTelegramBot,
   hasPermission,
+  isGerenteSiteRole,
   isPainelLojaGerenteScopeRole,
 } from '@/lib/permissions';
 
@@ -152,6 +154,22 @@ export function PainelLojaSidebar({ onNavigate }: PainelLojaSidebarProps = {}) {
       </div>
 
       <nav className="flex flex-1 flex-col space-y-1">
+        {isGerenteSiteRole(role) && (
+          <Link
+            href="/painel-loja/area"
+            onClick={nav}
+            className={cn(
+              'mb-2 flex items-center gap-3 rounded-lg border border-violet-500/45 bg-violet-950/50 px-4 py-3 text-sm font-semibold transition-colors',
+              pathname?.startsWith('/painel-loja/area')
+                ? 'border-violet-400 bg-violet-500 text-white'
+                : 'text-violet-100 hover:bg-violet-950/80'
+            )}
+          >
+            <Globe2 className="h-5 w-5 shrink-0" />
+            Gerente site
+          </Link>
+        )}
+
         {baseItems.map(({ href, label, icon: Icon }) => {
           const active =
             href === '/painel-loja'
